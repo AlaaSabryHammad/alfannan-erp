@@ -14,6 +14,7 @@ import {
   BadgeDollarSign,
   Printer,
   Wallet,
+  PackageCheck,
 } from 'lucide-react';
 import { PageHeader } from '../../components/ui/PageHeader';
 import { Button } from '../../components/ui/Button';
@@ -839,6 +840,7 @@ export function PurchaseInvoicesPage() {
   const [viewOpen, setViewOpen] = useState(false);
   const [createOpen, setCreateOpen] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<PurchaseInvoice | null>(null);
+  const [receiveTarget, setReceiveTarget] = useState<PurchaseInvoice | null>(null);
 
   const { data, isLoading } = useQuery({
     queryKey: ['purchase-invoices', page, pageSize, search, from, to],
@@ -859,6 +861,22 @@ export function PurchaseInvoicesPage() {
     .filter((i) => i.paymentStatus === 'PAID')
     .reduce((s, i) => s + Number(i.total), 0);
   const unpaidCount = allInvoices.filter((i) => i.paymentStatus !== 'PAID').length;
+
+  const receiveMutation = useMutation({
+    mutationFn: (id: number) => apiClient.post(`/purchase-invoices/${id}/receive`),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['purchase-invoices'] });
+      qc.invalidateQueries({ queryKey: ['purchase-invoices-all'] });
+      qc.invalidateQueries({ queryKey: ['stock'] });
+      qc.invalidateQueries({ queryKey: ['products'] });
+      toast('تم استلام البضاعة وترحيلها للمخزون');
+      setReceiveTarget(null);
+    },
+    onError: (err) => {
+      toast(getApiErrorMessage(err, 'حدث خطأ أثناء الاستلام'), 'error');
+      setReceiveTarget(null);
+    },
+  });
 
   const deleteMutation = useMutation({
     mutationFn: (id: number) => apiClient.delete(`/purchase-invoices/${id}`),
@@ -941,6 +959,15 @@ export function PurchaseInvoicesPage() {
           >
             <Eye size={14} />
           </button>
+          {canCreate && row.receiveStatus === 'PENDING' && (
+            <button
+              onClick={() => setReceiveTarget(row)}
+              className="p-1.5 rounded-lg hover:bg-success-bg text-app-muted hover:text-success transition-colors"
+              title="استلام البضاعة"
+            >
+              <PackageCheck size={14} />
+            </button>
+          )}
           {canDelete && (
             <button
               onClick={() => setDeleteTarget(row)}
@@ -1030,6 +1057,31 @@ export function PurchaseInvoicesPage() {
         open={viewOpen}
         onClose={() => { setViewOpen(false); setViewId(null); }}
       />
+
+      {/* Receive Confirm */}
+      <Modal
+        open={!!receiveTarget}
+        onClose={() => setReceiveTarget(null)}
+        title="تأكيد استلام البضاعة"
+        size="sm"
+        footer={
+          <>
+            <Button variant="outline" onClick={() => setReceiveTarget(null)}>إلغاء</Button>
+            <Button
+              loading={receiveMutation.isPending}
+              icon={<PackageCheck size={15} />}
+              onClick={() => receiveTarget && receiveMutation.mutate(receiveTarget.id)}
+            >
+              استلام
+            </Button>
+          </>
+        }
+      >
+        <p className="text-sm text-app-text">
+          سيتم إضافة بضاعة الفاتورة <span className="font-bold text-primary">{receiveTarget?.refNo}</span> إلى
+          مخزون {receiveTarget?.warehouse?.nameAr}، وتحديث متوسط تكلفة الأصناف، وترحيل القيد المحاسبي بتاريخ اليوم.
+        </p>
+      </Modal>
 
       {/* Delete Confirm */}
       <Modal

@@ -5,6 +5,7 @@ import prisma from '../lib/prisma';
 import { requireAuth, requirePermission } from '../middleware/auth';
 import { getPagination, paginatedResponse } from '../lib/paginate';
 import { postJournalEntry, reverseJournalEntryBySource, ACCT } from '../lib/ledger';
+import { applyMovingAverageCost } from '../lib/costing';
 import { parseDateRange } from '../lib/dateRange';
 
 const router = Router();
@@ -141,7 +142,13 @@ router.post('/', requirePermission('purchases.create'), async (req: Request, res
 
       // If RECEIVED → increment stock atomically & write IN movements
       if (body.receiveStatus === 'RECEIVED') {
+        // The invoice-level discount lowers the effective unit cost of every
+        // line proportionally — that net cost feeds the moving average.
+        const netFactor = subtotal > 0 ? (subtotal - (body.discount ?? 0)) / subtotal : 1;
         for (const item of body.items) {
+          // Re-average BEFORE incrementing the stock (reads on-hand qty)
+          await applyMovingAverageCost(tx, item.productId, item.qty, item.unitCost * netFactor);
+
           const balance = await tx.stockBalance.upsert({
             where: { productId_warehouseId: { productId: item.productId, warehouseId: body.warehouseId } },
             update: { quantity: { increment: item.qty } },
@@ -221,6 +228,104 @@ router.post('/', requirePermission('purchases.create'), async (req: Request, res
 
     res.status(201).json(full);
   } catch (err) {
+    next(err);
+  }
+});
+
+// POST /api/purchase-invoices/:id/receive — استلام بضاعة فاتورة معلّقة
+// A PENDING invoice has no stock and no journal yet; receiving it later
+// performs everything the create-as-RECEIVED path does, dated today.
+router.post('/:id/receive', requirePermission('purchases.create'), async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const id = parseInt(req.params.id);
+    const userId = req.user!.userId;
+    const receiveDate = new Date();
+
+    const invoice = await prisma.purchaseInvoice.findUniqueOrThrow({
+      where: { id },
+      include: { items: true },
+    });
+
+    await prisma.$transaction(async (tx) => {
+      // Claim atomically: only one concurrent receive can win
+      const claimed = await tx.purchaseInvoice.updateMany({
+        where: { id, receiveStatus: 'PENDING' },
+        data: { receiveStatus: 'RECEIVED' },
+      });
+      if (claimed.count === 0) {
+        throw new Error('هذه الفاتورة مستلمة بالفعل');
+      }
+
+      const subtotal = Number(invoice.subtotal);
+      const discount = Number(invoice.discount);
+      const netFactor = subtotal > 0 ? (subtotal - discount) / subtotal : 1;
+
+      for (const item of invoice.items) {
+        const qty = Number(item.qty);
+        // Re-average BEFORE incrementing the stock (reads on-hand qty)
+        await applyMovingAverageCost(tx, item.productId, qty, Number(item.unitCost) * netFactor);
+
+        const balance = await tx.stockBalance.upsert({
+          where: { productId_warehouseId: { productId: item.productId, warehouseId: invoice.warehouseId } },
+          update: { quantity: { increment: qty } },
+          create: { productId: item.productId, warehouseId: invoice.warehouseId, quantity: qty },
+        });
+        await tx.stockMovement.create({
+          data: {
+            productId: item.productId,
+            warehouseId: invoice.warehouseId,
+            type: 'IN',
+            quantity: qty,
+            balanceAfter: Number(balance.quantity),
+            refType: 'PURCHASE',
+            refId: invoice.id,
+            reason: `استلام بضاعة فاتورة شراء ${invoice.refNo}`,
+            createdById: userId,
+          },
+        });
+      }
+
+      // Credit CASH only when the invoice was fully paid at creation and no
+      // vouchers are involved (money left the treasury directly back then).
+      // Any voucher-based payment flows through AP, so crediting AP here nets
+      // out correctly against those voucher debits.
+      const voucherCount = await tx.voucher.count({ where: { purchaseInvoiceId: id } });
+      const creditAccountCode =
+        invoice.paymentStatus === 'PAID' && voucherCount === 0 ? ACCT.CASH : ACCT.AP;
+
+      const taxAmount = Number(invoice.tax);
+      const ledgerLines = [
+        { accountCode: ACCT.INVENTORY, debit: subtotal - discount, credit: 0, description: `مخزون ${invoice.refNo}` },
+        { accountCode: creditAccountCode, debit: 0, credit: Number(invoice.total), description: `مشتريات ${invoice.refNo}` },
+      ];
+      if (taxAmount > 0) {
+        ledgerLines.push({ accountCode: ACCT.INPUT_VAT, debit: taxAmount, credit: 0, description: `ضريبة شراء ${invoice.refNo}` });
+      }
+
+      await postJournalEntry(tx, {
+        date: receiveDate,
+        description: `استلام فاتورة شراء ${invoice.refNo}`,
+        sourceType: JournalSource.PURCHASE_INVOICE,
+        sourceId: invoice.id,
+        createdById: userId,
+        lines: ledgerLines,
+      });
+    });
+
+    const full = await prisma.purchaseInvoice.findUniqueOrThrow({
+      where: { id },
+      include: {
+        supplier: true,
+        warehouse: true,
+        items: { include: { product: { include: { unit: true } } } },
+      },
+    });
+    res.json(full);
+  } catch (err: any) {
+    if (typeof err?.message === 'string' && err.message.includes('مستلمة بالفعل')) {
+      res.status(400).json({ error: err.message });
+      return;
+    }
     next(err);
   }
 });
