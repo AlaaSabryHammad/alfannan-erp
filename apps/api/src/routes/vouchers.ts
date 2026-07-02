@@ -6,6 +6,12 @@ import { requireAuth, requirePermission } from '../middleware/auth';
 import { getPagination, paginatedResponse } from '../lib/paginate';
 import { parseDateRange } from '../lib/dateRange';
 import { postJournalEntry, reverseJournalEntryBySource, ACCT } from '../lib/ledger';
+import {
+  getSalesInvoiceSettlement,
+  getPurchaseInvoiceSettlement,
+  recomputeSalesInvoiceStatus,
+  recomputePurchaseInvoiceStatus,
+} from '../lib/settlement';
 
 const router = Router();
 router.use(requireAuth);
@@ -104,34 +110,6 @@ async function reversePartyBalance(tx: Prisma.TransactionClient, voucherId: numb
   } else if (v.partyType === 'SUPPLIER' && (v.type === 'PAYMENT' || v.type === 'DISCOUNT')) {
     await tx.supplier.update({ where: { id: v.partyId }, data: { currentBalance: inc } });
   }
-}
-
-/**
- * Recomputes a sales invoice's paidStatus from the sum of every voucher linked
- * to it (RECEIPT/DISCOUNT = money or discount applied against it). Call this
- * after creating or deleting any voucher with salesInvoiceId set.
- */
-async function recomputeSalesInvoiceStatus(tx: Prisma.TransactionClient, salesInvoiceId: number): Promise<void> {
-  const [invoice, vouchers] = await Promise.all([
-    tx.salesInvoice.findUniqueOrThrow({ where: { id: salesInvoiceId }, select: { total: true } }),
-    tx.voucher.findMany({ where: { salesInvoiceId }, select: { totalAmount: true } }),
-  ]);
-  const paid = vouchers.reduce((s, v) => s + Number(v.totalAmount), 0);
-  const total = Number(invoice.total);
-  const paidStatus = paid >= total - 0.01 ? 'PAID' : paid > 0 ? 'PARTIAL' : 'UNPAID';
-  await tx.salesInvoice.update({ where: { id: salesInvoiceId }, data: { paidStatus } });
-}
-
-/** Same as above but for purchase invoices (paymentStatus field). */
-async function recomputePurchaseInvoiceStatus(tx: Prisma.TransactionClient, purchaseInvoiceId: number): Promise<void> {
-  const [invoice, vouchers] = await Promise.all([
-    tx.purchaseInvoice.findUniqueOrThrow({ where: { id: purchaseInvoiceId }, select: { total: true } }),
-    tx.voucher.findMany({ where: { purchaseInvoiceId }, select: { totalAmount: true } }),
-  ]);
-  const paid = vouchers.reduce((s, v) => s + Number(v.totalAmount), 0);
-  const total = Number(invoice.total);
-  const paymentStatus = paid >= total - 0.01 ? 'PAID' : paid > 0 ? 'PARTIAL' : 'UNPAID';
-  await tx.purchaseInvoice.update({ where: { id: purchaseInvoiceId }, data: { paymentStatus } });
 }
 
 // ── GET /api/vouchers — list ──────────────────────────────────────────────────
@@ -270,23 +248,16 @@ router.post('/', requirePermission('treasury.create'), async (req: Request, res:
           throw new Error('المبلغ الإجمالي للسند يجب أن يكون أكبر من صفر');
         }
 
-        // Reject payments that would overpay the linked invoice
+        // Reject payments that would overpay the linked invoice —
+        // "remaining" accounts for both prior vouchers and BALANCE returns.
         if (body.salesInvoiceId) {
-          const [inv, existing] = await Promise.all([
-            tx.salesInvoice.findUniqueOrThrow({ where: { id: body.salesInvoiceId }, select: { total: true } }),
-            tx.voucher.aggregate({ where: { salesInvoiceId: body.salesInvoiceId }, _sum: { totalAmount: true } }),
-          ]);
-          const remaining = Number(inv.total) - Number(existing._sum.totalAmount ?? 0);
+          const { remaining } = await getSalesInvoiceSettlement(tx, body.salesInvoiceId);
           if (totalAmount > remaining + 0.01) {
             throw new Error(`المبلغ أكبر من المتبقي على الفاتورة (${remaining.toFixed(2)})`);
           }
         }
         if (body.purchaseInvoiceId) {
-          const [inv, existing] = await Promise.all([
-            tx.purchaseInvoice.findUniqueOrThrow({ where: { id: body.purchaseInvoiceId }, select: { total: true } }),
-            tx.voucher.aggregate({ where: { purchaseInvoiceId: body.purchaseInvoiceId }, _sum: { totalAmount: true } }),
-          ]);
-          const remaining = Number(inv.total) - Number(existing._sum.totalAmount ?? 0);
+          const { remaining } = await getPurchaseInvoiceSettlement(tx, body.purchaseInvoiceId);
           if (totalAmount > remaining + 0.01) {
             throw new Error(`المبلغ أكبر من المتبقي على الفاتورة (${remaining.toFixed(2)})`);
           }

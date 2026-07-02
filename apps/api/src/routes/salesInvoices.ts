@@ -5,6 +5,7 @@ import prisma from '../lib/prisma';
 import { requireAuth, requirePermission } from '../middleware/auth';
 import { getPagination, paginatedResponse } from '../lib/paginate';
 import { postJournalEntry, reverseJournalEntryBySource, ACCT } from '../lib/ledger';
+import { getSalesInvoiceSettlement } from '../lib/settlement';
 import { parseDateRange } from '../lib/dateRange';
 import { validateCoupon, computeCouponDiscount } from './coupons';
 
@@ -87,7 +88,7 @@ router.get('/', requirePermission('sales.view'), async (req: Request, res: Respo
 router.get('/:id', requirePermission('sales.view'), async (req: Request, res: Response, next: NextFunction) => {
   try {
     const id = parseInt(req.params.id);
-    const [invoice, paidAgg] = await Promise.all([
+    const [invoice, settlement] = await Promise.all([
       prisma.salesInvoice.findUniqueOrThrow({
         where: { id },
         include: {
@@ -97,10 +98,14 @@ router.get('/:id', requirePermission('sales.view'), async (req: Request, res: Re
           items: { include: { product: { include: { unit: true } } } },
         },
       }),
-      prisma.voucher.aggregate({ where: { salesInvoiceId: id }, _sum: { totalAmount: true } }),
+      getSalesInvoiceSettlement(prisma, id),
     ]);
-    const paidAmount = Number(paidAgg._sum.totalAmount ?? 0);
-    res.json({ ...invoice, paidAmount, remainingAmount: Number(invoice.total) - paidAmount });
+    res.json({
+      ...invoice,
+      paidAmount: settlement.paidAmount,
+      returnedAmount: settlement.returnedAmount,
+      remainingAmount: settlement.remaining,
+    });
   } catch (err) {
     next(err);
   }

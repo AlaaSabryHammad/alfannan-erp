@@ -6,6 +6,7 @@ import { requireAuth, requirePermission } from '../middleware/auth';
 import { getPagination, paginatedResponse } from '../lib/paginate';
 import { postJournalEntry, reverseJournalEntryBySource, ACCT } from '../lib/ledger';
 import { applyMovingAverageCost } from '../lib/costing';
+import { getPurchaseInvoiceSettlement } from '../lib/settlement';
 import { parseDateRange } from '../lib/dateRange';
 
 const router = Router();
@@ -86,7 +87,7 @@ router.get('/', requirePermission('purchases.view'), async (req: Request, res: R
 router.get('/:id', requirePermission('purchases.view'), async (req: Request, res: Response, next: NextFunction) => {
   try {
     const id = parseInt(req.params.id);
-    const [invoice, paidAgg] = await Promise.all([
+    const [invoice, settlement] = await Promise.all([
       prisma.purchaseInvoice.findUniqueOrThrow({
         where: { id },
         include: {
@@ -95,10 +96,14 @@ router.get('/:id', requirePermission('purchases.view'), async (req: Request, res
           items: { include: { product: { include: { unit: true } } } },
         },
       }),
-      prisma.voucher.aggregate({ where: { purchaseInvoiceId: id }, _sum: { totalAmount: true } }),
+      getPurchaseInvoiceSettlement(prisma, id),
     ]);
-    const paidAmount = Number(paidAgg._sum.totalAmount ?? 0);
-    res.json({ ...invoice, paidAmount, remainingAmount: Number(invoice.total) - paidAmount });
+    res.json({
+      ...invoice,
+      paidAmount: settlement.paidAmount,
+      returnedAmount: settlement.returnedAmount,
+      remainingAmount: settlement.remaining,
+    });
   } catch (err) {
     next(err);
   }

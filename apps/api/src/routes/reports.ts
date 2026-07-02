@@ -491,6 +491,21 @@ router.get('/vat', async (req: Request, res: Response, next: NextFunction) => {
       0,
     );
 
+    // ── Sales returns lower output VAT (إشعارات دائن) ─────────────────────────
+    const salesReturns = await prisma.salesReturn.findMany({
+      where: dateWhere,
+      orderBy: { date: 'desc' },
+      include: {
+        customer: { select: { id: true, nameAr: true } },
+        salesInvoice: { select: { refNo: true } },
+      },
+    });
+    const salesReturnsVAT = salesReturns.reduce((s, r) => s + Number(r.tax ?? 0), 0);
+    const salesReturnsNet = salesReturns.reduce(
+      (s, r) => s + Number(r.subtotal ?? 0) - Number(r.discount ?? 0),
+      0,
+    );
+
     // ── Purchases (input VAT) ─────────────────────────────────────────────────
     const purchaseInvoices = await prisma.purchaseInvoice.findMany({
       where: dateWhere,
@@ -499,14 +514,31 @@ router.get('/vat', async (req: Request, res: Response, next: NextFunction) => {
     });
     const purchaseTaxable = purchaseInvoices.filter((inv) => Number(inv.tax) > 0);
 
-    const inputVAT = purchaseInvoices.reduce((s, inv) => s + Number(inv.tax ?? 0), 0);
+    const grossInputVAT = purchaseInvoices.reduce((s, inv) => s + Number(inv.tax ?? 0), 0);
     const purchasesTaxableNet = purchaseTaxable.reduce(
       (s, inv) => s + Number(inv.subtotal ?? 0) - Number(inv.discount ?? 0),
       0,
     );
 
+    // ── Purchase returns lower input VAT (إشعارات مدين) ───────────────────────
+    const purchaseReturns = await prisma.purchaseReturn.findMany({
+      where: dateWhere,
+      orderBy: { date: 'desc' },
+      include: {
+        supplier: { select: { id: true, nameAr: true } },
+        purchaseInvoice: { select: { refNo: true } },
+      },
+    });
+    const purchaseReturnsVAT = purchaseReturns.reduce((s, r) => s + Number(r.tax ?? 0), 0);
+    const purchaseReturnsNet = purchaseReturns.reduce(
+      (s, r) => s + Number(r.subtotal ?? 0) - Number(r.discount ?? 0),
+      0,
+    );
+
     // ── Net VAT (payable if positive / refundable if negative) ────────────────
-    const netVAT = outputVAT - inputVAT;
+    const netOutputVAT = outputVAT - salesReturnsVAT;
+    const netInputVAT = grossInputVAT - purchaseReturnsVAT;
+    const netVAT = netOutputVAT - netInputVAT;
 
     res.json({
       period: { from: from ?? null, to: to ?? null },
@@ -516,6 +548,9 @@ router.get('/vat', async (req: Request, res: Response, next: NextFunction) => {
         taxableNet: salesTaxableNet,
         exemptNet: salesExemptNet,
         outputVAT,
+        returnsCount: salesReturns.length,
+        returnsNet: salesReturnsNet,
+        returnsVAT: salesReturnsVAT,
         invoices: salesTaxable.map((inv) => ({
           id: inv.id,
           refNo: inv.refNo,
@@ -526,11 +561,25 @@ router.get('/vat', async (req: Request, res: Response, next: NextFunction) => {
           tax: Number(inv.tax),
           total: Number(inv.total),
         })),
+        returns: salesReturns.map((r) => ({
+          id: r.id,
+          refNo: r.refNo,
+          date: r.date,
+          customerName: r.customer?.nameAr ?? '—',
+          invoiceRefNo: r.salesInvoice?.refNo ?? '—',
+          subtotal: Number(r.subtotal),
+          discount: Number(r.discount),
+          tax: Number(r.tax),
+          total: Number(r.total),
+        })),
       },
       purchases: {
         taxableCount: purchaseTaxable.length,
         taxableNet: purchasesTaxableNet,
-        inputVAT,
+        inputVAT: grossInputVAT,
+        returnsCount: purchaseReturns.length,
+        returnsNet: purchaseReturnsNet,
+        returnsVAT: purchaseReturnsVAT,
         invoices: purchaseTaxable.map((inv) => ({
           id: inv.id,
           refNo: inv.refNo,
@@ -541,9 +590,23 @@ router.get('/vat', async (req: Request, res: Response, next: NextFunction) => {
           tax: Number(inv.tax),
           total: Number(inv.total),
         })),
+        returns: purchaseReturns.map((r) => ({
+          id: r.id,
+          refNo: r.refNo,
+          date: r.date,
+          supplierName: r.supplier?.nameAr ?? '—',
+          invoiceRefNo: r.purchaseInvoice?.refNo ?? '—',
+          subtotal: Number(r.subtotal),
+          discount: Number(r.discount),
+          tax: Number(r.tax),
+          total: Number(r.total),
+        })),
       },
-      outputVAT,
-      inputVAT,
+      // Top-level figures are NET of returns — what actually goes on the VAT return
+      outputVAT: netOutputVAT,
+      inputVAT: netInputVAT,
+      grossOutputVAT: outputVAT,
+      grossInputVAT,
       netVAT,
       isPayable: netVAT >= 0, // true = must pay to authority; false = refundable
     });
@@ -808,19 +871,28 @@ router.get('/ar-aging', async (req: Request, res: Response, next: NextFunction) 
       include: { customer: { select: { id: true, nameAr: true } } },
     });
     const invoiceIds = invoices.map((i) => i.id);
-    const paidAgg = invoiceIds.length
-      ? await prisma.voucher.groupBy({
-          by: ['salesInvoiceId'],
-          where: { salesInvoiceId: { in: invoiceIds } },
-          _sum: { totalAmount: true },
-        })
-      : [];
+    const [paidAgg, returnAgg] = invoiceIds.length
+      ? await Promise.all([
+          prisma.voucher.groupBy({
+            by: ['salesInvoiceId'],
+            where: { salesInvoiceId: { in: invoiceIds } },
+            _sum: { totalAmount: true },
+          }),
+          prisma.salesReturn.groupBy({
+            by: ['salesInvoiceId'],
+            where: { salesInvoiceId: { in: invoiceIds }, refundMethod: 'BALANCE' },
+            _sum: { total: true },
+          }),
+        ])
+      : [[], []];
     const paidMap = new Map(paidAgg.map((v) => [v.salesInvoiceId, Number(v._sum.totalAmount ?? 0)]));
+    const returnMap = new Map(returnAgg.map((r) => [r.salesInvoiceId, Number(r._sum.total ?? 0)]));
 
     const byCustomer = new Map<number, { id: number; nameAr: string } & ReturnType<typeof emptyAgingRow>>();
     for (const inv of invoices) {
       const paid = paidMap.get(inv.id) ?? 0;
-      const remaining = Number(inv.total) - paid;
+      const returned = returnMap.get(inv.id) ?? 0; // BALANCE returns settle the receivable
+      const remaining = Number(inv.total) - paid - returned;
       if (remaining <= 0.01) continue;
 
       const ageDays = Math.floor((asOf.getTime() - inv.date.getTime()) / 86400000);
@@ -860,19 +932,28 @@ router.get('/ap-aging', async (req: Request, res: Response, next: NextFunction) 
       include: { supplier: { select: { id: true, nameAr: true } } },
     });
     const invoiceIds = invoices.map((i) => i.id);
-    const paidAgg = invoiceIds.length
-      ? await prisma.voucher.groupBy({
-          by: ['purchaseInvoiceId'],
-          where: { purchaseInvoiceId: { in: invoiceIds } },
-          _sum: { totalAmount: true },
-        })
-      : [];
+    const [paidAgg, returnAgg] = invoiceIds.length
+      ? await Promise.all([
+          prisma.voucher.groupBy({
+            by: ['purchaseInvoiceId'],
+            where: { purchaseInvoiceId: { in: invoiceIds } },
+            _sum: { totalAmount: true },
+          }),
+          prisma.purchaseReturn.groupBy({
+            by: ['purchaseInvoiceId'],
+            where: { purchaseInvoiceId: { in: invoiceIds }, refundMethod: 'BALANCE' },
+            _sum: { total: true },
+          }),
+        ])
+      : [[], []];
     const paidMap = new Map(paidAgg.map((v) => [v.purchaseInvoiceId, Number(v._sum.totalAmount ?? 0)]));
+    const returnMap = new Map(returnAgg.map((r) => [r.purchaseInvoiceId, Number(r._sum.total ?? 0)]));
 
     const bySupplier = new Map<number, { id: number; nameAr: string } & ReturnType<typeof emptyAgingRow>>();
     for (const inv of invoices) {
       const paid = paidMap.get(inv.id) ?? 0;
-      const remaining = Number(inv.total) - paid;
+      const returned = returnMap.get(inv.id) ?? 0; // BALANCE returns settle the payable
+      const remaining = Number(inv.total) - paid - returned;
       if (remaining <= 0.01) continue;
 
       const ageDays = Math.floor((asOf.getTime() - inv.date.getTime()) / 86400000);

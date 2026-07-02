@@ -58,9 +58,10 @@ router.get('/:id/statement', requirePermission('suppliers.view'), async (req: Re
     const id = parseInt(req.params.id);
     const supplier = await prisma.supplier.findUniqueOrThrow({ where: { id } });
 
-    const [invoices, vouchers] = await Promise.all([
+    const [invoices, vouchers, returns] = await Promise.all([
       prisma.purchaseInvoice.findMany({ where: { supplierId: id }, orderBy: { date: 'asc' } }),
       prisma.voucher.findMany({ where: { partyType: 'SUPPLIER', partyId: id }, orderBy: { date: 'asc' } }),
+      prisma.purchaseReturn.findMany({ where: { supplierId: id }, orderBy: { date: 'asc' } }),
     ]);
 
     // For a supplier, "credit" = payable increases (we owe them more), "debit" = payable decreases (we paid).
@@ -68,11 +69,31 @@ router.get('/:id/statement', requirePermission('suppliers.view'), async (req: Re
     const rows: Row[] = [];
     let seq = 0;
 
+    // Invoices with vouchers or BALANCE returns applied were settled through
+    // those documents (each shown as its own row) — the "paid at purchase"
+    // offset row is only for invoices paid at creation. paymentStatus alone
+    // can't tell the two apart: it is recomputed when documents settle it later.
+    const invoiceIds = invoices.map((i) => i.id);
+    const settledViaDocs = new Set<number>();
+    if (invoiceIds.length) {
+      const linkedVouchers = await prisma.voucher.groupBy({
+        by: ['purchaseInvoiceId'],
+        where: { purchaseInvoiceId: { in: invoiceIds } },
+        _sum: { totalAmount: true },
+      });
+      for (const v of linkedVouchers) {
+        if (v.purchaseInvoiceId && Number(v._sum.totalAmount ?? 0) > 0) settledViaDocs.add(v.purchaseInvoiceId);
+      }
+    }
+    for (const r of returns) {
+      if (r.refundMethod === 'BALANCE') settledViaDocs.add(r.purchaseInvoiceId);
+    }
+
     for (const inv of invoices) {
       rows.push({ date: inv.date, refNo: inv.refNo, description: `فاتورة شراء ${inv.refNo}`, debit: 0, credit: Number(inv.total), seq: seq++ });
       // Invoices settled in full at creation never raised the payable — show the
       // offsetting entry so every purchase is visible without inflating the balance.
-      if (inv.paymentStatus === 'PAID') {
+      if (inv.paymentStatus === 'PAID' && !settledViaDocs.has(inv.id)) {
         rows.push({ date: inv.date, refNo: inv.refNo, description: `سداد عند الشراء — ${inv.refNo}`, debit: Number(inv.total), credit: 0, seq: seq++ });
       }
     }
@@ -83,6 +104,17 @@ router.get('/:id/statement', requirePermission('suppliers.view'), async (req: Re
         rows.push({ date: v.date, refNo: v.voucherNo, description: v.description ?? v.voucherNo, debit: amount, credit: 0, seq: seq++ });
       } else if (v.type === 'RECEIPT') {
         rows.push({ date: v.date, refNo: v.voucherNo, description: v.description ?? v.voucherNo, debit: 0, credit: amount, seq: seq++ });
+      }
+    }
+
+    // Returns debit the supplier (we owe them less). A CASH refund hands the
+    // money straight back, so it gets an offsetting credit row — leaving the
+    // payable unchanged.
+    for (const r of returns) {
+      const amount = Number(r.total);
+      rows.push({ date: r.date, refNo: r.refNo, description: `مرتجع شراء ${r.refNo}`, debit: amount, credit: 0, seq: seq++ });
+      if (r.refundMethod === 'CASH') {
+        rows.push({ date: r.date, refNo: r.refNo, description: `استرداد نقدي — ${r.refNo}`, debit: 0, credit: amount, seq: seq++ });
       }
     }
 

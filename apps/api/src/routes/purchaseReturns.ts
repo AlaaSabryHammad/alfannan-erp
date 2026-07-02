@@ -13,6 +13,7 @@ import { requireAuth, requirePermission } from '../middleware/auth';
 import { getPagination, paginatedResponse } from '../lib/paginate';
 import { parseDateRange } from '../lib/dateRange';
 import { postJournalEntry, reverseJournalEntryBySource, ACCT } from '../lib/ledger';
+import { recomputePurchaseInvoiceStatus } from '../lib/settlement';
 
 const router = Router();
 router.use(requireAuth);
@@ -267,6 +268,9 @@ router.post('/', requirePermission('purchases.create'), async (req: Request, res
         });
       }
 
+      // A BALANCE return settles part of the invoice — re-derive its payment status
+      await recomputePurchaseInvoiceStatus(tx, invoice.id);
+
       return ret;
     });
 
@@ -326,6 +330,7 @@ router.delete('/:id', requirePermission('purchases.delete'), async (req: Request
       }
 
       await tx.purchaseReturn.delete({ where: { id } });
+      await recomputePurchaseInvoiceStatus(tx, ret.purchaseInvoiceId);
     });
 
     res.json({ success: true });

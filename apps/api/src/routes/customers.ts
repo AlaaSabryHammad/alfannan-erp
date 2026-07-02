@@ -59,21 +59,43 @@ router.get('/:id/statement', requirePermission('customers.view'), async (req: Re
     const id = parseInt(req.params.id);
     const customer = await prisma.customer.findUniqueOrThrow({ where: { id } });
 
-    const [invoices, vouchers] = await Promise.all([
+    const [invoices, vouchers, returns] = await Promise.all([
       prisma.salesInvoice.findMany({ where: { customerId: id }, orderBy: { date: 'asc' } }),
       prisma.voucher.findMany({ where: { partyType: 'CUSTOMER', partyId: id }, orderBy: { date: 'asc' } }),
+      prisma.salesReturn.findMany({ where: { customerId: id }, orderBy: { date: 'asc' } }),
     ]);
 
     type Row = { date: Date; refNo: string; description: string; debit: number; credit: number; seq: number };
     const rows: Row[] = [];
     let seq = 0;
 
+    // Invoices that have vouchers or BALANCE returns applied against them were
+    // settled through those documents (each shown as its own row below) — the
+    // "collected at sale" offset row is only for invoices paid at creation.
+    // paidStatus alone can't tell the two apart: it is recomputed to PAID when
+    // vouchers/returns settle the invoice later.
+    const invoiceIds = invoices.map((i) => i.id);
+    const settledViaDocs = new Set<number>();
+    if (invoiceIds.length) {
+      const linkedVouchers = await prisma.voucher.groupBy({
+        by: ['salesInvoiceId'],
+        where: { salesInvoiceId: { in: invoiceIds } },
+        _sum: { totalAmount: true },
+      });
+      for (const v of linkedVouchers) {
+        if (v.salesInvoiceId && Number(v._sum.totalAmount ?? 0) > 0) settledViaDocs.add(v.salesInvoiceId);
+      }
+    }
+    for (const r of returns) {
+      if (r.refundMethod === 'BALANCE') settledViaDocs.add(r.salesInvoiceId);
+    }
+
     for (const inv of invoices) {
       rows.push({ date: inv.date, refNo: inv.refNo, description: `فاتورة بيع ${inv.refNo}`, debit: Number(inv.total), credit: 0, seq: seq++ });
       // Invoices settled in full at the moment of sale (cash/card, not credit) never
       // raised the receivable in the first place — show the offsetting entry so the
       // statement stays transparent about every sale without inflating the balance.
-      if (inv.paymentMethod !== 'CREDIT' && inv.paidStatus === 'PAID') {
+      if (inv.paymentMethod !== 'CREDIT' && inv.paidStatus === 'PAID' && !settledViaDocs.has(inv.id)) {
         rows.push({ date: inv.date, refNo: inv.refNo, description: `تحصيل عند البيع — ${inv.refNo}`, debit: 0, credit: Number(inv.total), seq: seq++ });
       }
     }
@@ -84,6 +106,17 @@ router.get('/:id/statement', requirePermission('customers.view'), async (req: Re
         rows.push({ date: v.date, refNo: v.voucherNo, description: v.description ?? v.voucherNo, debit: 0, credit: amount, seq: seq++ });
       } else if (v.type === 'PAYMENT') {
         rows.push({ date: v.date, refNo: v.voucherNo, description: v.description ?? v.voucherNo, debit: amount, credit: 0, seq: seq++ });
+      }
+    }
+
+    // Returns credit the customer. A CASH refund pays the money straight back
+    // out, so it gets an offsetting debit row — same transparency treatment as
+    // cash sales above — leaving the receivable unchanged.
+    for (const r of returns) {
+      const amount = Number(r.total);
+      rows.push({ date: r.date, refNo: r.refNo, description: `مرتجع بيع ${r.refNo}`, debit: 0, credit: amount, seq: seq++ });
+      if (r.refundMethod === 'CASH') {
+        rows.push({ date: r.date, refNo: r.refNo, description: `ردّ نقدي — ${r.refNo}`, debit: amount, credit: 0, seq: seq++ });
       }
     }
 
