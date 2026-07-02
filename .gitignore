@@ -1,0 +1,10 @@
+node_modules/
+dist/
+.env
+*.env.local
+*.log
+.DS_Store
+Thumbs.db
+prisma/migrations/dev.db
+apps/api/uploads/*
+!apps/api/uploads/.gitkeep
