@@ -64,6 +64,8 @@ model User {
   recurringEntriesCreated RecurringEntry[]
   approvalsCreated        JournalEntryApproval[] @relation("ApprovalMaker")
   approvalsReviewed       JournalEntryApproval[] @relation("ApprovalChecker")
+  salesReturnsCreated     SalesReturn[]
+  purchaseReturnsCreated  PurchaseReturn[]
 }
 
 // ── BRANCHES ──────────────────────────────────────────────────────────────────
@@ -148,6 +150,8 @@ model Product {
   bomLinesAsComponent  BOMLine[]       @relation("BOMLineComponent")
   workOrders           WorkOrder[]     @relation("WorkOrderFinishedProduct")
   workOrderLinesAsComponent WorkOrderLine[] @relation("WorkOrderLineComponent")
+  salesReturnItems     SalesReturnItem[]
+  purchaseReturnItems  PurchaseReturnItem[]
 }
 
 // ── WAREHOUSES ────────────────────────────────────────────────────────────────
@@ -171,6 +175,8 @@ model Warehouse {
   transfersTo    StockTransfer[]  @relation("TransferTo")
   stockCounts    StockCount[]
   workOrders     WorkOrder[]
+  salesReturns   SalesReturn[]
+  purchaseReturns PurchaseReturn[]
 }
 
 // ── STOCK ─────────────────────────────────────────────────────────────────────
@@ -343,6 +349,7 @@ model Customer {
 
   invoices            SalesInvoice[]
   loyaltyTransactions LoyaltyTransaction[]
+  salesReturns        SalesReturn[]
 }
 
 // ── SALES INVOICES ────────────────────────────────────────────────────────────
@@ -400,6 +407,7 @@ model SalesInvoice {
   items               SalesInvoiceItem[]
   vouchers            Voucher[]
   loyaltyTransactions LoyaltyTransaction[]
+  returns             SalesReturn[]
 
   @@index([customerId])
   @@index([warehouseId])
@@ -464,6 +472,100 @@ model SalesInvoiceItem {
   @@index([productId])
 }
 
+// ── RETURNS (المرتجعات — إشعارات دائن/مدين) ────────────────────────────────────
+// Posted invoices are permanent; undoing part (or all) of a sale/purchase is
+// done with a return document that restores stock and reverses the ledger,
+// never by deleting the original invoice.
+
+enum RefundMethod {
+  CASH    // ردّ نقدي من/إلى الخزينة
+  BALANCE // على الحساب — يخفّض مديونية العميل أو مستحقات المورد
+}
+
+model SalesReturn {
+  id             Int          @id @default(autoincrement())
+  refNo          String       @unique
+  salesInvoiceId Int
+  customerId     Int
+  warehouseId    Int
+  date           DateTime     @default(now())
+  subtotal       Decimal      @db.Decimal(12, 2) // إجمالي بنود المرتجع بأسعار الفاتورة الأصلية
+  discount       Decimal      @db.Decimal(12, 2) @default(0) // نصيب المرتجع من خصم الفاتورة (نسبي)
+  tax            Decimal      @db.Decimal(12, 2) @default(0) // نصيب المرتجع من ضريبة الفاتورة (نسبي)
+  total          Decimal      @db.Decimal(12, 2) // subtotal - discount + tax = المبلغ المسترد
+  refundMethod   RefundMethod @default(BALANCE)
+  reason         String?
+  createdById    Int?
+  createdAt      DateTime     @default(now())
+
+  salesInvoice SalesInvoice      @relation(fields: [salesInvoiceId], references: [id])
+  customer     Customer          @relation(fields: [customerId], references: [id])
+  warehouse    Warehouse         @relation(fields: [warehouseId], references: [id])
+  createdBy    User?             @relation(fields: [createdById], references: [id], onDelete: SetNull)
+  items        SalesReturnItem[]
+
+  @@index([salesInvoiceId])
+  @@index([customerId])
+  @@index([date])
+}
+
+model SalesReturnItem {
+  id        Int     @id @default(autoincrement())
+  returnId  Int
+  productId Int
+  qty       Decimal @db.Decimal(12, 2)
+  unitPrice Decimal @db.Decimal(12, 2) // سعر البيع من الفاتورة الأصلية
+  lineTotal Decimal @db.Decimal(12, 2)
+
+  return  SalesReturn @relation(fields: [returnId], references: [id], onDelete: Cascade)
+  product Product     @relation(fields: [productId], references: [id])
+
+  @@index([returnId])
+  @@index([productId])
+}
+
+model PurchaseReturn {
+  id                Int          @id @default(autoincrement())
+  refNo             String       @unique
+  purchaseInvoiceId Int
+  supplierId        Int
+  warehouseId       Int
+  date              DateTime     @default(now())
+  subtotal          Decimal      @db.Decimal(12, 2)
+  discount          Decimal      @db.Decimal(12, 2) @default(0)
+  tax               Decimal      @db.Decimal(12, 2) @default(0)
+  total             Decimal      @db.Decimal(12, 2)
+  refundMethod      RefundMethod @default(BALANCE)
+  reason            String?
+  createdById       Int?
+  createdAt         DateTime     @default(now())
+
+  purchaseInvoice PurchaseInvoice      @relation(fields: [purchaseInvoiceId], references: [id])
+  supplier        Supplier             @relation(fields: [supplierId], references: [id])
+  warehouse       Warehouse            @relation(fields: [warehouseId], references: [id])
+  createdBy       User?                @relation(fields: [createdById], references: [id], onDelete: SetNull)
+  items           PurchaseReturnItem[]
+
+  @@index([purchaseInvoiceId])
+  @@index([supplierId])
+  @@index([date])
+}
+
+model PurchaseReturnItem {
+  id        Int     @id @default(autoincrement())
+  returnId  Int
+  productId Int
+  qty       Decimal @db.Decimal(12, 2)
+  unitCost  Decimal @db.Decimal(12, 2) // تكلفة الشراء من الفاتورة الأصلية
+  lineTotal Decimal @db.Decimal(12, 2)
+
+  return  PurchaseReturn @relation(fields: [returnId], references: [id], onDelete: Cascade)
+  product Product        @relation(fields: [productId], references: [id])
+
+  @@index([returnId])
+  @@index([productId])
+}
+
 // ── SUPPLIERS ─────────────────────────────────────────────────────────────────
 
 enum SupplierStatus {
@@ -482,6 +584,7 @@ model Supplier {
   createdAt      DateTime       @default(now())
 
   purchaseInvoices PurchaseInvoice[]
+  purchaseReturns  PurchaseReturn[]
 }
 
 // ── PURCHASE INVOICES ─────────────────────────────────────────────────────────
@@ -510,6 +613,7 @@ model PurchaseInvoice {
   warehouse Warehouse            @relation(fields: [warehouseId], references: [id])
   items     PurchaseInvoiceItem[]
   vouchers  Voucher[]
+  returns   PurchaseReturn[]
 
   @@index([supplierId])
   @@index([warehouseId])
@@ -571,6 +675,8 @@ model Account {
 enum JournalSource {
   SALES_INVOICE
   PURCHASE_INVOICE
+  SALES_RETURN
+  PURCHASE_RETURN
   EXPENSE
   MANUAL
   OPENING

@@ -26,6 +26,7 @@ export const ACCT: Record<string, string> = {
   DEPRECIATION_EXP: '6100',     // مصروف الإهلاك (EXPENSE)
   SALARIES_EXP:     '6200',     // الرواتب والأجور (EXPENSE)
   DISCOUNT_EARNED:  '4100',     // الخصم المكتسب (REVENUE)
+  SALES_RETURNS:    '4200',     // مردودات المبيعات (REVENUE contra — debit-normal usage)
   DISCOUNT_ALLOWED: '5100',     // الخصم المسموح به (EXPENSE)
   RETAINED_EARNINGS: '7900',    // الأرباح المرحلة (EQUITY)
 };

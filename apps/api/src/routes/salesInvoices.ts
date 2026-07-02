@@ -355,9 +355,16 @@ router.delete('/:id', requirePermission('sales.delete'), async (req: Request, re
     // Vouchers linked to this invoice already moved treasury money and the
     // customer balance; deleting the invoice underneath them would orphan the
     // vouchers (FK is SET NULL) and double-reverse the customer balance.
-    const linkedVouchers = await prisma.voucher.count({ where: { salesInvoiceId: id } });
+    const [linkedVouchers, linkedReturns] = await Promise.all([
+      prisma.voucher.count({ where: { salesInvoiceId: id } }),
+      prisma.salesReturn.count({ where: { salesInvoiceId: id } }),
+    ]);
     if (linkedVouchers > 0) {
       res.status(400).json({ error: 'لا يمكن حذف الفاتورة: توجد سندات قبض/خصم مرتبطة بها — احذف السندات أولاً' });
+      return;
+    }
+    if (linkedReturns > 0) {
+      res.status(400).json({ error: 'لا يمكن حذف الفاتورة: توجد مرتجعات مرتبطة بها — احذف المرتجعات أولاً' });
       return;
     }
 

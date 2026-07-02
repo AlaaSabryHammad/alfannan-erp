@@ -36,6 +36,8 @@ import {
   Ticket,
   Network,
   GitBranch,
+  Undo2,
+  RotateCcw,
 } from 'lucide-react';
 import { cn } from '../lib/utils';
 
@@ -82,8 +84,10 @@ const NAV_GROUPS: NavGroup[] = [
       { label: 'شاشة POS السريعة', path: '/pos', icon: <ShoppingCart size={17} />, highlight: 'orange' },
       { label: 'العملاء', path: '/customers', icon: <Users size={17} /> },
       { label: 'فواتير البيع', path: '/sales-invoices', icon: <FileText size={17} /> },
+      { label: 'مرتجعات المبيعات', path: '/sales-returns', icon: <Undo2 size={17} /> },
       { label: 'الموردون', path: '/suppliers', icon: <Truck size={17} /> },
       { label: 'فواتير الشراء', path: '/purchase-invoices', icon: <Receipt size={17} /> },
+      { label: 'مرتجعات المشتريات', path: '/purchase-returns', icon: <RotateCcw size={17} /> },
       { label: 'كوبونات الخصم', path: '/coupons', icon: <Ticket size={17} /> },
     ],
   },

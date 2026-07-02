@@ -180,7 +180,10 @@ router.post('/', requirePermission('purchases.create'), async (req: Request, res
           body.paymentStatus === 'PAID' ? ACCT.CASH : ACCT.AP;
 
         const taxAmount = Number(body.tax ?? 0);
-        const inventoryAmount = subtotal;
+        // Inventory is booked at NET cost (after discount) — booking the gross
+        // subtotal while crediting the discounted total leaves the entry
+        // unbalanced and postJournalEntry rejects it.
+        const inventoryAmount = subtotal - (body.discount ?? 0);
 
         const ledgerLines = [
           // Dr: 1200 inventory = subtotal
@@ -235,9 +238,16 @@ router.delete('/:id', requirePermission('purchases.delete'), async (req: Request
     // Vouchers linked to this invoice already moved treasury money and the
     // supplier balance; deleting the invoice underneath them would orphan the
     // vouchers (FK is SET NULL) and double-reverse the supplier balance.
-    const linkedVouchers = await prisma.voucher.count({ where: { purchaseInvoiceId: id } });
+    const [linkedVouchers, linkedReturns] = await Promise.all([
+      prisma.voucher.count({ where: { purchaseInvoiceId: id } }),
+      prisma.purchaseReturn.count({ where: { purchaseInvoiceId: id } }),
+    ]);
     if (linkedVouchers > 0) {
       res.status(400).json({ error: 'لا يمكن حذف الفاتورة: توجد سندات صرف/خصم مرتبطة بها — احذف السندات أولاً' });
+      return;
+    }
+    if (linkedReturns > 0) {
+      res.status(400).json({ error: 'لا يمكن حذف الفاتورة: توجد مرتجعات مرتبطة بها — احذف المرتجعات أولاً' });
       return;
     }
 
