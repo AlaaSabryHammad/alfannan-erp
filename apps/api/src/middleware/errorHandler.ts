@@ -1,5 +1,6 @@
 import { Request, Response, NextFunction } from 'express';
 import { ZodError } from 'zod';
+import { PeriodLockedError } from '../lib/ledger';
 
 function isFKViolation(err: unknown): boolean {
   if (!err || typeof err !== 'object') return false;
@@ -23,6 +24,13 @@ export function errorHandler(err: unknown, _req: Request, res: Response, _next: 
 
   if (isFKViolation(err)) {
     res.status(400).json({ error: 'لا يمكن الحذف لارتباطه بسجلات أخرى' });
+    return;
+  }
+
+  // Posting/deleting a document dated inside a locked fiscal period — a user
+  // decision problem, not a server fault, so surface the Arabic message as 400.
+  if (err instanceof PeriodLockedError) {
+    res.status(400).json({ error: err.message });
     return;
   }
 

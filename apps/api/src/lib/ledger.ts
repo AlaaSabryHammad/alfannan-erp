@@ -59,6 +59,34 @@ function isDebitNormal(type: AccountType): boolean {
   return type === AccountType.ASSET || type === AccountType.EXPENSE;
 }
 
+// ── Fiscal-period locking ─────────────────────────────────────────────────────
+
+/** Thrown when a posting/reversal targets a locked fiscal period → HTTP 400. */
+export class PeriodLockedError extends Error {}
+
+/**
+ * Rejects the operation if the month containing `date` is LOCKED.
+ * Called from postJournalEntry and reverseJournalEntryBySource, the single
+ * choke point every document (invoices, vouchers, returns, payroll, manual
+ * entries…) goes through — so one check protects the whole ledger.
+ */
+export async function assertPeriodOpen(
+  tx: Prisma.TransactionClient,
+  date: Date,
+): Promise<void> {
+  const year = date.getFullYear();
+  const month = date.getMonth() + 1;
+  const period = await tx.fiscalPeriod.findUnique({
+    where: { year_month: { year, month } },
+    select: { status: true },
+  });
+  if (period?.status === 'LOCKED') {
+    throw new PeriodLockedError(
+      `الفترة المحاسبية ${month}/${year} مقفلة — لا يمكن إنشاء أو حذف مستندات بتاريخ يقع فيها`,
+    );
+  }
+}
+
 // ── Entry-number generator: JE-YYYYMMDD-NNNN ─────────────────────────────────
 async function generateEntryNo(
   tx: Prisma.TransactionClient,
@@ -93,6 +121,8 @@ export async function postJournalEntry(
   params: PostEntryParams,
 ) {
   const { date, description, sourceType, sourceId, createdById, lines } = params;
+
+  await assertPeriodOpen(tx, date);
 
   // Resolve account codes → ids and fetch account types
   const resolvedLines: Array<{
@@ -217,6 +247,10 @@ export async function reverseJournalEntryBySource(
   });
 
   if (!original) return; // No ledger entry to reverse (e.g. older data before ledger)
+
+  // The reversal touches the balances of the period the entry was posted in —
+  // if that period is locked, the source document must not be deleted either.
+  await assertPeriodOpen(tx, original.date);
 
   // Unwind each account's balance by reversing the original net effect
   for (const line of original.lines) {

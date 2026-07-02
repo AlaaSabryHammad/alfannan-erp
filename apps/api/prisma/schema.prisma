@@ -66,6 +66,7 @@ model User {
   approvalsReviewed       JournalEntryApproval[] @relation("ApprovalChecker")
   salesReturnsCreated     SalesReturn[]
   purchaseReturnsCreated  PurchaseReturn[]
+  fiscalPeriodsLocked     FiscalPeriod[]
 }
 
 // ── BRANCHES ──────────────────────────────────────────────────────────────────
@@ -668,6 +669,29 @@ model Account {
 
   @@index([type])
   @@index([parentId])
+}
+
+// ── FISCAL PERIODS (إقفال الفترات المحاسبية) ──────────────────────────────────
+// A LOCKED month rejects any journal posting or reversal dated inside it —
+// enforced at the single ledger choke point (postJournalEntry /
+// reverseJournalEntryBySource), which covers every document type.
+
+enum PeriodStatus {
+  OPEN
+  LOCKED
+}
+
+model FiscalPeriod {
+  id         Int          @id @default(autoincrement())
+  year       Int
+  month      Int // 1-12
+  status     PeriodStatus @default(OPEN)
+  lockedAt   DateTime?
+  lockedById Int?
+
+  lockedBy User? @relation(fields: [lockedById], references: [id], onDelete: SetNull)
+
+  @@unique([year, month])
 }
 
 // ── JOURNAL ───────────────────────────────────────────────────────────────────

@@ -4,7 +4,7 @@ import { Prisma, JournalSource, AssetCategory } from '@prisma/client';
 import prisma from '../lib/prisma';
 import { requireAuth, requirePermission } from '../middleware/auth';
 import { getPagination, paginatedResponse } from '../lib/paginate';
-import { postJournalEntry, reverseJournalEntryBySource, ACCT } from '../lib/ledger';
+import { postJournalEntry, reverseJournalEntryBySource, assertPeriodOpen, ACCT } from '../lib/ledger';
 
 const router = Router();
 router.use(requireAuth);
@@ -212,6 +212,11 @@ router.delete('/:id', requirePermission('assets.delete'), async (req: Request, r
         where: { sourceType: JournalSource.DEPRECIATION, sourceId: id },
         include: { lines: { include: { account: { select: { id: true, type: true } } } } },
       });
+
+      // Every entry being unwound must fall in an open fiscal period
+      for (const entry of entries) {
+        await assertPeriodOpen(tx, entry.date);
+      }
 
       for (const entry of entries) {
         for (const line of entry.lines) {

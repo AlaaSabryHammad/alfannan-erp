@@ -32,6 +32,7 @@ import { CostCentersPage } from './pages/accounting/CostCentersPage';
 import { BudgetsPage } from './pages/accounting/BudgetsPage';
 import { RecurringEntriesPage } from './pages/accounting/RecurringEntriesPage';
 import { JournalApprovalsPage } from './pages/accounting/JournalApprovalsPage';
+import { FiscalPeriodsPage } from './pages/accounting/FiscalPeriodsPage';
 import { VouchersPage } from './pages/treasury/VouchersPage';
 import { PromissoryNotesPage } from './pages/treasury/PromissoryNotesPage';
 import { CashMovementPage } from './pages/treasury/CashMovementPage';
@@ -106,6 +107,7 @@ export function App() {
               <Route path="budgets" element={<BudgetsPage />} />
               <Route path="recurring-entries" element={<RecurringEntriesPage />} />
               <Route path="journal-approvals" element={<JournalApprovalsPage />} />
+              <Route path="fiscal-periods" element={<FiscalPeriodsPage />} />
 
               {/* Treasury & Vouchers */}
               <Route path="vouchers" element={<VouchersPage />} />

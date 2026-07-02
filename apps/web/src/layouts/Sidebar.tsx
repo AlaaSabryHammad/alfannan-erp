@@ -38,6 +38,7 @@ import {
   GitBranch,
   Undo2,
   RotateCcw,
+  Lock,
 } from 'lucide-react';
 import { cn } from '../lib/utils';
 
@@ -102,6 +103,7 @@ const NAV_GROUPS: NavGroup[] = [
       { label: 'الموازنات التقديرية', path: '/budgets', icon: <TrendingUp size={17} /> },
       { label: 'القيود المتكررة', path: '/recurring-entries', icon: <Repeat size={17} /> },
       { label: 'اعتماد القيود', path: '/journal-approvals', icon: <Shield size={17} /> },
+      { label: 'الفترات المحاسبية', path: '/fiscal-periods', icon: <Lock size={17} /> },
     ],
   },
   {
