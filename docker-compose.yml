@@ -1,0 +1,71 @@
+# الفنان ERP — تشغيل كامل بحاوية واحدة لكل خدمة
+#
+#   cp .env.docker.example .env.docker   # ثم عدّل كلمات السر
+#   docker compose --env-file .env.docker up -d --build
+#
+# الواجهة: http://localhost:8080 — النسخ الاحتياطي اليومي في ./backups
+
+services:
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: alfannan
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: ${DB_PASSWORD:?set DB_PASSWORD in .env.docker}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d alfannan"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  api:
+    build:
+      context: .
+      dockerfile: deploy/api.Dockerfile
+    restart: unless-stopped
+    environment:
+      DATABASE_URL: postgresql://postgres:${DB_PASSWORD}@db:5432/alfannan?schema=public
+      JWT_SECRET: ${JWT_SECRET:?set JWT_SECRET in .env.docker}
+      PORT: "4000"
+      CORS_ORIGIN: ${CORS_ORIGIN:-http://localhost:8080}
+    volumes:
+      - uploads:/app/apps/api/uploads
+    depends_on:
+      db:
+        condition: service_healthy
+
+  web:
+    build:
+      context: .
+      dockerfile: deploy/web.Dockerfile
+    restart: unless-stopped
+    ports:
+      - "${WEB_PORT:-8080}:80"
+    depends_on:
+      - api
+
+  # نسخة pg_dump يومية مضغوطة إلى ./backups مع الإبقاء على آخر 30
+  backup:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      PGPASSWORD: ${DB_PASSWORD}
+    volumes:
+      - ./backups:/backups
+    depends_on:
+      db:
+        condition: service_healthy
+    entrypoint: >
+      sh -c 'while true; do
+        pg_dump -h db -U postgres -d alfannan -F c -f "/backups/alfannan-$$(date +%Y%m%d-%H%M%S).dump"
+        && echo "backup OK $$(date)";
+        ls -1t /backups/alfannan-*.dump 2>/dev/null | tail -n +31 | xargs -r rm -f;
+        sleep 86400;
+      done'
+
+volumes:
+  pgdata:
+  uploads:

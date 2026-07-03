@@ -1,6 +1,8 @@
 node_modules/
 dist/
 .env
+.env.docker
+backups/
 *.env.local
 *.log
 .DS_Store
