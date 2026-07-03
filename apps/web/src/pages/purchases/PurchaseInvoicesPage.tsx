@@ -78,6 +78,7 @@ interface PurchaseInvoice {
   paidAmount?: number;
   remainingAmount?: number;
   supplierId?: number;
+  branchId?: number | null;
 }
 
 // ─── Label Maps ───────────────────────────────────────────────────────────────
@@ -241,6 +242,7 @@ function RecordPaymentModal({
         purchaseInvoiceId: invoice!.id,
         amount: parseFloat(amount),
         description: `دفعة على فاتورة ${invoice!.refNo}`,
+        branchId: invoice!.branchId ?? undefined, // السند يتبع فرع الفاتورة
       }),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['purchase-invoices'] });

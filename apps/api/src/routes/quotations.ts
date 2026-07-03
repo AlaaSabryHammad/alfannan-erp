@@ -30,6 +30,7 @@ const quotationSchema = z.object({
   discount: z.number().nonnegative().optional().default(0),
   tax: z.number().nonnegative().optional().default(0),
   notes: z.string().optional().nullable(),
+  branchId: z.number().int().positive().optional().nullable(), // فرع العمل الحالي (من محدد الفرع في الأعلى)
   items: z.array(itemSchema).min(1),
 });
 
@@ -111,7 +112,7 @@ router.post('/', requirePermission('sales.create'), async (req: Request, res: Re
         data: {
           refNo,
           customerId: body.customerId,
-          branchId: creator?.branchId ?? null,
+          branchId: body.branchId ?? creator?.branchId ?? null,
           validUntil: body.validUntil ? new Date(body.validUntil) : null,
           subtotal,
           discount: body.discount ?? 0,

@@ -6,6 +6,7 @@ import { getApiErrorMessage } from '../../lib/utils';
 import { Modal } from '../../components/ui/Modal';
 import { Button } from '../../components/ui/Button';
 import { Input, Select } from '../../components/ui/Input';
+import { useBranch } from '../../contexts/BranchContext';
 
 type VoucherTypeT = 'RECEIPT' | 'PAYMENT' | 'DISCOUNT' | 'DEPOSIT';
 type PartyTypeT = 'CUSTOMER' | 'SUPPLIER' | 'ACCOUNT';
@@ -51,6 +52,7 @@ function toast(msg: string, type: 'success' | 'error' = 'success') {
 }
 
 export function CreateVoucherModal({ open, onClose, onCreated }: CreateVoucherModalProps) {
+  const { branchId } = useBranch();
   const [type, setType] = useState<VoucherTypeT>('RECEIPT');
   const [date, setDate] = useState(new Date().toISOString().slice(0, 10));
   const [treasuryAccountId, setTreasuryAccountId] = useState<number | ''>('');
@@ -150,6 +152,7 @@ export function CreateVoucherModal({ open, onClose, onCreated }: CreateVoucherMo
       date,
       treasuryAccountId,
       description: description || undefined,
+      branchId: branchId ?? undefined, // فرع العمل الحالي من محدد الفرع في الأعلى
     };
 
     if (type !== 'DEPOSIT') {

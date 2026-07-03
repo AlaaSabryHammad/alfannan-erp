@@ -46,6 +46,7 @@ const createVoucherSchema = z.object({
   description: z.string().optional().nullable(),
   amount: z.number().positive().optional(), // simple mode total (used when no lines)
   lines: z.array(voucherLineSchema).optional(), // compound mode
+  branchId: z.number().int().positive().optional().nullable(), // فرع العمل الحالي (من محدد الفرع في الأعلى)
 });
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -316,11 +317,13 @@ router.post('/', requirePermission('treasury.create'), async (req: Request, res:
         ledgerLines.push({ accountCode: ACCT.CASH, debit: 0, credit: totalAmount, description: lineDesc });
       }
 
-      // The voucher belongs to its creator's branch
+      // The voucher belongs to the active working branch selected in the topbar
+      // when provided; otherwise it falls back to the creator's own branch.
       const creator = await tx.user.findUnique({
         where: { id: userId },
         select: { branchId: true },
       });
+      const voucherBranchId = body.branchId ?? creator?.branchId ?? null;
 
       // Create voucher + lines
       const v = await tx.voucher.create({
@@ -328,7 +331,7 @@ router.post('/', requirePermission('treasury.create'), async (req: Request, res:
           voucherNo,
           type,
           date: vDate,
-          branchId: creator?.branchId ?? null,
+          branchId: voucherBranchId,
           treasuryAccountId: body.treasuryAccountId,
           partyType: body.partyType ?? null,
           partyId: body.partyId ?? null,

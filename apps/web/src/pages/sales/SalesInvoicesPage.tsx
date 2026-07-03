@@ -54,6 +54,7 @@ interface SalesInvoice {
   paidAmount?: number;
   remainingAmount?: number;
   customerId?: number;
+  branchId?: number | null;
   zatcaStatus?: 'NOT_CONFIGURED' | 'PENDING' | 'REPORTED' | 'CLEARED' | 'FAILED';
   zatcaQrPayload?: string | null;
 }
@@ -180,6 +181,7 @@ function RecordPaymentModal({
         salesInvoiceId: invoice!.id,
         amount: parseFloat(amount),
         description: `دفعة على فاتورة ${invoice!.refNo}`,
+        branchId: invoice!.branchId ?? undefined, // السند يتبع فرع الفاتورة
       }),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['sales-invoices'] });

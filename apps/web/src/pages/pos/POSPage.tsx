@@ -469,6 +469,7 @@ export function POSPage() {
             salesInvoiceId: inv.id,
             amount: tendered,
             description: `دفعة جزئية عند البيع — ${inv.refNo}`,
+            branchId: branchId ?? undefined,
           }).catch(() => {
             toast('تم إنشاء الفاتورة لكن تعذر تسجيل الدفعة الجزئية — سجّلها يدويًا من تفاصيل الفاتورة', 'error');
           });
