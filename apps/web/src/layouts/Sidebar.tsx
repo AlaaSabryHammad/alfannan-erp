@@ -84,9 +84,12 @@ const NAV_GROUPS: NavGroup[] = [
     items: [
       { label: 'شاشة POS السريعة', path: '/pos', icon: <ShoppingCart size={17} />, highlight: 'orange' },
       { label: 'العملاء', path: '/customers', icon: <Users size={17} /> },
+      { label: 'عروض الأسعار', path: '/quotations', icon: <ScrollText size={17} /> },
+      { label: 'أوامر البيع', path: '/sales-orders', icon: <ClipboardCheck size={17} /> },
       { label: 'فواتير البيع', path: '/sales-invoices', icon: <FileText size={17} /> },
       { label: 'مرتجعات المبيعات', path: '/sales-returns', icon: <Undo2 size={17} /> },
       { label: 'الموردون', path: '/suppliers', icon: <Truck size={17} /> },
+      { label: 'أوامر الشراء', path: '/purchase-orders', icon: <ClipboardCheck size={17} /> },
       { label: 'فواتير الشراء', path: '/purchase-invoices', icon: <Receipt size={17} /> },
       { label: 'مرتجعات المشتريات', path: '/purchase-returns', icon: <RotateCcw size={17} /> },
       { label: 'كوبونات الخصم', path: '/coupons', icon: <Ticket size={17} /> },

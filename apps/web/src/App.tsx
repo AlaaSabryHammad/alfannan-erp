@@ -23,6 +23,7 @@ import { BarcodeLabelsPage } from './pages/inventory/BarcodeLabelsPage';
 import { CustomersPage } from './pages/sales/CustomersPage';
 import { SalesInvoicesPage } from './pages/sales/SalesInvoicesPage';
 import { SalesReturnsPage, PurchaseReturnsPage } from './pages/returns/ReturnsPage';
+import { QuotationsPage, SalesOrdersPage, PurchaseOrdersPage } from './pages/orders/OrdersPages';
 import { POSPage } from './pages/pos/POSPage';
 import { SuppliersPage } from './pages/purchases/SuppliersPage';
 import { PurchaseInvoicesPage } from './pages/purchases/PurchaseInvoicesPage';
@@ -95,9 +96,12 @@ export function App() {
               {/* Sales & Purchases */}
               <Route path="pos" element={<POSPage />} />
               <Route path="customers" element={<CustomersPage />} />
+              <Route path="quotations" element={<QuotationsPage />} />
+              <Route path="sales-orders" element={<SalesOrdersPage />} />
               <Route path="sales-invoices" element={<SalesInvoicesPage />} />
               <Route path="sales-returns" element={<SalesReturnsPage />} />
               <Route path="suppliers" element={<SuppliersPage />} />
+              <Route path="purchase-orders" element={<PurchaseOrdersPage />} />
               <Route path="purchase-invoices" element={<PurchaseInvoicesPage />} />
               <Route path="purchase-returns" element={<PurchaseReturnsPage />} />
 
