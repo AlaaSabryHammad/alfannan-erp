@@ -7,6 +7,7 @@ import { getPagination, paginatedResponse } from '../lib/paginate';
 import { reverseJournalEntryBySource, ACCT } from '../lib/ledger';
 import { getSalesInvoiceSettlement } from '../lib/settlement';
 import { createSalesInvoiceInTx, SALES_INVOICE_USER_ERRORS } from '../lib/salesInvoiceService';
+import { runWithRetry } from '../lib/retry';
 import { parseDateRange } from '../lib/dateRange';
 
 const router = Router();
@@ -108,8 +109,8 @@ router.post('/', requirePermission('sales.create'), async (req: Request, res: Re
     const body = createInvoiceSchema.parse(req.body);
     const cashierId = req.user!.userId;
 
-    const invoice = await prisma.$transaction(async (tx) =>
-      createSalesInvoiceInTx(tx, { ...body, cashierId }),
+    const invoice = await runWithRetry(() =>
+      prisma.$transaction(async (tx) => createSalesInvoiceInTx(tx, { ...body, cashierId })),
     );
 
     const full = await prisma.salesInvoice.findUniqueOrThrow({

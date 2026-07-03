@@ -6,6 +6,7 @@ import { requireAuth, requirePermission } from '../middleware/auth';
 import { getPagination, paginatedResponse } from '../lib/paginate';
 import { parseDateRange } from '../lib/dateRange';
 import { postJournalEntry, reverseJournalEntryBySource, ACCT } from '../lib/ledger';
+import { runWithRetry } from '../lib/retry';
 import {
   getSalesInvoiceSettlement,
   getPurchaseInvoiceSettlement,
@@ -228,7 +229,7 @@ router.post('/', requirePermission('treasury.create'), async (req: Request, res:
     const vDate = body.date ? new Date(body.date) : new Date();
     const type = body.type as VoucherTypeT;
 
-    const result = await prisma.$transaction(async (tx) => {
+    const result = await runWithRetry(() => prisma.$transaction(async (tx) => {
       const treasuryCode = await getTreasuryCode(tx, body.treasuryAccountId);
 
       // Determine total amount and counterparty lines
@@ -366,7 +367,7 @@ router.post('/', requirePermission('treasury.create'), async (req: Request, res:
       }
 
       return v;
-    });
+    }));
 
     // Re-fetch full detail
     const full = await prisma.voucher.findUniqueOrThrow({

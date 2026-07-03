@@ -8,6 +8,7 @@ import { postJournalEntry, reverseJournalEntryBySource, ACCT } from '../lib/ledg
 import { applyMovingAverageCost } from '../lib/costing';
 import { getPurchaseInvoiceSettlement } from '../lib/settlement';
 import { createPurchaseInvoiceInTx } from '../lib/purchaseInvoiceService';
+import { runWithRetry } from '../lib/retry';
 import { parseDateRange } from '../lib/dateRange';
 
 const router = Router();
@@ -109,8 +110,8 @@ router.post('/', requirePermission('purchases.create'), async (req: Request, res
     const body = createPurchaseSchema.parse(req.body);
     const userId = req.user!.userId;
 
-    const invoice = await prisma.$transaction(async (tx) =>
-      createPurchaseInvoiceInTx(tx, { ...body, userId }),
+    const invoice = await runWithRetry(() =>
+      prisma.$transaction(async (tx) => createPurchaseInvoiceInTx(tx, { ...body, userId })),
     );
 
     const full = await prisma.purchaseInvoice.findUniqueOrThrow({

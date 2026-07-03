@@ -1,11 +1,62 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { useQuery } from '@tanstack/react-query';
-import { Bell, ChevronDown, LogOut, User, ShoppingCart, Building2, Menu, CalendarDays } from 'lucide-react';
+import { useQuery, useMutation } from '@tanstack/react-query';
+import { Bell, ChevronDown, LogOut, ShoppingCart, Building2, Menu, CalendarDays, KeyRound } from 'lucide-react';
 import { useAuth, usePermission } from '../contexts/AuthContext';
 import { useDateRange, type DatePreset } from '../contexts/DateRangeContext';
 import { useBranch } from '../contexts/BranchContext';
+import { Modal } from '../components/ui/Modal';
+import { Button } from '../components/ui/Button';
+import { Input } from '../components/ui/Input';
+import { getApiErrorMessage } from '../lib/utils';
 import apiClient from '../lib/api';
+
+// ── Change-password modal ──────────────────────────────────────────────────────
+function ChangePasswordModal({ open, onClose }: { open: boolean; onClose: () => void }) {
+  const [currentPassword, setCurrent] = useState('');
+  const [newPassword, setNew] = useState('');
+  const [confirm, setConfirm] = useState('');
+  const [error, setError] = useState('');
+  const [done, setDone] = useState(false);
+
+  const mutation = useMutation({
+    mutationFn: () => apiClient.post('/auth/change-password', { currentPassword, newPassword }),
+    onSuccess: () => { setDone(true); setError(''); },
+    onError: (err) => setError(getApiErrorMessage(err, 'تعذّر تغيير كلمة المرور')),
+  });
+
+  const close = () => {
+    setCurrent(''); setNew(''); setConfirm(''); setError(''); setDone(false);
+    onClose();
+  };
+
+  const mismatch = confirm.length > 0 && newPassword !== confirm;
+  const valid = currentPassword && newPassword.length >= 6 && newPassword === confirm;
+
+  return (
+    <Modal open={open} onClose={close} title="تغيير كلمة المرور" size="sm"
+      footer={done ? (
+        <Button onClick={close}>تم</Button>
+      ) : (
+        <>
+          <Button variant="outline" onClick={close}>إلغاء</Button>
+          <Button loading={mutation.isPending} disabled={!valid} onClick={() => mutation.mutate()}>حفظ</Button>
+        </>
+      )}>
+      {done ? (
+        <p className="text-sm text-success font-medium">تم تغيير كلمة المرور بنجاح.</p>
+      ) : (
+        <div dir="rtl" className="space-y-3">
+          <Input label="كلمة المرور الحالية" type="password" value={currentPassword} onChange={(e) => setCurrent(e.target.value)} />
+          <Input label="كلمة المرور الجديدة (6 أحرف على الأقل)" type="password" value={newPassword} onChange={(e) => setNew(e.target.value)} />
+          <Input label="تأكيد كلمة المرور الجديدة" type="password" value={confirm} onChange={(e) => setConfirm(e.target.value)} />
+          {mismatch && <p className="text-xs text-danger">كلمتا المرور غير متطابقتين</p>}
+          {error && <div className="bg-danger-bg text-danger text-sm font-medium px-4 py-2.5 rounded-lg">{error}</div>}
+        </div>
+      )}
+    </Modal>
+  );
+}
 
 interface AlertsSummary {
   total: number;
@@ -43,6 +94,7 @@ export function Topbar({ onMenuToggle }: { onMenuToggle?: () => void }) {
   const [userMenuOpen, setUserMenuOpen] = useState(false);
   const [presetOpen, setPresetOpen] = useState(false);
   const [branchOpen, setBranchOpen] = useState(false);
+  const [pwOpen, setPwOpen] = useState(false);
 
   const { data: branches = [] } = useQuery({
     queryKey: ['branches', 'topbar'],
@@ -100,11 +152,12 @@ export function Topbar({ onMenuToggle }: { onMenuToggle?: () => void }) {
                 <button
                   onClick={() => {
                     setUserMenuOpen(false);
+                    setPwOpen(true);
                   }}
                   className="w-full flex items-center gap-2 px-4 py-2 text-sm text-app-muted hover:bg-gray-50 transition-colors"
                 >
-                  <User size={15} />
-                  <span>الملف الشخصي</span>
+                  <KeyRound size={15} />
+                  <span>تغيير كلمة المرور</span>
                 </button>
                 <button
                   onClick={() => {
@@ -260,6 +313,8 @@ export function Topbar({ onMenuToggle }: { onMenuToggle?: () => void }) {
           </button>
         )}
       </div>
+
+      <ChangePasswordModal open={pwOpen} onClose={() => setPwOpen(false)} />
     </header>
   );
 }
