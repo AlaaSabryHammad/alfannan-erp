@@ -153,9 +153,12 @@ app.use((_req, res) => {
 app.use(errorHandler);
 
 // ── Start ─────────────────────────────────────────────────────────────────────
-app.listen(PORT, () => {
-  console.log(`✅ الفنان ERP API running on http://localhost:${PORT}`);
-  startScheduler();
-});
+// Tests import `app` and drive it with supertest — no listener, no scheduler.
+if (process.env.NODE_ENV !== 'test') {
+  app.listen(PORT, () => {
+    console.log(`✅ الفنان ERP API running on http://localhost:${PORT}`);
+    startScheduler();
+  });
+}
 
 export default app;

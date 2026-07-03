@@ -8,7 +8,8 @@
     "start": "node dist/index.js",
     "prisma:migrate": "prisma migrate dev",
     "prisma:generate": "prisma generate",
-    "seed": "tsx prisma/seed.ts"
+    "seed": "tsx prisma/seed.ts",
+    "test": "vitest run"
   },
   "dependencies": {
     "@prisma/client": "^5.22.0",
@@ -27,8 +28,11 @@
     "@types/jsonwebtoken": "^9.0.7",
     "@types/multer": "^2.1.0",
     "@types/node": "^22.10.0",
+    "@types/supertest": "^7.2.0",
     "prisma": "^5.22.0",
+    "supertest": "^7.2.2",
     "tsx": "^4.19.2",
-    "typescript": "^5.7.2"
+    "typescript": "^5.7.2",
+    "vitest": "^4.1.9"
   }
 }
