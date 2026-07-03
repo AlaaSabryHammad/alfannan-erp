@@ -7,6 +7,7 @@ import {
 import { formatMoney, resolveImageUrl, getApiErrorMessage } from '../../lib/utils';
 import { printReceipt, type ReceiptDoc } from '../../lib/print';
 import { useAuth } from '../../contexts/AuthContext';
+import { useBranch } from '../../contexts/BranchContext';
 import { Modal } from '../../components/ui/Modal';
 import { Button } from '../../components/ui/Button';
 import apiClient from '../../lib/api';
@@ -17,6 +18,13 @@ interface Department {
   id: number;
   nameAr: string;
   children?: Department[];
+}
+
+interface Warehouse {
+  id: number;
+  nameAr: string;
+  isActive: boolean;
+  branch?: { id: number; nameAr: string } | null;
 }
 
 interface StockBalance {
@@ -71,7 +79,6 @@ const PAYMENT_METHODS: { code: PaymentMethod; label: string; icon: React.ReactNo
   { code: 'CREDIT', label: 'أجل', icon: <Receipt size={18} /> },
 ];
 
-const DEFAULT_WAREHOUSE_ID = 1;
 const CASH_CUSTOMER_ID = 3; // "عميل نقدي عام" — matches the actual walk-in customer seeded in the DB
 
 type PriceTier = 'RETAIL' | 'HALF' | 'WHOLESALE';
@@ -105,6 +112,13 @@ function toast(msg: string, type: 'success' | 'error' = 'success') {
 const fetchDepartments = async (): Promise<Department[]> => {
   const res = await apiClient.get<Department[]>('/departments');
   return res.data;
+};
+
+const fetchWarehouses = async (): Promise<Warehouse[]> => {
+  const res = await apiClient.get<PaginatedResponse<Warehouse>>('/warehouses', {
+    params: { page: 1, pageSize: 200 },
+  });
+  return res.data.data.filter((w) => w.isActive);
 };
 
 const fetchAllProducts = async (): Promise<Product[]> => {
@@ -201,7 +215,9 @@ export function POSPage() {
   const [priceTier, setPriceTier] = useState<PriceTier>('RETAIL');
   const [tendered, setTendered] = useState<number>(0);
   const [lastReceipt, setLastReceipt] = useState<ReceiptDoc | null>(null);
+  const [warehouseId, setWarehouseId] = useState<number | null>(null);
   const { user } = useAuth();
+  const { branchId } = useBranch();
 
   const searchRef = useRef<HTMLInputElement>(null);
 
@@ -227,6 +243,20 @@ export function POSPage() {
     queryKey: ['products', 'pos'],
     queryFn: fetchAllProducts,
   });
+
+  const { data: warehouses = [] } = useQuery({
+    queryKey: ['warehouses', 'pos'],
+    queryFn: fetchWarehouses,
+  });
+
+  // Pick the selling warehouse: keep the current choice if still valid, else
+  // prefer one in the branch selected in the topbar, else the first warehouse.
+  useEffect(() => {
+    if (warehouses.length === 0) return;
+    if (warehouseId != null && warehouses.some((w) => w.id === warehouseId)) return;
+    const inBranch = branchId != null ? warehouses.find((w) => w.branch?.id === branchId) : undefined;
+    setWarehouseId((inBranch ?? warehouses[0]).id);
+  }, [warehouses, branchId, warehouseId]);
 
   const { data: customers = [] } = useQuery({
     queryKey: ['customers', 'pos'],
@@ -266,7 +296,7 @@ export function POSPage() {
       const unitPrice = priceForTier(product, priceTier);
       setCart((prev) => {
         const existing = prev.find((i) => i.productId === product.id);
-        const stock = getStock(product, DEFAULT_WAREHOUSE_ID);
+        const stock = getStock(product, warehouseId ?? 0);
         if (existing) {
           if (existing.qty >= stock && stock > 0) {
             toast(`لا يمكن إضافة أكثر من المتاح في المخزون (${stock})`, 'error');
@@ -293,7 +323,7 @@ export function POSPage() {
       });
       // Brief audio-style feedback toast for scanner adds
     },
-    [priceTier]
+    [priceTier, warehouseId]
   );
 
   // --- Barcode scanner: Enter on the search field exact-matches barcode/SKU ---
@@ -407,7 +437,7 @@ export function POSPage() {
     mutationFn: () =>
       apiClient.post('/sales-invoices', {
         customerId,
-        warehouseId: DEFAULT_WAREHOUSE_ID,
+        warehouseId,
         discount,
         tax: Number(taxAmount.toFixed(2)),
         paymentMethod: backendPaymentMethod,
@@ -490,6 +520,10 @@ export function POSPage() {
       toast('أضف منتجات إلى السلة أولاً', 'error');
       return;
     }
+    if (warehouseId == null) {
+      toast('اختر مستودع البيع أولاً', 'error');
+      return;
+    }
     submitMutation.mutate();
   };
 
@@ -510,18 +544,32 @@ export function POSPage() {
     <div className="flex gap-4 h-[calc(100vh-8rem)] overflow-hidden">
       {/* ====== LEFT: Product Grid ====== */}
       <div className="flex-1 flex flex-col gap-3 overflow-hidden">
-        {/* Search */}
-        <div className="relative">
-          <Search size={16} className="absolute right-3 top-1/2 -translate-y-1/2 text-app-muted" />
-          <input
-            ref={searchRef}
-            type="text"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            onKeyDown={handleSearchKeyDown}
-            placeholder="ابحث بالاسم، رمز الصنف SKU، أو امسح الباركود مباشرة (Enter للإضافة)... (F1)"
-            className="w-full border border-app-border rounded-xl pr-10 pl-4 py-2.5 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-colors shadow-sm"
-          />
+        {/* Search + warehouse */}
+        <div className="flex items-center gap-2">
+          <div className="relative flex-1">
+            <Search size={16} className="absolute right-3 top-1/2 -translate-y-1/2 text-app-muted" />
+            <input
+              ref={searchRef}
+              type="text"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              onKeyDown={handleSearchKeyDown}
+              placeholder="ابحث بالاسم، رمز الصنف SKU، أو امسح الباركود مباشرة (Enter للإضافة)... (F1)"
+              className="w-full border border-app-border rounded-xl pr-10 pl-4 py-2.5 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-colors shadow-sm"
+            />
+          </div>
+          {warehouses.length > 1 && (
+            <select
+              value={warehouseId ?? ''}
+              onChange={(e) => { setWarehouseId(Number(e.target.value)); setCart([]); }}
+              title="مستودع البيع"
+              className="flex-shrink-0 border border-app-border rounded-xl px-3 py-2.5 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary shadow-sm max-w-[12rem]"
+            >
+              {warehouses.map((w) => (
+                <option key={w.id} value={w.id}>{w.nameAr}</option>
+              ))}
+            </select>
+          )}
         </div>
 
         {/* Department tabs */}
@@ -586,7 +634,7 @@ export function POSPage() {
                 <ProductCard
                   key={p.id}
                   product={p}
-                  warehouseId={DEFAULT_WAREHOUSE_ID}
+                  warehouseId={warehouseId ?? 0}
                   onAdd={addToCart}
                   priceTier={priceTier}
                 />
@@ -834,7 +882,7 @@ export function POSPage() {
           {/* Confirm Button */}
           <button
             onClick={handleConfirm}
-            disabled={cart.length === 0 || submitMutation.isPending}
+            disabled={cart.length === 0 || warehouseId == null || submitMutation.isPending}
             className="w-full py-3 rounded-xl bg-accent hover:bg-accent-600 disabled:opacity-50 disabled:cursor-not-allowed text-white font-bold text-sm flex items-center justify-center gap-2 transition-colors"
           >
             {submitMutation.isPending ? (

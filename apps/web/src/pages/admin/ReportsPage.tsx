@@ -188,6 +188,7 @@ interface VatInvoice {
   date: string;
   customerName?: string;
   supplierName?: string;
+  invoiceRefNo?: string;
   subtotal: number;
   discount: number;
   tax: number;
@@ -275,16 +276,26 @@ interface VatData {
     taxableNet: number;
     exemptNet: number;
     outputVAT: number;
+    returnsCount: number;
+    returnsNet: number;
+    returnsVAT: number;
     invoices: VatInvoice[];
+    returns: VatInvoice[];
   };
   purchases: {
     taxableCount: number;
     taxableNet: number;
     inputVAT: number;
+    returnsCount: number;
+    returnsNet: number;
+    returnsVAT: number;
     invoices: VatInvoice[];
+    returns: VatInvoice[];
   };
   outputVAT: number;
   inputVAT: number;
+  grossOutputVAT: number;
+  grossInputVAT: number;
   netVAT: number;
   isPayable: boolean;
 }
@@ -1163,6 +1174,22 @@ export function ReportsPage() {
                     </div>
                   </div>
 
+                  {/* Net-of-returns clarification — the top figures already deduct returns */}
+                  {(vat.sales.returnsVAT > 0 || vat.purchases.returnsVAT > 0) && (
+                    <div className="bg-warning-bg/40 border border-warning/30 rounded-xl p-3 text-xs text-app-text grid grid-cols-1 sm:grid-cols-2 gap-2">
+                      <div>
+                        ضريبة المخرجات = إجمالي {formatMoney(vat.grossOutputVAT)} − مردودات مبيعات{' '}
+                        <span className="font-semibold text-danger">{formatMoney(vat.sales.returnsVAT)}</span> = صافي{' '}
+                        <span className="font-semibold text-success">{formatMoney(vat.outputVAT)}</span>
+                      </div>
+                      <div>
+                        ضريبة المدخلات = إجمالي {formatMoney(vat.grossInputVAT)} − مردودات مشتريات{' '}
+                        <span className="font-semibold text-danger">{formatMoney(vat.purchases.returnsVAT)}</span> = صافي{' '}
+                        <span className="font-semibold text-primary">{formatMoney(vat.inputVAT)}</span>
+                      </div>
+                    </div>
+                  )}
+
                   {/* Sales invoices */}
                   <div>
                     <h4 className="text-sm font-bold text-app-text mb-2">فواتير المبيعات الخاضعة للضريبة</h4>
@@ -1196,6 +1223,39 @@ export function ReportsPage() {
                     </div>
                   </div>
 
+                  {/* Sales returns (credit notes) */}
+                  {vat.sales.returns.length > 0 && (
+                    <div>
+                      <h4 className="text-sm font-bold text-danger mb-2">مردودات المبيعات (إشعارات دائن)</h4>
+                      <div className="overflow-x-auto rounded-xl border border-app-border">
+                        <table className="w-full text-sm">
+                          <thead className="bg-gray-50">
+                            <tr>
+                              <th className="px-3 py-2 text-right text-xs font-semibold text-app-muted">رقم المرتجع</th>
+                              <th className="px-3 py-2 text-right text-xs font-semibold text-app-muted">الفاتورة الأصلية</th>
+                              <th className="px-3 py-2 text-right text-xs font-semibold text-app-muted">التاريخ</th>
+                              <th className="px-3 py-2 text-right text-xs font-semibold text-app-muted">العميل</th>
+                              <th className="px-3 py-2 text-left text-xs font-semibold text-app-muted">صافي القيمة</th>
+                              <th className="px-3 py-2 text-left text-xs font-semibold text-app-muted">الضريبة</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {vat.sales.returns.map((r) => (
+                              <tr key={r.id} className="border-t border-app-border">
+                                <td className="px-3 py-2 font-mono text-xs">{r.refNo}</td>
+                                <td className="px-3 py-2 font-mono text-xs text-app-muted">{r.invoiceRefNo ?? '—'}</td>
+                                <td className="px-3 py-2 text-app-muted">{formatDate(r.date)}</td>
+                                <td className="px-3 py-2">{r.customerName ?? '—'}</td>
+                                <td className="px-3 py-2 text-left font-mono">− {formatMoney(r.subtotal - r.discount)}</td>
+                                <td className="px-3 py-2 text-left font-mono text-danger font-semibold">− {formatMoney(r.tax)}</td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+                  )}
+
                   {/* Purchase invoices */}
                   <div>
                     <h4 className="text-sm font-bold text-app-text mb-2">فواتير المشتريات الخاضعة للضريبة</h4>
@@ -1228,6 +1288,39 @@ export function ReportsPage() {
                       </table>
                     </div>
                   </div>
+
+                  {/* Purchase returns (debit notes) */}
+                  {vat.purchases.returns.length > 0 && (
+                    <div>
+                      <h4 className="text-sm font-bold text-danger mb-2">مردودات المشتريات (إشعارات مدين)</h4>
+                      <div className="overflow-x-auto rounded-xl border border-app-border">
+                        <table className="w-full text-sm">
+                          <thead className="bg-gray-50">
+                            <tr>
+                              <th className="px-3 py-2 text-right text-xs font-semibold text-app-muted">رقم المرتجع</th>
+                              <th className="px-3 py-2 text-right text-xs font-semibold text-app-muted">الفاتورة الأصلية</th>
+                              <th className="px-3 py-2 text-right text-xs font-semibold text-app-muted">التاريخ</th>
+                              <th className="px-3 py-2 text-right text-xs font-semibold text-app-muted">المورد</th>
+                              <th className="px-3 py-2 text-left text-xs font-semibold text-app-muted">صافي القيمة</th>
+                              <th className="px-3 py-2 text-left text-xs font-semibold text-app-muted">الضريبة</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {vat.purchases.returns.map((r) => (
+                              <tr key={r.id} className="border-t border-app-border">
+                                <td className="px-3 py-2 font-mono text-xs">{r.refNo}</td>
+                                <td className="px-3 py-2 font-mono text-xs text-app-muted">{r.invoiceRefNo ?? '—'}</td>
+                                <td className="px-3 py-2 text-app-muted">{formatDate(r.date)}</td>
+                                <td className="px-3 py-2">{r.supplierName ?? '—'}</td>
+                                <td className="px-3 py-2 text-left font-mono">− {formatMoney(r.subtotal - r.discount)}</td>
+                                <td className="px-3 py-2 text-left font-mono text-danger font-semibold">− {formatMoney(r.tax)}</td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+                  )}
                 </div>
               )}
             </Card>

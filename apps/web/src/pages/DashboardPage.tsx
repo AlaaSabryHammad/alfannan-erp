@@ -14,6 +14,7 @@ import { Badge } from '../components/ui/Badge';
 import { formatMoney, formatDate } from '../lib/utils';
 import apiClient from '../lib/api';
 import { useDateRange } from '../contexts/DateRangeContext';
+import { useBranch } from '../contexts/BranchContext';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 interface ChartPoint {
@@ -74,10 +75,11 @@ interface DashboardData {
 }
 
 // ─── Fetch ─────────────────────────────────────────────────────────────────────
-const fetchDashboard = async (from: string | null, to: string | null): Promise<DashboardData> => {
-  const params: Record<string, string> = {};
+const fetchDashboard = async (from: string | null, to: string | null, branchId: number | null): Promise<DashboardData> => {
+  const params: Record<string, string | number> = {};
   if (from) params.from = from;
   if (to) params.to = to;
+  if (branchId != null) params.branchId = branchId;
   const res = await apiClient.get<DashboardData>('/dashboard', { params });
   return res.data;
 };
@@ -152,10 +154,11 @@ function KpiCard({
 // ─── Main Component ────────────────────────────────────────────────────────────
 export function DashboardPage() {
   const { from, to } = useDateRange();
+  const { branchId } = useBranch();
 
   const { data, isLoading, isError } = useQuery({
-    queryKey: ['dashboard', from, to],
-    queryFn: () => fetchDashboard(from, to),
+    queryKey: ['dashboard', from, to, branchId],
+    queryFn: () => fetchDashboard(from, to, branchId),
     refetchInterval: 60_000,
   });
 

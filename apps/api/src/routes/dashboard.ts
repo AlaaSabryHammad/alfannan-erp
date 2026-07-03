@@ -16,7 +16,20 @@ router.get('/', requirePermission('dashboard.view'), async (req: Request, res: R
       req.query.from as string | undefined,
       req.query.to   as string | undefined,
     );
-    const dateWhere = dateRange ? { date: dateRange } : {};
+
+    // Optional branch filter: document figures scope by branchId, stock figures
+    // by the warehouses belonging to that branch. Expenses and receivables are
+    // company-wide (not branch-attributable in the schema).
+    const branchId = req.query.branchId ? parseInt(req.query.branchId as string) : undefined;
+    const branchWarehouseIds = branchId
+      ? (await prisma.warehouse.findMany({ where: { branchId }, select: { id: true } })).map((w) => w.id)
+      : undefined;
+
+    const dateWhere = {
+      ...(dateRange ? { date: dateRange } : {}),
+      ...(branchId ? { branchId } : {}),
+    };
+    const stockWhere = branchWarehouseIds ? { warehouseId: { in: branchWarehouseIds } } : {};
 
     // ── Net Sales (filtered or all-time)
     const salesAgg = await prisma.salesInvoice.aggregate({ where: dateWhere, _sum: { total: true } });
@@ -24,6 +37,7 @@ router.get('/', requirePermission('dashboard.view'), async (req: Request, res: R
 
     // ── Inventory valuation (costPrice * totalQty per product) — always all-time
     const stockBalances = await prisma.stockBalance.findMany({
+      where: stockWhere,
       include: { product: { select: { costPrice: true } } },
     });
     const inventoryValuation = stockBalances.reduce(
@@ -52,11 +66,11 @@ router.get('/', requirePermission('dashboard.view'), async (req: Request, res: R
     // ── Monthly sales + purchases series (current year — always year-scoped for chart)
     const [monthlyInvoices, monthlyPurchaseInvoices] = await Promise.all([
       prisma.salesInvoice.findMany({
-        where: { date: { gte: startOfYear } },
+        where: { date: { gte: startOfYear }, ...(branchId ? { branchId } : {}) },
         select: { date: true, total: true },
       }),
       prisma.purchaseInvoice.findMany({
-        where: { date: { gte: startOfYear } },
+        where: { date: { gte: startOfYear }, ...(branchId ? { branchId } : {}) },
         select: { date: true, total: true },
       }),
     ]);
@@ -87,6 +101,7 @@ router.get('/', requirePermission('dashboard.view'), async (req: Request, res: R
 
     // ── Recent movements (last 10, not date-filtered — always show latest activity)
     const recentMovements = await prisma.stockMovement.findMany({
+      where: stockWhere,
       orderBy: { createdAt: 'desc' },
       take: 10,
       include: {
@@ -109,7 +124,7 @@ router.get('/', requirePermission('dashboard.view'), async (req: Request, res: R
 
     // ── Purchases + expenses within range
     const [purchasesAgg, expensesAgg] = await Promise.all([
-      prisma.purchaseInvoice.aggregate({ where: dateWhere, _sum: { total: true } }),
+      prisma.purchaseInvoice.aggregate({ where: { ...dateWhere }, _sum: { total: true } }),
       prisma.expense.aggregate({
         where: dateRange ? { date: dateRange } : {},
         _sum: { amount: true },
@@ -123,8 +138,8 @@ router.get('/', requirePermission('dashboard.view'), async (req: Request, res: R
     const totalReceivables = Number(customerAgg._sum.currentBalance ?? 0);
 
     // COGS estimate for the range: sum of (qty * costPrice) for sold items within range
-    const soldItemsWhere = dateRange
-      ? { invoice: { date: dateRange } }
+    const soldItemsWhere = (dateRange || branchId)
+      ? { invoice: { ...(dateRange ? { date: dateRange } : {}), ...(branchId ? { branchId } : {}) } }
       : {};
     const soldItems = await prisma.salesInvoiceItem.findMany({
       where: soldItemsWhere,

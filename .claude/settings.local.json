@@ -183,7 +183,8 @@
       "PowerShell(docker --version 2>&1)",
       "PowerShell(docker info --format \"{{.ServerVersion}}\" 2>&1)",
       "PowerShell(powershell -ExecutionPolicy Bypass -File D:\\\\projects\\\\Alfannan\\\\scripts\\\\backup-db.ps1; Get-ChildItem D:\\\\projects\\\\Alfannan\\\\backups | Select-Object Name, Length)",
-      "PowerShell(schtasks /Create /TN \"AlfannanDbBackup\" /TR \"powershell -ExecutionPolicy Bypass -File D:\\\\projects\\\\Alfannan\\\\scripts\\\\backup-db.ps1\" /SC DAILY /ST 03:00 /F; schtasks /Query /TN \"AlfannanDbBackup\" 2>&1 | Select-Object -Last 3)"
+      "PowerShell(schtasks /Create /TN \"AlfannanDbBackup\" /TR \"powershell -ExecutionPolicy Bypass -File D:\\\\projects\\\\Alfannan\\\\scripts\\\\backup-db.ps1\" /SC DAILY /ST 03:00 /F; schtasks /Query /TN \"AlfannanDbBackup\" 2>&1 | Select-Object -Last 3)",
+      "Bash(curl -s -o /dev/null -w \"%{http_code}\" http://localhost:4000/health)"
     ]
   }
 }
