@@ -116,6 +116,7 @@ const NAV_GROUPS: NavGroup[] = [
       { label: 'السندات', path: '/vouchers', icon: <Wallet size={17} /> },
       { label: 'الكمبيالات والشيكات', path: '/promissory-notes', icon: <Banknote size={17} /> },
       { label: 'حركة الصندوق', path: '/cash-movement', icon: <ArrowLeftRight size={17} /> },
+      { label: 'التسوية البنكية', path: '/bank-reconciliation', icon: <ClipboardCheck size={17} /> },
     ],
   },
   {

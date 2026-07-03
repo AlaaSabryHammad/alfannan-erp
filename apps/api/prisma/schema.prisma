@@ -70,6 +70,7 @@ model User {
   quotationsCreated       Quotation[]
   salesOrdersCreated      SalesOrder[]
   purchaseOrdersCreated   PurchaseOrder[]
+  reconciliationsCreated  BankReconciliation[]
 }
 
 // ── BRANCHES ──────────────────────────────────────────────────────────────────
@@ -851,6 +852,7 @@ model Account {
   journalLines JournalLine[]
   voucherTreasury Voucher[]   @relation("VoucherTreasuryAccount")
   voucherLines VoucherLine[]
+  bankReconciliations BankReconciliation[]
   budgets      Budget[]
   recurringEntryLines RecurringEntryLine[]
   approvalLines JournalEntryApprovalLine[]
@@ -933,6 +935,7 @@ model JournalLine {
   entry      JournalEntry @relation(fields: [entryId], references: [id], onDelete: Cascade)
   account    Account      @relation(fields: [accountId], references: [id])
   costCenter CostCenter?  @relation(fields: [costCenterId], references: [id])
+  reconciliationLine BankReconciliationLine?
 
   @@index([accountId])
   @@index([entryId])
@@ -1051,6 +1054,48 @@ model JournalEntryApprovalLine {
 
   @@index([requestId])
   @@index([accountId])
+}
+
+// ── BANK RECONCILIATION (التسوية البنكية) ─────────────────────────────────────
+// Matches journal lines on a bank/cash account against the real bank
+// statement. A journal line can be reconciled exactly once, ever.
+
+enum ReconciliationStatus {
+  DRAFT
+  COMPLETED
+}
+
+model BankReconciliation {
+  id               Int                  @id @default(autoincrement())
+  reconNo          String               @unique
+  accountId        Int                  // حساب البنك/الخزينة موضوع التسوية
+  statementDate    DateTime             // تاريخ كشف البنك
+  statementBalance Decimal              @db.Decimal(12, 2) // الرصيد حسب كشف البنك
+  clearedBalance   Decimal              @db.Decimal(12, 2) @default(0) // الرصيد الدفتري المُسوّى عند الإكمال
+  difference       Decimal              @db.Decimal(12, 2) @default(0) // كشف البنك − الدفتري المُسوّى
+  status           ReconciliationStatus @default(DRAFT)
+  notes            String?
+  createdById      Int?
+  completedAt      DateTime?
+  createdAt        DateTime             @default(now())
+
+  account   Account                   @relation(fields: [accountId], references: [id])
+  createdBy User?                     @relation(fields: [createdById], references: [id], onDelete: SetNull)
+  lines     BankReconciliationLine[]
+
+  @@index([accountId])
+  @@index([status])
+}
+
+model BankReconciliationLine {
+  id               Int @id @default(autoincrement())
+  reconciliationId Int
+  journalLineId    Int @unique // السطر يُسوّى مرة واحدة فقط عبر كل الجلسات
+
+  reconciliation BankReconciliation @relation(fields: [reconciliationId], references: [id], onDelete: Cascade)
+  journalLine    JournalLine        @relation(fields: [journalLineId], references: [id])
+
+  @@index([reconciliationId])
 }
 
 // ── PARTNERS ──────────────────────────────────────────────────────────────────

@@ -38,6 +38,7 @@ import { FiscalPeriodsPage } from './pages/accounting/FiscalPeriodsPage';
 import { VouchersPage } from './pages/treasury/VouchersPage';
 import { PromissoryNotesPage } from './pages/treasury/PromissoryNotesPage';
 import { CashMovementPage } from './pages/treasury/CashMovementPage';
+import { BankReconciliationPage } from './pages/treasury/BankReconciliationPage';
 import { FixedAssetsPage } from './pages/assets/FixedAssetsPage';
 import { EmployeesPage } from './pages/hr/EmployeesPage';
 import { PayrollPage } from './pages/hr/PayrollPage';
@@ -119,6 +120,7 @@ export function App() {
               <Route path="vouchers" element={<VouchersPage />} />
               <Route path="promissory-notes" element={<PromissoryNotesPage />} />
               <Route path="cash-movement" element={<CashMovementPage />} />
+              <Route path="bank-reconciliation" element={<BankReconciliationPage />} />
 
               {/* Manufacturing */}
               <Route path="bom" element={<BomPage />} />
