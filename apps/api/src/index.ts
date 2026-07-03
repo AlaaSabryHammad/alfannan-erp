@@ -48,6 +48,8 @@ import notificationsRouter from './routes/notifications';
 import branchesRouter from './routes/branches';
 import zatcaRouter from './routes/zatca';
 import stockCountsRouter from './routes/stockCounts';
+import schedulerRouter from './routes/scheduler';
+import { startScheduler } from './lib/scheduler';
 import { auditMiddleware } from './middleware/audit';
 import { errorHandler } from './middleware/errorHandler';
 
@@ -132,6 +134,7 @@ app.use('/api/coupons', couponsRouter);
 app.use('/api/notifications', notificationsRouter);
 app.use('/api/branches', branchesRouter);
 app.use('/api/zatca', zatcaRouter);
+app.use('/api/scheduler', schedulerRouter);
 
 // ── 404 handler ───────────────────────────────────────────────────────────────
 app.use((_req, res) => {
@@ -144,6 +147,7 @@ app.use(errorHandler);
 // ── Start ─────────────────────────────────────────────────────────────────────
 app.listen(PORT, () => {
   console.log(`✅ الفنان ERP API running on http://localhost:${PORT}`);
+  startScheduler();
 });
 
 export default app;
