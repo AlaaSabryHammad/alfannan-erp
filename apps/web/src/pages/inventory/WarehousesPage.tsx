@@ -19,13 +19,16 @@ import type { PaginatedResponse, PaginationMeta } from '../../types';
 
 // --- Types ---
 interface WarehouseManager { id: number; name: string; email: string; }
+interface Branch { id: number; nameAr: string; isActive: boolean; }
 interface Warehouse {
   id: number;
   nameAr: string;
   location: string | null;
   managerId: number | null;
+  branchId: number | null;
   isActive: boolean;
   manager: WarehouseManager | null;
+  branch: { id: number; nameAr: string } | null;
   _count?: { stockBalances?: number };
 }
 interface SimpleUser { id: number; name: string; email: string; }
@@ -35,6 +38,7 @@ const warehouseSchema = z.object({
   nameAr: z.string().min(1, 'الاسم مطلوب'),
   location: z.string().optional().nullable(),
   managerId: z.string().optional().nullable(),
+  branchId: z.string().optional().nullable(),
   isActive: z.boolean().optional(),
 });
 
@@ -54,6 +58,11 @@ const fetchAllWarehouses = async () => {
 const fetchUsers = async () => {
   const res = await apiClient.get<PaginatedResponse<SimpleUser>>('/users', { params: { pageSize: 200 } });
   return res.data.data;
+};
+
+const fetchBranches = async () => {
+  const res = await apiClient.get<Branch[]>('/branches');
+  return res.data;
 };
 
 function toast(msg: string, type: 'success' | 'error' = 'success') {
@@ -109,6 +118,8 @@ export function WarehousesPage() {
     retry: false,
   });
 
+  const { data: branches = [] } = useQuery({ queryKey: ['branches'], queryFn: fetchBranches, retry: false });
+
   const { register, handleSubmit, reset, formState: { errors } } = useForm<WarehouseFormValues>({
     resolver: zodResolver(warehouseSchema),
   });
@@ -152,7 +163,7 @@ export function WarehousesPage() {
 
   const openCreate = () => {
     setEditTarget(null);
-    reset({ nameAr: '', location: '', managerId: '', isActive: true });
+    reset({ nameAr: '', location: '', managerId: '', branchId: '', isActive: true });
     setModalOpen(true);
   };
 
@@ -162,6 +173,7 @@ export function WarehousesPage() {
       nameAr: w.nameAr,
       location: w.location ?? '',
       managerId: w.managerId ? String(w.managerId) : '',
+      branchId: w.branchId ? String(w.branchId) : '',
       isActive: w.isActive,
     });
     setModalOpen(true);
@@ -172,6 +184,7 @@ export function WarehousesPage() {
       nameAr: values.nameAr,
       location: values.location || null,
       managerId: values.managerId ? parseInt(values.managerId) : null,
+      branchId: values.branchId ? parseInt(values.branchId) : null,
       isActive: values.isActive ?? true,
     };
     if (editTarget) {
@@ -192,6 +205,11 @@ export function WarehousesPage() {
       key: 'location',
       header: 'الموقع',
       render: (row) => row.location ?? <span className="text-app-muted text-xs">—</span>,
+    },
+    {
+      key: 'branch',
+      header: 'الفرع',
+      render: (row) => row.branch?.nameAr ?? <span className="text-app-muted text-xs">— غير مرتبط —</span>,
     },
     {
       key: 'manager',
@@ -310,6 +328,10 @@ export function WarehousesPage() {
         <form className="flex flex-col gap-4" onSubmit={handleSubmit(onSubmit)}>
           <Input label="اسم المستودع" required {...register('nameAr')} error={errors.nameAr?.message} />
           <Input label="الموقع" {...register('location')} error={errors.location?.message} />
+          <Select label="الفرع التابع له" {...register('branchId')} error={errors.branchId?.message}>
+            <option value="">— بدون فرع —</option>
+            {branches.filter((b) => b.isActive).map((b) => <option key={b.id} value={b.id}>{b.nameAr}</option>)}
+          </Select>
           {users.length > 0 && (
             <Select label="المدير المسؤول" {...register('managerId')} error={errors.managerId?.message}>
               <option value="">— بدون مدير —</option>
