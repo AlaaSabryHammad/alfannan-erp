@@ -10,6 +10,7 @@ import { DataTable } from '../../components/ui/DataTable';
 import type { Column } from '../../components/ui/DataTable';
 import { usePermission } from '../../contexts/AuthContext';
 import { useDateRange } from '../../contexts/DateRangeContext';
+import { useBranch } from '../../contexts/BranchContext';
 import { formatMoney, formatDate, getApiErrorMessage } from '../../lib/utils';
 import { printInvoice } from '../../lib/print';
 import apiClient from '../../lib/api';
@@ -99,11 +100,12 @@ const paidStatusVariant: Record<string, 'success' | 'warning' | 'danger'> = {
 };
 
 // --- API ---
-const fetchInvoices = async (params: { page: number; pageSize: number; search: string; from?: string | null; to?: string | null }) => {
-  const { from, to, ...rest } = params;
+const fetchInvoices = async (params: { page: number; pageSize: number; search: string; from?: string | null; to?: string | null; branchId?: number | null }) => {
+  const { from, to, branchId, ...rest } = params;
   const queryParams: Record<string, string | number> = { ...rest };
   if (from) queryParams.from = from;
   if (to) queryParams.to = to;
+  if (branchId != null) queryParams.branchId = branchId;
   const res = await apiClient.get<PaginatedResponse<SalesInvoice>>('/sales-invoices', { params: queryParams });
   return res.data;
 };
@@ -424,6 +426,7 @@ export function SalesInvoicesPage() {
   const qc = useQueryClient();
   const canDelete = usePermission('sales.delete');
   const { from, to } = useDateRange();
+  const { branchId } = useBranch();
 
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
@@ -433,14 +436,14 @@ export function SalesInvoicesPage() {
   const [deleteTarget, setDeleteTarget] = useState<SalesInvoice | null>(null);
 
   const { data, isLoading } = useQuery({
-    queryKey: ['sales-invoices', page, pageSize, search, from, to],
-    queryFn: () => fetchInvoices({ page, pageSize, search, from, to }),
+    queryKey: ['sales-invoices', page, pageSize, search, from, to, branchId],
+    queryFn: () => fetchInvoices({ page, pageSize, search, from, to, branchId }),
   });
 
-  // All invoices for KPIs (also respects date range)
+  // All invoices for KPIs (also respects date range + branch)
   const { data: allData } = useQuery({
-    queryKey: ['sales-invoices-all', from, to],
-    queryFn: () => fetchInvoices({ page: 1, pageSize: 1000, search: '', from, to }),
+    queryKey: ['sales-invoices-all', from, to, branchId],
+    queryFn: () => fetchInvoices({ page: 1, pageSize: 1000, search: '', from, to, branchId }),
     staleTime: 1000 * 60 * 2,
   });
 

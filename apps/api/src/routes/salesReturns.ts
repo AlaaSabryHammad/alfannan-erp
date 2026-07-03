@@ -99,6 +99,7 @@ router.get('/', requirePermission('sales.view'), async (req: Request, res: Respo
         { customer: { nameAr: { contains: search, mode: 'insensitive' } } },
       ];
     }
+    if (req.query.branchId) where.branchId = parseInt(req.query.branchId as string);
     const dateRange = parseDateRange(req.query.from as string | undefined, req.query.to as string | undefined);
     if (dateRange) where.date = dateRange;
 
@@ -212,6 +213,7 @@ router.post('/', requirePermission('sales.create'), async (req: Request, res: Re
           salesInvoiceId: invoice.id,
           customerId: invoice.customerId,
           warehouseId: invoice.warehouseId,
+          branchId: invoice.branchId, // المرتجع يتبع فرع الفاتورة الأصلية
           date: retDate,
           subtotal: new Prisma.Decimal(subtotal),
           discount: new Prisma.Decimal(discount),

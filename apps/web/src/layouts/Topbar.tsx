@@ -2,8 +2,9 @@ import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { Bell, ChevronDown, LogOut, User, ShoppingCart, Building2, Menu, CalendarDays } from 'lucide-react';
-import { useAuth } from '../contexts/AuthContext';
+import { useAuth, usePermission } from '../contexts/AuthContext';
 import { useDateRange, type DatePreset } from '../contexts/DateRangeContext';
+import { useBranch } from '../contexts/BranchContext';
 import apiClient from '../lib/api';
 
 interface AlertsSummary {
@@ -28,11 +29,27 @@ const PRESET_LABELS: Record<DatePreset, string> = {
   custom: 'مخصص',
 };
 
+interface BranchOption {
+  id: number;
+  nameAr: string;
+  isActive: boolean;
+}
+
 export function Topbar({ onMenuToggle }: { onMenuToggle?: () => void }) {
   const { user, logout } = useAuth();
   const { from, to, preset, setPreset, setCustomFrom, setCustomTo } = useDateRange();
+  const { branchId, branchName, setBranch } = useBranch();
+  const canViewBranches = usePermission('warehouses.view');
   const [userMenuOpen, setUserMenuOpen] = useState(false);
   const [presetOpen, setPresetOpen] = useState(false);
+  const [branchOpen, setBranchOpen] = useState(false);
+
+  const { data: branches = [] } = useQuery({
+    queryKey: ['branches', 'topbar'],
+    queryFn: async () => (await apiClient.get<BranchOption[]>('/branches')).data,
+    enabled: canViewBranches,
+    staleTime: 1000 * 60 * 10,
+  });
 
   const { data: alertsSummary } = useQuery({
     queryKey: ['alerts-summary'],
@@ -201,11 +218,39 @@ export function Topbar({ onMenuToggle }: { onMenuToggle?: () => void }) {
 
       {/* Left: branch selector + hamburger */}
       <div className="flex items-center gap-2 mr-auto">
-        <button className="flex items-center gap-1.5 text-sm font-medium text-primary border border-primary/20 bg-primary-50 rounded-xl px-3 py-2 hover:bg-primary-100 transition-colors">
-          <Building2 size={15} />
-          <span className="hidden sm:inline">كافة الفروع والمستودعات</span>
-          <ChevronDown size={13} />
-        </button>
+        <div className="relative">
+          <button
+            onClick={() => canViewBranches && setBranchOpen((v) => !v)}
+            className="flex items-center gap-1.5 text-sm font-medium text-primary border border-primary/20 bg-primary-50 rounded-xl px-3 py-2 hover:bg-primary-100 transition-colors"
+          >
+            <Building2 size={15} />
+            <span className="hidden sm:inline">{branchName ?? 'كافة الفروع والمستودعات'}</span>
+            <ChevronDown size={13} />
+          </button>
+
+          {branchOpen && (
+            <>
+              <div className="fixed inset-0 z-10" onClick={() => setBranchOpen(false)} />
+              <div className="absolute top-full left-0 mt-1 w-56 bg-white rounded-xl border border-app-border shadow-lg z-20 py-1 overflow-hidden">
+                <button
+                  onClick={() => { setBranch(null, null); setBranchOpen(false); }}
+                  className={`w-full text-right px-4 py-2 text-sm hover:bg-gray-50 transition-colors ${branchId == null ? 'text-primary font-semibold bg-primary-50' : 'text-app-text'}`}
+                >
+                  كافة الفروع والمستودعات
+                </button>
+                {branches.filter((b) => b.isActive).map((b) => (
+                  <button
+                    key={b.id}
+                    onClick={() => { setBranch(b.id, b.nameAr); setBranchOpen(false); }}
+                    className={`w-full text-right px-4 py-2 text-sm hover:bg-gray-50 transition-colors ${branchId === b.id ? 'text-primary font-semibold bg-primary-50' : 'text-app-text'}`}
+                  >
+                    {b.nameAr}
+                  </button>
+                ))}
+              </div>
+            </>
+          )}
+        </div>
         {onMenuToggle && (
           <button
             onClick={onMenuToggle}

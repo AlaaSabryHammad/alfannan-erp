@@ -85,6 +85,7 @@ router.get('/', requirePermission('purchases.view'), async (req: Request, res: R
         { supplier: { nameAr: { contains: search, mode: 'insensitive' } } },
       ];
     }
+    if (req.query.branchId) where.branchId = parseInt(req.query.branchId as string);
     const dateRange = parseDateRange(req.query.from as string | undefined, req.query.to as string | undefined);
     if (dateRange) where.date = dateRange;
 
@@ -202,6 +203,7 @@ router.post('/', requirePermission('purchases.create'), async (req: Request, res
           purchaseInvoiceId: invoice.id,
           supplierId: invoice.supplierId,
           warehouseId: invoice.warehouseId,
+          branchId: invoice.branchId, // المرتجع يتبع فرع الفاتورة الأصلية
           date: retDate,
           subtotal: new Prisma.Decimal(subtotal),
           discount: new Prisma.Decimal(discount),

@@ -55,6 +55,7 @@ router.get('/', requirePermission('purchases.view'), async (req: Request, res: R
     }
     if (paymentStatus) where.paymentStatus = paymentStatus;
     if (receiveStatus) where.receiveStatus = receiveStatus;
+    if (req.query.branchId) where.branchId = parseInt(req.query.branchId as string);
 
     const dateRange = parseDateRange(
       req.query.from as string | undefined,
@@ -71,6 +72,7 @@ router.get('/', requirePermission('purchases.view'), async (req: Request, res: R
         include: {
           supplier: { select: { id: true, nameAr: true, company: true } },
           warehouse: { select: { id: true, nameAr: true } },
+          branch: { select: { id: true, nameAr: true } },
           items: { include: { product: { select: { id: true, nameAr: true, sku: true } } } },
         },
       }),
@@ -120,11 +122,18 @@ router.post('/', requirePermission('purchases.create'), async (req: Request, res
       const total = subtotal - (body.discount ?? 0) + (body.tax ?? 0);
       const refNo = generatePoNo();
 
+      // The document belongs to its warehouse's branch
+      const poWarehouse = await tx.warehouse.findUniqueOrThrow({
+        where: { id: body.warehouseId },
+        select: { branchId: true },
+      });
+
       const inv = await tx.purchaseInvoice.create({
         data: {
           refNo,
           supplierId: body.supplierId,
           warehouseId: body.warehouseId,
+          branchId: poWarehouse.branchId,
           date: body.date ? new Date(body.date) : new Date(),
           subtotal,
           discount: body.discount ?? 0,

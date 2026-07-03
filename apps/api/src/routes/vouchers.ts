@@ -122,6 +122,7 @@ router.get('/', requirePermission('treasury.view'), async (req: Request, res: Re
     const where: Record<string, unknown> = {};
     if (typeFilter) where.type = typeFilter;
     if (dateRange) where.date = dateRange;
+    if (req.query.branchId) where.branchId = parseInt(req.query.branchId as string);
     if (search) {
       where.OR = [
         { voucherNo: { contains: search, mode: 'insensitive' } },
@@ -314,12 +315,19 @@ router.post('/', requirePermission('treasury.create'), async (req: Request, res:
         ledgerLines.push({ accountCode: ACCT.CASH, debit: 0, credit: totalAmount, description: lineDesc });
       }
 
+      // The voucher belongs to its creator's branch
+      const creator = await tx.user.findUnique({
+        where: { id: userId },
+        select: { branchId: true },
+      });
+
       // Create voucher + lines
       const v = await tx.voucher.create({
         data: {
           voucherNo,
           type,
           date: vDate,
+          branchId: creator?.branchId ?? null,
           treasuryAccountId: body.treasuryAccountId,
           partyType: body.partyType ?? null,
           partyId: body.partyId ?? null,

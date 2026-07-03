@@ -15,6 +15,7 @@ import { Input, Select } from '../../components/ui/Input';
 import { DataTable } from '../../components/ui/DataTable';
 import type { Column } from '../../components/ui/DataTable';
 import { usePermission } from '../../contexts/AuthContext';
+import { useBranch } from '../../contexts/BranchContext';
 import { formatMoney, formatDate, getApiErrorMessage } from '../../lib/utils';
 import apiClient from '../../lib/api';
 import type { PaginatedResponse, PaginationMeta } from '../../types';
@@ -407,6 +408,7 @@ function ReturnsPage({ cfg }: { cfg: FlavorConfig }) {
   const qc = useQueryClient();
   const canCreate = usePermission(cfg.createPerm);
   const canDelete = usePermission(cfg.deletePerm);
+  const { branchId } = useBranch();
 
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
@@ -417,11 +419,11 @@ function ReturnsPage({ cfg }: { cfg: FlavorConfig }) {
   const [deleteTarget, setDeleteTarget] = useState<ReturnDoc | null>(null);
 
   const { data, isLoading } = useQuery({
-    queryKey: [cfg.queryKey, page, pageSize, search],
+    queryKey: [cfg.queryKey, page, pageSize, search, branchId],
     queryFn: async () => {
-      const res = await apiClient.get<PaginatedResponse<ReturnDoc>>(cfg.endpoint, {
-        params: { page, pageSize, search },
-      });
+      const params: Record<string, string | number> = { page, pageSize, search };
+      if (branchId != null) params.branchId = branchId;
+      const res = await apiClient.get<PaginatedResponse<ReturnDoc>>(cfg.endpoint, { params });
       return res.data;
     },
   });

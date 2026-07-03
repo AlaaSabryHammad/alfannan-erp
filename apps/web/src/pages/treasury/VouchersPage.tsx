@@ -4,6 +4,7 @@ import { Plus, Eye, Trash2, Printer, Wallet } from 'lucide-react';
 import apiClient from '../../lib/api';
 import { usePermission } from '../../contexts/AuthContext';
 import { useDateRange } from '../../contexts/DateRangeContext';
+import { useBranch } from '../../contexts/BranchContext';
 import { formatMoney, formatDate, getApiErrorMessage } from '../../lib/utils';
 import { printInvoice } from '../../lib/print';
 import { PageHeader } from '../../components/ui/PageHeader';
@@ -103,6 +104,7 @@ export function VouchersPage() {
   const canCreate = usePermission('treasury.create');
   const canDelete = usePermission('treasury.delete');
   const { from, to } = useDateRange();
+  const { branchId } = useBranch();
 
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
@@ -114,12 +116,13 @@ export function VouchersPage() {
 
   // ── List query ────────────────────────────────────────────────────────────
   const { data, isLoading } = useQuery<PaginatedResponse<VoucherRow>>({
-    queryKey: ['vouchers', page, pageSize, search, tab, from, to],
+    queryKey: ['vouchers', page, pageSize, search, tab, from, to, branchId],
     queryFn: async () => {
       const params: Record<string, string | number> = { page, pageSize, search };
       if (tab !== 'ALL') params.type = tab;
       if (from) params.from = from;
       if (to) params.to = to;
+      if (branchId != null) params.branchId = branchId;
       const res = await apiClient.get<PaginatedResponse<VoucherRow>>('/vouchers', { params });
       return res.data;
     },
@@ -127,11 +130,12 @@ export function VouchersPage() {
 
   // ── KPI aggregation query (all types in range) ─────────────────────────────
   const { data: allData } = useQuery<PaginatedResponse<VoucherRow>>({
-    queryKey: ['vouchers-all', from, to],
+    queryKey: ['vouchers-all', from, to, branchId],
     queryFn: async () => {
       const params: Record<string, string | number> = { page: 1, pageSize: 1000 };
       if (from) params.from = from;
       if (to) params.to = to;
+      if (branchId != null) params.branchId = branchId;
       const res = await apiClient.get<PaginatedResponse<VoucherRow>>('/vouchers', { params });
       return res.data;
     },

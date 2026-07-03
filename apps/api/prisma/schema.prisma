@@ -82,6 +82,11 @@ model Branch {
 
   warehouses Warehouse[] @relation("BranchWarehouses")
   users      User[]      @relation("BranchUsers")
+  salesInvoices    SalesInvoice[]
+  purchaseInvoices PurchaseInvoice[]
+  salesReturns     SalesReturn[]
+  purchaseReturns  PurchaseReturn[]
+  vouchers         Voucher[]
 }
 
 // ── DEPARTMENTS ───────────────────────────────────────────────────────────────
@@ -381,6 +386,7 @@ model SalesInvoice {
   customerId     Int
   warehouseId    Int
   cashierId      Int
+  branchId       Int?          // فرع المستند — يُشتق من فرع المستودع عند الإنشاء
   date           DateTime      @default(now())
   subtotal       Decimal       @db.Decimal(12, 2)
   discount       Decimal       @db.Decimal(12, 2) @default(0)
@@ -405,6 +411,7 @@ model SalesInvoice {
   warehouse           Warehouse            @relation(fields: [warehouseId], references: [id])
   cashier             User                 @relation(fields: [cashierId], references: [id])
   coupon              Coupon?              @relation(fields: [couponId], references: [id])
+  branch              Branch?              @relation(fields: [branchId], references: [id])
   items               SalesInvoiceItem[]
   vouchers            Voucher[]
   loyaltyTransactions LoyaltyTransaction[]
@@ -412,6 +419,7 @@ model SalesInvoice {
 
   @@index([customerId])
   @@index([warehouseId])
+  @@index([branchId])
   @@index([date])
 }
 
@@ -489,6 +497,7 @@ model SalesReturn {
   salesInvoiceId Int
   customerId     Int
   warehouseId    Int
+  branchId       Int?         // فرع المستند — يرث فرع الفاتورة الأصلية
   date           DateTime     @default(now())
   subtotal       Decimal      @db.Decimal(12, 2) // إجمالي بنود المرتجع بأسعار الفاتورة الأصلية
   discount       Decimal      @db.Decimal(12, 2) @default(0) // نصيب المرتجع من خصم الفاتورة (نسبي)
@@ -502,11 +511,13 @@ model SalesReturn {
   salesInvoice SalesInvoice      @relation(fields: [salesInvoiceId], references: [id])
   customer     Customer          @relation(fields: [customerId], references: [id])
   warehouse    Warehouse         @relation(fields: [warehouseId], references: [id])
+  branch       Branch?           @relation(fields: [branchId], references: [id])
   createdBy    User?             @relation(fields: [createdById], references: [id], onDelete: SetNull)
   items        SalesReturnItem[]
 
   @@index([salesInvoiceId])
   @@index([customerId])
+  @@index([branchId])
   @@index([date])
 }
 
@@ -531,6 +542,7 @@ model PurchaseReturn {
   purchaseInvoiceId Int
   supplierId        Int
   warehouseId       Int
+  branchId          Int?         // فرع المستند — يرث فرع الفاتورة الأصلية
   date              DateTime     @default(now())
   subtotal          Decimal      @db.Decimal(12, 2)
   discount          Decimal      @db.Decimal(12, 2) @default(0)
@@ -544,11 +556,13 @@ model PurchaseReturn {
   purchaseInvoice PurchaseInvoice      @relation(fields: [purchaseInvoiceId], references: [id])
   supplier        Supplier             @relation(fields: [supplierId], references: [id])
   warehouse       Warehouse            @relation(fields: [warehouseId], references: [id])
+  branch          Branch?              @relation(fields: [branchId], references: [id])
   createdBy       User?                @relation(fields: [createdById], references: [id], onDelete: SetNull)
   items           PurchaseReturnItem[]
 
   @@index([purchaseInvoiceId])
   @@index([supplierId])
+  @@index([branchId])
   @@index([date])
 }
 
@@ -600,6 +614,7 @@ model PurchaseInvoice {
   refNo         String        @unique
   supplierId    Int
   warehouseId   Int
+  branchId      Int?          // فرع المستند — يُشتق من فرع المستودع عند الإنشاء
   date          DateTime      @default(now())
   subtotal      Decimal       @db.Decimal(12, 2)
   discount      Decimal       @db.Decimal(12, 2) @default(0)
@@ -612,12 +627,14 @@ model PurchaseInvoice {
 
   supplier  Supplier             @relation(fields: [supplierId], references: [id])
   warehouse Warehouse            @relation(fields: [warehouseId], references: [id])
+  branch    Branch?              @relation(fields: [branchId], references: [id])
   items     PurchaseInvoiceItem[]
   vouchers  Voucher[]
   returns   PurchaseReturn[]
 
   @@index([supplierId])
   @@index([warehouseId])
+  @@index([branchId])
   @@index([date])
 }
 
@@ -989,6 +1006,7 @@ model Voucher {
   partyId           Int?
   salesInvoiceId    Int?
   purchaseInvoiceId Int?
+  branchId          Int?        // فرع المستند — يُشتق من فرع منشئ السند
   description       String?
   totalAmount       Decimal     @db.Decimal(12, 2) @default(0)
   journalEntryId    Int?        @unique
@@ -999,6 +1017,7 @@ model Voucher {
   journalEntry    JournalEntry?    @relation(fields: [journalEntryId], references: [id])
   salesInvoice    SalesInvoice?    @relation(fields: [salesInvoiceId], references: [id])
   purchaseInvoice PurchaseInvoice? @relation(fields: [purchaseInvoiceId], references: [id])
+  branch          Branch?          @relation(fields: [branchId], references: [id])
   createdBy       User?            @relation(fields: [createdById], references: [id], onDelete: SetNull)
   lines           VoucherLine[]
   settledNotes    PromissoryNote[]
@@ -1009,6 +1028,7 @@ model Voucher {
   @@index([partyType, partyId])
   @@index([salesInvoiceId])
   @@index([purchaseInvoiceId])
+  @@index([branchId])
 }
 
 model VoucherLine {

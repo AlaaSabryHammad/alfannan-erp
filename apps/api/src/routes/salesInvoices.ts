@@ -55,6 +55,7 @@ router.get('/', requirePermission('sales.view'), async (req: Request, res: Respo
       ];
     }
     if (paidStatus) where.paidStatus = paidStatus;
+    if (req.query.branchId) where.branchId = parseInt(req.query.branchId as string);
 
     const dateRange = parseDateRange(
       req.query.from as string | undefined,
@@ -72,6 +73,7 @@ router.get('/', requirePermission('sales.view'), async (req: Request, res: Respo
           customer: { select: { id: true, nameAr: true, company: true } },
           cashier: { select: { id: true, name: true } },
           warehouse: { select: { id: true, nameAr: true } },
+          branch: { select: { id: true, nameAr: true } },
           items: { include: { product: { select: { id: true, nameAr: true, sku: true } } } },
         },
       }),
@@ -177,6 +179,12 @@ router.post('/', requirePermission('sales.create'), async (req: Request, res: Re
       const loyaltyEnabled = (loyaltyEnabledSetting?.value ?? 'true') === 'true';
       const pointsEarned = loyaltyEnabled ? Math.floor(total * parseFloat(loyaltyEarnRateSetting?.value ?? '0.1')) : 0;
 
+      // The document belongs to its warehouse's branch
+      const saleWarehouse = await tx.warehouse.findUniqueOrThrow({
+        where: { id: body.warehouseId },
+        select: { branchId: true },
+      });
+
       // Fetch products for costPrice
       const productIds = body.items.map(i => i.productId);
       const productMap = await tx.product.findMany({
@@ -191,6 +199,7 @@ router.post('/', requirePermission('sales.create'), async (req: Request, res: Re
           customerId: body.customerId,
           warehouseId: body.warehouseId,
           cashierId,
+          branchId: saleWarehouse.branchId,
           subtotal,
           discount: finalDiscount,
           tax: body.tax ?? 0,

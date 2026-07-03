@@ -2,6 +2,7 @@ import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { AuthProvider } from './contexts/AuthContext';
 import { DateRangeProvider } from './contexts/DateRangeContext';
+import { BranchProvider } from './contexts/BranchContext';
 import { ProtectedRoute } from './components/ProtectedRoute';
 import { AppShell } from './layouts/AppShell';
 import { LoginPage } from './pages/auth/LoginPage';
@@ -62,6 +63,7 @@ export function App() {
     <QueryClientProvider client={queryClient}>
       <AuthProvider>
         <DateRangeProvider>
+        <BranchProvider>
         <BrowserRouter>
           <Routes>
             {/* Public routes */}
@@ -146,6 +148,7 @@ export function App() {
             <Route path="*" element={<Navigate to="/login" replace />} />
           </Routes>
         </BrowserRouter>
+        </BranchProvider>
         </DateRangeProvider>
       </AuthProvider>
     </QueryClientProvider>
