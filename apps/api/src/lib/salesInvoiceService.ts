@@ -11,6 +11,7 @@
  */
 import { Prisma, JournalSource } from '@prisma/client';
 import { postJournalEntry, ACCT } from './ledger';
+import { getReservedQty } from './reservation';
 import { validateCoupon, computeCouponDiscount } from '../routes/coupons';
 
 export interface SalesInvoiceItemInput {
@@ -30,11 +31,14 @@ export interface CreateSalesInvoiceInput {
   redeemPoints?: number;
   items: SalesInvoiceItemInput[];
   cashierId: number;
+  /** set when fulfilling a sales order — that order may consume its own reservation */
+  fulfillingSalesOrderId?: number;
 }
 
 /** Messages that are business rejections (HTTP 400), not server errors. */
 export const SALES_INVOICE_USER_ERRORS = [
   'الكمية غير متوفرة بالمخزون',
+  'محجوزة لأوامر بيع',
   'تجاوز الحد الائتماني',
   'الكوبون',
   'نقاط الولاء',
@@ -190,6 +194,15 @@ export async function createSalesInvoiceInTx(tx: Prisma.TransactionClient, body:
 
     if (newQty < 0) {
       throw new Error(`الكمية غير متوفرة بالمخزون للمنتج رقم ${item.productId}`);
+    }
+
+    // What remains must still cover other PENDING sales orders' reservations —
+    // an order being fulfilled is entitled to eat its own reservation only.
+    const reserved = await getReservedQty(tx, item.productId, body.warehouseId, body.fulfillingSalesOrderId);
+    if (newQty < reserved - 0.0001) {
+      throw new Error(
+        `الكمية محجوزة لأوامر بيع معلّقة — المنتج رقم ${item.productId}: المتبقي بعد البيع ${newQty} أقل من المحجوز ${reserved}`
+      );
     }
 
     await tx.stockMovement.create({

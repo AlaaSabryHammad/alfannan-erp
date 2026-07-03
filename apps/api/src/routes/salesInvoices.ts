@@ -6,7 +6,7 @@ import { requireAuth, requirePermission } from '../middleware/auth';
 import { getPagination, paginatedResponse } from '../lib/paginate';
 import { reverseJournalEntryBySource, ACCT } from '../lib/ledger';
 import { getSalesInvoiceSettlement } from '../lib/settlement';
-import { createSalesInvoiceInTx } from '../lib/salesInvoiceService';
+import { createSalesInvoiceInTx, SALES_INVOICE_USER_ERRORS } from '../lib/salesInvoiceService';
 import { parseDateRange } from '../lib/dateRange';
 
 const router = Router();
@@ -124,13 +124,7 @@ router.post('/', requirePermission('sales.create'), async (req: Request, res: Re
 
     res.status(201).json(full);
   } catch (err: any) {
-    if (typeof err?.message === 'string' && (
-      err.message.includes('الكمية غير متوفرة بالمخزون') ||
-      err.message.includes('تجاوز الحد الائتماني') ||
-      err.message.includes('الكوبون') ||
-      err.message.includes('نقاط الولاء') ||
-      err.message.includes('قيمة الخصم الإجمالية')
-    )) {
+    if (typeof err?.message === 'string' && SALES_INVOICE_USER_ERRORS.some((m) => err.message.includes(m))) {
       res.status(400).json({ error: err.message });
       return;
     }

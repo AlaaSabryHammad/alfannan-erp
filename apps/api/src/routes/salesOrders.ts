@@ -13,6 +13,7 @@ import { requireAuth, requirePermission } from '../middleware/auth';
 import { getPagination, paginatedResponse } from '../lib/paginate';
 import { parseDateRange } from '../lib/dateRange';
 import { createSalesInvoiceInTx, SALES_INVOICE_USER_ERRORS } from '../lib/salesInvoiceService';
+import { getReservedQty } from '../lib/reservation';
 
 const router = Router();
 router.use(requireAuth);
@@ -108,6 +109,22 @@ router.post('/', requirePermission('sales.create'), async (req: Request, res: Re
         where: { id: body.warehouseId },
         select: { branchId: true },
       });
+
+      // The order reserves its quantities — it can only reserve what is
+      // actually available: on-hand minus what other PENDING orders hold.
+      for (const item of body.items) {
+        const bal = await tx.stockBalance.findUnique({
+          where: { productId_warehouseId: { productId: item.productId, warehouseId: body.warehouseId } },
+        });
+        const onHand = Number(bal?.quantity ?? 0);
+        const reserved = await getReservedQty(tx, item.productId, body.warehouseId);
+        if (item.qty > onHand - reserved + 0.0001) {
+          throw new Error(
+            `الكمية غير كافية للحجز — المنتج رقم ${item.productId}: المتاح ${Math.max(0, onHand - reserved)} (رصيد ${onHand} − محجوز ${reserved})`
+          );
+        }
+      }
+
       const orderNo = await generateOrderNo(tx, new Date());
       return tx.salesOrder.create({
         data: {
@@ -136,7 +153,7 @@ router.post('/', requirePermission('sales.create'), async (req: Request, res: Re
     });
     res.status(201).json(created);
   } catch (err: any) {
-    if (err?.message?.includes('الخصم يتجاوز')) {
+    if (err?.message?.includes('الخصم يتجاوز') || err?.message?.includes('غير كافية للحجز')) {
       res.status(400).json({ error: err.message });
       return;
     }
@@ -180,6 +197,7 @@ router.post('/:id/fulfill', requirePermission('sales.create'), async (req: Reque
           unitPrice: Number(i.unitPrice),
         })),
         cashierId: userId,
+        fulfillingSalesOrderId: order.id,
       });
 
       await tx.salesOrder.update({ where: { id }, data: { invoiceId: inv.id } });

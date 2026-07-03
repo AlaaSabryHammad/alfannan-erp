@@ -6,7 +6,7 @@
  */
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Plus, Trash2, Send, CheckCircle, XCircle, ArrowLeftRight, PackageCheck, Ban } from 'lucide-react';
+import { Plus, Trash2, Send, CheckCircle, XCircle, ArrowLeftRight, PackageCheck, Ban, Printer } from 'lucide-react';
 import { PageHeader } from '../../components/ui/PageHeader';
 import { Button } from '../../components/ui/Button';
 import { Badge } from '../../components/ui/Badge';
@@ -17,6 +17,7 @@ import type { Column } from '../../components/ui/DataTable';
 import { usePermission } from '../../contexts/AuthContext';
 import { useBranch } from '../../contexts/BranchContext';
 import { formatMoney, formatDate, getApiErrorMessage } from '../../lib/utils';
+import { printInvoice } from '../../lib/print';
 import apiClient from '../../lib/api';
 import type { PaginatedResponse, PaginationMeta } from '../../types';
 
@@ -34,12 +35,16 @@ interface Doc {
   quotation?: { id: number; refNo: string } | null;
   invoice?: { id: number; refNo: string } | null;
   salesOrder?: { id: number; orderNo: string } | null;
+  items?: Array<{
+    qty: number; unitPrice?: number; unitCost?: number; lineTotal: number;
+    product: { nameAr: string; sku: string; unit?: { nameAr: string } | null };
+  }>;
 }
 
 type Flavor = 'quotation' | 'salesOrder' | 'purchaseOrder';
 
 const CFG: Record<Flavor, {
-  title: string; subtitle: string; endpoint: string; queryKey: string;
+  title: string; subtitle: string; printTitle: string; endpoint: string; queryKey: string;
   numberKey: 'refNo' | 'orderNo'; partyKey: 'customer' | 'supplier'; partyLabel: string;
   partyEndpoint: string; priceLabel: string; needsWarehouse: boolean;
   viewPerm: string; createPerm: string; deletePerm: string;
@@ -47,7 +52,7 @@ const CFG: Record<Flavor, {
   statusVariants: Record<string, 'success' | 'warning' | 'danger' | 'default'>;
 }> = {
   quotation: {
-    title: 'عروض الأسعار', subtitle: 'عروض أسعار للعملاء — تتحول إلى أوامر بيع',
+    title: 'عروض الأسعار', subtitle: 'عروض أسعار للعملاء — تتحول إلى أوامر بيع', printTitle: 'عرض سعر',
     endpoint: '/quotations', queryKey: 'quotations', numberKey: 'refNo',
     partyKey: 'customer', partyLabel: 'العميل', partyEndpoint: '/customers',
     priceLabel: 'سعر الوحدة', needsWarehouse: false,
@@ -56,7 +61,7 @@ const CFG: Record<Flavor, {
     statusVariants: { DRAFT: 'default', SENT: 'warning', ACCEPTED: 'success', REJECTED: 'danger', CONVERTED: 'success' },
   },
   salesOrder: {
-    title: 'أوامر البيع', subtitle: 'أوامر بيع مؤكدة — تنفيذها يُنشئ الفاتورة',
+    title: 'أوامر البيع', subtitle: 'أوامر بيع مؤكدة — تنفيذها يُنشئ الفاتورة', printTitle: 'أمر بيع',
     endpoint: '/sales-orders', queryKey: 'sales-orders', numberKey: 'orderNo',
     partyKey: 'customer', partyLabel: 'العميل', partyEndpoint: '/customers',
     priceLabel: 'سعر الوحدة', needsWarehouse: true,
@@ -65,7 +70,7 @@ const CFG: Record<Flavor, {
     statusVariants: { PENDING: 'warning', FULFILLED: 'success', CANCELLED: 'danger' },
   },
   purchaseOrder: {
-    title: 'أوامر الشراء', subtitle: 'أوامر شراء للموردين — تتحول إلى فواتير شراء',
+    title: 'أوامر الشراء', subtitle: 'أوامر شراء للموردين — تتحول إلى فواتير شراء', printTitle: 'أمر شراء',
     endpoint: '/purchase-orders', queryKey: 'purchase-orders', numberKey: 'orderNo',
     partyKey: 'supplier', partyLabel: 'المورد', partyEndpoint: '/suppliers',
     priceLabel: 'تكلفة الوحدة', needsWarehouse: true,
@@ -314,6 +319,30 @@ function DocsPage({ flavor }: { flavor: Flavor }) {
       key: 'actions', header: 'عمليات',
       render: (r) => (
         <div className="flex items-center gap-1">
+          <button title="طباعة" className="p-1.5 rounded-lg hover:bg-primary-50 text-app-muted hover:text-primary"
+            onClick={() => printInvoice({
+              docTitle: cfg.printTitle,
+              refNo: r[cfg.numberKey] ?? '',
+              date: r.date,
+              partyLabel: cfg.partyLabel,
+              partyName: r[cfg.partyKey]?.nameAr ?? '—',
+              warehouse: r.warehouse?.nameAr,
+              statusText: cfg.statusLabels[r.status] ?? r.status,
+              items: (r.items ?? []).map((it) => ({
+                name: it.product.nameAr,
+                sku: it.product.sku,
+                unit: it.product.unit?.nameAr,
+                qty: Number(it.qty),
+                unitPrice: Number(it.unitPrice ?? it.unitCost ?? 0),
+                lineTotal: Number(it.lineTotal),
+              })),
+              subtotal: Number(r.subtotal),
+              discount: Number(r.discount),
+              tax: Number(r.tax),
+              total: Number(r.total),
+            })}>
+            <Printer size={14} />
+          </button>
           {canCreate && flavor === 'quotation' && (r.status === 'DRAFT') && (
             <button title="إرسال للعميل" className="p-1.5 rounded-lg hover:bg-primary-50 text-app-muted hover:text-primary"
               onClick={() => act.mutate({ path: `${cfg.endpoint}/${r.id}/status`, body: { status: 'SENT' } })}><Send size={14} /></button>
