@@ -45,6 +45,7 @@ export const SETTING_DEFAULTS: Record<string, string> = {
   zatcaSecret:           '',
   sellerVatNumber:       '', // الرقم الضريبي للمنشأة (15 رقمًا)
   sellerName:            'الفنان للتوريدات العمومية',
+  zatcaSignerPrivateKey: '', // المفتاح الخاص (PEM, secp256k1) للختم الرقمي — يُستخرج مع شهادة CSID من بوابة فاتورة
 };
 
 async function mergedSettings(): Promise<Record<string, string>> {

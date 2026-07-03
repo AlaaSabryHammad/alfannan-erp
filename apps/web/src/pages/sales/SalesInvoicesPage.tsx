@@ -55,6 +55,7 @@ interface SalesInvoice {
   remainingAmount?: number;
   customerId?: number;
   zatcaStatus?: 'NOT_CONFIGURED' | 'PENDING' | 'REPORTED' | 'CLEARED' | 'FAILED';
+  zatcaQrPayload?: string | null;
 }
 
 const zatcaStatusLabel: Record<string, string> = {
@@ -291,6 +292,7 @@ function InvoiceDetailModal({
       tax: Number(invoice.tax),
       total: Number(invoice.total),
       sellerVatNumber: settings?.vatNumber,
+      zatcaQrPayload: invoice.zatcaQrPayload,
     });
   };
 

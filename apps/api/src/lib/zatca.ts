@@ -20,17 +20,86 @@ async function getSetting(key: string): Promise<string | null> {
   return row?.value ?? SETTING_DEFAULTS[key] ?? null;
 }
 
-interface InvoiceForHash {
-  refNo: string;
-  date: Date;
-  total: number;
-  previousHash: string | null;
+/**
+ * The invoice hash per ZATCA is SHA-256 of the invoice XML (with the PIH already
+ * embedded), Base64-encoded. The PIH must be inside the XML BEFORE hashing —
+ * that's what chains each invoice to its predecessor. NOTE: production requires
+ * XML canonicalization (C14N) via ZATCA's SDK before hashing; here we hash the
+ * UTF-8 XML bytes deterministically, which is correct in structure and stable,
+ * and is the drop-in point for C14N once the SDK/certificate are available.
+ */
+export function computeInvoiceHash(xml: string): string {
+  return crypto.createHash('sha256').update(xml, 'utf8').digest('base64');
 }
 
-/** SHA-256 hash of a canonical invoice string, chained to the previous invoice's hash (PIH). */
-export function computeInvoiceHash(inv: InvoiceForHash): string {
-  const canonical = `${inv.refNo}|${inv.date.toISOString()}|${inv.total.toFixed(2)}|${inv.previousHash ?? ''}`;
-  return crypto.createHash('sha256').update(canonical, 'utf8').digest('base64');
+/**
+ * ECDSA cryptographic stamp: signs the invoice (its SHA-256 digest) with the
+ * taxpayer's private key (PEM, secp256k1 per ZATCA). Returns the Base64
+ * signature, or null when no signing key is configured (Phase 1 only).
+ */
+export function signInvoiceXml(xml: string, privateKeyPem: string | null): string | null {
+  if (!privateKeyPem?.trim()) return null;
+  const key = crypto.createPrivateKey(privateKeyPem);
+  return crypto.sign('sha256', Buffer.from(xml, 'utf8'), key).toString('base64');
+}
+
+/** Verify a signature produced by signInvoiceXml (used by tests and diagnostics). */
+export function verifyInvoiceSignature(xml: string, signatureBase64: string, publicKeyPem: string): boolean {
+  const key = crypto.createPublicKey(publicKeyPem);
+  return crypto.verify('sha256', Buffer.from(xml, 'utf8'), key, Buffer.from(signatureBase64, 'base64'));
+}
+
+// ── QR (TLV + Base64) ──────────────────────────────────────────────────────────
+function tlv(tag: number, value: Buffer): Buffer {
+  return Buffer.concat([Buffer.from([tag, value.length]), value]);
+}
+
+export interface ZatcaQrInput {
+  sellerName: string;
+  sellerVatNumber: string;
+  timestamp: string;      // ISO 8601
+  invoiceTotal: number;   // incl. VAT
+  vatTotal: number;
+  invoiceHash?: string;   // Phase 2: base64 SHA-256 of the XML
+  signatureBase64?: string | null; // Phase 2: ECDSA stamp
+  publicKeyDer?: Buffer | null;    // Phase 2: seller public key (DER)
+}
+
+/**
+ * Builds the Base64 TLV QR payload. With a hash + signature + public key present
+ * it emits the 9-tag Phase-2 form (tags 6-8; tag 9, ZATCA's stamp over the public
+ * key, is only available after clearance and is omitted offline). Otherwise it
+ * emits the 5-tag Phase-1 form.
+ */
+export function buildQrPayload(q: ZatcaQrInput): string {
+  const enc = (s: string) => Buffer.from(s, 'utf8');
+  const parts: Buffer[] = [
+    tlv(1, enc(q.sellerName)),
+    tlv(2, enc(q.sellerVatNumber)),
+    tlv(3, enc(q.timestamp)),
+    tlv(4, enc(q.invoiceTotal.toFixed(2))),
+    tlv(5, enc(q.vatTotal.toFixed(2))),
+  ];
+  if (q.invoiceHash && q.signatureBase64 && q.publicKeyDer) {
+    parts.push(tlv(6, enc(q.invoiceHash)));
+    parts.push(tlv(7, Buffer.from(q.signatureBase64, 'base64')));
+    parts.push(tlv(8, q.publicKeyDer));
+  }
+  return Buffer.concat(parts).toString('base64');
+}
+
+/** Decode a TLV/Base64 QR payload back to a tag→value map (bytes). Test/diagnostic helper. */
+export function decodeQrPayload(base64: string): Map<number, Buffer> {
+  const buf = Buffer.from(base64, 'base64');
+  const out = new Map<number, Buffer>();
+  let i = 0;
+  while (i + 2 <= buf.length) {
+    const tag = buf[i];
+    const len = buf[i + 1];
+    out.set(tag, buf.subarray(i + 2, i + 2 + len));
+    i += 2 + len;
+  }
+  return out;
 }
 
 /** First invoice in the chain has no predecessor — ZATCA specifies a fixed base64 zero-hash. */
@@ -44,7 +113,6 @@ interface InvoiceXmlInput {
   discount: number;
   tax: number;
   total: number;
-  invoiceHash: string;
   previousInvoiceHash: string;
   sellerName: string;
   sellerVatNumber: string;

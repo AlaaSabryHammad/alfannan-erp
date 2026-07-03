@@ -2,7 +2,10 @@ import { Router, Request, Response, NextFunction } from 'express';
 import crypto from 'crypto';
 import prisma from '../lib/prisma';
 import { requireAuth, requirePermission } from '../middleware/auth';
-import { computeInvoiceHash, buildInvoiceXml, submitInvoiceToZatca, ZATCA_GENESIS_HASH } from '../lib/zatca';
+import {
+  computeInvoiceHash, buildInvoiceXml, submitInvoiceToZatca, ZATCA_GENESIS_HASH,
+  signInvoiceXml, buildQrPayload,
+} from '../lib/zatca';
 import { SETTING_DEFAULTS } from './settings';
 
 const router = Router();
@@ -44,10 +47,11 @@ router.post('/sales-invoices/:id/submit', requirePermission('sales.edit'), async
       return;
     }
 
-    const settingsRows = await prisma.setting.findMany({ where: { key: { in: ['sellerVatNumber', 'sellerName'] } } });
+    const settingsRows = await prisma.setting.findMany({ where: { key: { in: ['sellerVatNumber', 'sellerName', 'zatcaSignerPrivateKey'] } } });
     const settingsMap = new Map(settingsRows.map((r) => [r.key, r.value]));
     const sellerVatNumber = settingsMap.get('sellerVatNumber') ?? SETTING_DEFAULTS.sellerVatNumber;
     const sellerName = settingsMap.get('sellerName') ?? SETTING_DEFAULTS.sellerName;
+    const signerPrivateKey = settingsMap.get('zatcaSignerPrivateKey') ?? null;
 
     // Find the previous invoice in the chain (by id order) to link this one's PIH.
     const previous = await prisma.salesInvoice.findFirst({
@@ -57,16 +61,11 @@ router.post('/sales-invoices/:id/submit', requirePermission('sales.edit'), async
     });
     const previousInvoiceHash = previous?.invoiceHash ?? ZATCA_GENESIS_HASH;
 
-    const invoiceHash = computeInvoiceHash({
-      refNo: invoice.refNo,
-      date: invoice.date,
-      total: Number(invoice.total),
-      previousHash: previousInvoiceHash,
-    });
-
     const uuid = crypto.randomUUID();
     const isSimplified = !invoice.customer.vatNumber; // B2C (no buyer VAT) → simplified/reporting; B2B → standard/clearance
 
+    // Correct ZATCA order: build the XML with the PIH embedded FIRST, then the
+    // invoice hash is SHA-256 of that XML, then the ECDSA stamp signs it.
     const xml = buildInvoiceXml({
       refNo: invoice.refNo,
       uuid,
@@ -75,7 +74,6 @@ router.post('/sales-invoices/:id/submit', requirePermission('sales.edit'), async
       discount: Number(invoice.discount),
       tax: Number(invoice.tax),
       total: Number(invoice.total),
-      invoiceHash,
       previousInvoiceHash,
       sellerName,
       sellerVatNumber,
@@ -90,8 +88,29 @@ router.post('/sales-invoices/:id/submit', requirePermission('sales.edit'), async
         taxRate: Number(it.product.taxRate ?? 0),
       })),
     });
-    const xmlBase64 = Buffer.from(xml, 'utf8').toString('base64');
+    const invoiceHash = computeInvoiceHash(xml);
+    const signatureBase64 = signInvoiceXml(xml, signerPrivateKey);
 
+    // Public key (DER) for the Phase-2 QR, derived from the signing key when present
+    let publicKeyDer: Buffer | null = null;
+    if (signerPrivateKey?.trim()) {
+      try {
+        publicKeyDer = crypto.createPublicKey(signerPrivateKey).export({ type: 'spki', format: 'der' });
+      } catch { publicKeyDer = null; }
+    }
+
+    const qrPayload = buildQrPayload({
+      sellerName,
+      sellerVatNumber,
+      timestamp: invoice.date.toISOString(),
+      invoiceTotal: Number(invoice.total),
+      vatTotal: Number(invoice.tax),
+      invoiceHash,
+      signatureBase64,
+      publicKeyDer,
+    });
+
+    const xmlBase64 = Buffer.from(xml, 'utf8').toString('base64');
     const result = await submitInvoiceToZatca(xmlBase64, uuid, isSimplified);
 
     const updated = await prisma.salesInvoice.update({
@@ -103,6 +122,8 @@ router.post('/sales-invoices/:id/submit', requirePermission('sales.edit'), async
         zatcaStatus: result.status,
         zatcaSubmittedAt: new Date(),
         zatcaResponse: `${result.message}${result.rawResponse ? ' — ' + result.rawResponse : ''}`.slice(0, 4000),
+        zatcaSignature: signatureBase64,
+        zatcaQrPayload: qrPayload,
       },
     });
 

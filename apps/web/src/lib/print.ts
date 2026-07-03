@@ -41,15 +41,21 @@ function printDocument(bodyHtml: string, opts: { title: string; pageCss: string 
  * Renders the ZATCA QR as a data-URL <img> block, or '' when no seller VAT
  * number is configured (e.g. purchase invoices, or before Settings are filled in).
  */
-async function zatcaQrBlock(params: { sellerVatNumber?: string | null; date: string; total: number; tax: number }): Promise<string> {
-  if (!params.sellerVatNumber) return '';
-  const payload = buildZatcaQrPayload({
-    sellerName: COMPANY,
-    vatNumber: params.sellerVatNumber,
-    timestamp: new Date(params.date).toISOString(),
-    invoiceTotal: params.total,
-    vatTotal: params.tax,
-  });
+async function zatcaQrBlock(params: { sellerVatNumber?: string | null; date: string; total: number; tax: number; qrPayload?: string | null }): Promise<string> {
+  // Prefer the server-generated payload (Phase-2, cryptographically stamped)
+  // once the invoice has been submitted; otherwise fall back to the client-side
+  // Phase-1 QR built from the mandatory fields.
+  let payload = params.qrPayload ?? '';
+  if (!payload) {
+    if (!params.sellerVatNumber) return '';
+    payload = buildZatcaQrPayload({
+      sellerName: COMPANY,
+      vatNumber: params.sellerVatNumber,
+      timestamp: new Date(params.date).toISOString(),
+      invoiceTotal: params.total,
+      vatTotal: params.tax,
+    });
+  }
   const dataUrl = await QRCode.toDataURL(payload, { margin: 1, width: 110 });
   return `<div class="zatca-qr"><img src="${dataUrl}" width="110" height="110" alt="ZATCA QR" /><p>فاتورة ضريبية متوافقة مع منظومة (فاتورة)</p></div>`;
 }
@@ -91,6 +97,8 @@ export interface InvoiceDoc {
   total: number;
   /** Company's ZATCA VAT registration number — when present, a compliant QR is printed. */
   sellerVatNumber?: string | null;
+  /** Server-generated Phase-2 (stamped) QR payload — preferred over the client Phase-1 QR when set. */
+  zatcaQrPayload?: string | null;
 }
 
 const A4_CSS = `
@@ -179,7 +187,7 @@ export async function printInvoice(doc: InvoiceDoc): Promise<void> {
         <div class="t grand"><span>الإجمالي الكلي</span><span class="num">${esc(formatMoney(doc.total))}</span></div>
       </div>
 
-      ${await zatcaQrBlock({ sellerVatNumber: doc.sellerVatNumber, date: doc.date, total: doc.total, tax: doc.tax })}
+      ${await zatcaQrBlock({ sellerVatNumber: doc.sellerVatNumber, date: doc.date, total: doc.total, tax: doc.tax, qrPayload: doc.zatcaQrPayload })}
 
       <div class="foot">
         شكراً لتعاملكم مع ${esc(COMPANY)} · تمت الطباعة بتاريخ ${esc(formatDate(new Date().toISOString()))}
@@ -275,6 +283,8 @@ export interface ReceiptDoc {
   total: number;
   /** Company's ZATCA VAT registration number — when present, a compliant QR is printed. */
   sellerVatNumber?: string | null;
+  /** Server-generated Phase-2 (stamped) QR payload — preferred over the client Phase-1 QR when set. */
+  zatcaQrPayload?: string | null;
 }
 
 const RECEIPT_CSS = `
@@ -326,7 +336,7 @@ export async function printReceipt(doc: ReceiptDoc): Promise<void> {
         <div class="g"><span>الإجمالي</span><span>${esc(formatMoney(doc.total))}</span></div>
         ${doc.paymentText ? `<div class="s"><span>طريقة الدفع</span><span>${esc(doc.paymentText)}</span></div>` : ''}
       </div>
-      ${await zatcaQrBlock({ sellerVatNumber: doc.sellerVatNumber, date: now.toISOString(), total: doc.total, tax: doc.tax ?? 0 })}
+      ${await zatcaQrBlock({ sellerVatNumber: doc.sellerVatNumber, date: now.toISOString(), total: doc.total, tax: doc.tax ?? 0, qrPayload: doc.zatcaQrPayload })}
       <div class="foot">شكراً لتعاملكم مع ${esc(COMPANY)}</div>
     </div>`;
 

@@ -420,6 +420,8 @@ model SalesInvoice {
   zatcaUuid           String?      // المُعرّف الفريد المُرسَل إلى هيئة الزكاة
   zatcaSubmittedAt    DateTime?
   zatcaResponse       String?      // آخر استجابة/رسالة خطأ من هيئة الزكاة — للتشخيص
+  zatcaSignature      String?      // التوقيع الرقمي (ECDSA) لتجزئة الفاتورة — الختم المميّز
+  zatcaQrPayload      String?      // حمولة رمز QR (TLV/Base64) — المرحلة 2 عند التوقيع، وإلا المرحلة 1
 
   customer            Customer             @relation(fields: [customerId], references: [id])
   warehouse           Warehouse            @relation(fields: [warehouseId], references: [id])
