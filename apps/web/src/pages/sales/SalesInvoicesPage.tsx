@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Eye, Trash2, FileText, CheckCircle, Clock, XCircle, Printer, Wallet, MessageCircle, ShieldCheck } from 'lucide-react';
+import { Eye, FileText, CheckCircle, Clock, XCircle, Printer, Wallet, MessageCircle, ShieldCheck } from 'lucide-react';
 import { PageHeader } from '../../components/ui/PageHeader';
 import { Button } from '../../components/ui/Button';
 import { Badge } from '../../components/ui/Badge';
@@ -428,7 +428,6 @@ function InvoiceDetailModal({
 // --- Main Component ---
 export function SalesInvoicesPage() {
   const qc = useQueryClient();
-  const canDelete = usePermission('sales.delete');
   const { from, to } = useDateRange();
   const { branchId } = useBranch();
 
@@ -437,7 +436,6 @@ export function SalesInvoicesPage() {
   const [search, setSearch] = useState('');
   const [viewId, setViewId] = useState<number | null>(null);
   const [viewOpen, setViewOpen] = useState(false);
-  const [deleteTarget, setDeleteTarget] = useState<SalesInvoice | null>(null);
 
   const { data, isLoading } = useQuery({
     queryKey: ['sales-invoices', page, pageSize, search, from, to, branchId],
@@ -456,17 +454,6 @@ export function SalesInvoicesPage() {
   const totalSales = allInvoices.reduce((s, inv) => s + Number(inv.total), 0);
   const paidCount = allInvoices.filter((i) => i.paidStatus === 'PAID').length;
   const unpaidCount = allInvoices.filter((i) => i.paidStatus !== 'PAID').length;
-
-  const deleteMutation = useMutation({
-    mutationFn: (id: number) => apiClient.delete(`/sales-invoices/${id}`),
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['sales-invoices'] });
-      qc.invalidateQueries({ queryKey: ['customer-statement'] });
-      toast('تم حذف الفاتورة');
-      setDeleteTarget(null);
-    },
-    onError: (err) => toast(getApiErrorMessage(err, 'حدث خطأ أثناء الحذف'), 'error'),
-  });
 
   const whatsappMutation = useMutation({
     mutationFn: (id: number) => apiClient.post(`/notifications/sales-invoices/${id}/whatsapp`),
@@ -573,15 +560,6 @@ export function SalesInvoicesPage() {
               <ShieldCheck size={14} />
             </button>
           )}
-          {canDelete && (
-            <button
-              onClick={() => setDeleteTarget(row)}
-              className="p-1.5 rounded-lg hover:bg-red-50 text-app-muted hover:text-danger transition-colors"
-              title="حذف"
-            >
-              <Trash2 size={14} />
-            </button>
-          )}
         </div>
       ),
     },
@@ -645,30 +623,6 @@ export function SalesInvoicesPage() {
         onClose={() => { setViewOpen(false); setViewId(null); }}
       />
 
-      {/* Delete Confirm */}
-      <Modal
-        open={!!deleteTarget}
-        onClose={() => setDeleteTarget(null)}
-        title="تأكيد الحذف"
-        size="sm"
-        footer={
-          <>
-            <Button variant="outline" onClick={() => setDeleteTarget(null)}>إلغاء</Button>
-            <Button
-              variant="danger"
-              loading={deleteMutation.isPending}
-              onClick={() => deleteTarget && deleteMutation.mutate(deleteTarget.id)}
-            >
-              حذف
-            </Button>
-          </>
-        }
-      >
-        <p className="text-sm text-app-text">
-          هل تريد حذف الفاتورة <span className="font-bold text-primary">{deleteTarget?.refNo}</span>؟
-          لن يمكن التراجع عن هذا الإجراء.
-        </p>
-      </Modal>
     </div>
   );
 }

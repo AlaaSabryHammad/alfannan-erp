@@ -2,7 +2,7 @@
  * المشتريات: خصم الفاتورة (توازن القيد)، متوسط التكلفة المتحرك، استلام المعلّق، مرتجع الشراء.
  */
 import { describe, it, expect } from 'vitest';
-import { api, prisma, fixtures, expectLedgerInvariants } from './helpers';
+import { api, prisma, fixtures, expectLedgerInvariants, forceDeleteSalesInvoiceForTest } from './helpers';
 
 describe('purchasing, costing, and receiving', () => {
   it('moving average tracks receipts (discount prorated) and feeds COGS', async () => {
@@ -75,7 +75,7 @@ describe('purchasing, costing, and receiving', () => {
     await expectLedgerInvariants();
 
     // cleanup
-    await api('delete', `/sales-invoices/${sale.body.id}`);
+    await forceDeleteSalesInvoiceForTest(sale.body.id);
     await api('delete', `/purchase-returns/${pret.body.id}`);
     for (const id of [p3.body.id, p2.body.id, p1.body.id]) {
       expect((await api('delete', `/purchase-invoices/${id}`)).status).toBe(200);

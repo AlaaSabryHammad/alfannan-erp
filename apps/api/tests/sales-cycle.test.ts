@@ -2,7 +2,7 @@
  * دورة المبيعات: فاتورة آجلة → سند قبض → مرتجع → حواجز الحذف → الثوابت المحاسبية.
  */
 import { describe, it, expect } from 'vitest';
-import { api, prisma, fixtures, expectLedgerInvariants } from './helpers';
+import { api, prisma, fixtures, expectLedgerInvariants, forceDeleteSalesInvoiceForTest } from './helpers';
 
 describe('sales cycle', () => {
   it('credit invoice → payment → balance return → guarded deletes, balances exact', async () => {
@@ -52,13 +52,16 @@ describe('sales cycle', () => {
     });
     expect(over.status).toBe(400);
 
-    // invoice with linked documents cannot be deleted
-    expect((await api('delete', `/sales-invoices/${inv.body.id}`)).status).toBe(400);
+    // by policy, a sales invoice can never be deleted — corrections go via returns
+    const forbidden = await api('delete', `/sales-invoices/${inv.body.id}`);
+    expect(forbidden.status).toBe(400);
+    expect(forbidden.body.error).toContain('لا يمكن حذف فاتورة المبيعات');
 
-    // unwind: return → voucher → invoice; customer balance must land exactly where it started
+    // unwind for teardown: return → voucher (both deletable) → force-remove the
+    // invoice directly; the customer balance must land exactly where it started
     expect((await api('delete', `/sales-returns/${ret.body.id}`)).status).toBe(200);
     expect((await api('delete', `/vouchers/${v.body.id}`)).status).toBe(200);
-    expect((await api('delete', `/sales-invoices/${inv.body.id}`)).status).toBe(200);
+    await forceDeleteSalesInvoiceForTest(inv.body.id);
 
     const custAfter = await prisma.customer.findUniqueOrThrow({ where: { id: customer.id } });
     expect(Number(custAfter.currentBalance)).toBeCloseTo(custBefore, 2);
@@ -66,7 +69,7 @@ describe('sales cycle', () => {
     await expectLedgerInvariants();
   });
 
-  it('deleting a journal entry never breaks next-day numbering (max+1, not count+1)', async () => {
+  it('removing a journal entry never breaks next-day numbering (max+1, not count+1)', async () => {
     const { customer, warehouse, product } = await fixtures();
     const mk = () => api('post', '/sales-invoices', {
       customerId: customer.id, warehouseId: warehouse.id,
@@ -77,11 +80,12 @@ describe('sales cycle', () => {
     const b = await mk();
     expect(a.status).toBe(201);
     expect(b.status).toBe(201);
-    // delete the FIRST — count-based sequencing would now re-issue B's number
-    expect((await api('delete', `/sales-invoices/${a.body.id}`)).status).toBe(200);
+    // remove the FIRST entry — count-based sequencing would now re-issue B's
+    // number (this is what a voucher/return deletion does to the JE sequence)
+    await forceDeleteSalesInvoiceForTest(a.body.id);
     const c = await mk();
     expect(c.status).toBe(201);
-    await api('delete', `/sales-invoices/${b.body.id}`);
-    await api('delete', `/sales-invoices/${c.body.id}`);
+    await forceDeleteSalesInvoiceForTest(b.body.id);
+    await forceDeleteSalesInvoiceForTest(c.body.id);
   });
 });

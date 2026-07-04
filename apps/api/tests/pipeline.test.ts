@@ -2,7 +2,7 @@
  * خط الأنابيب: عرض سعر → أمر بيع → فاتورة، وأمر شراء → فاتورة، مع حواجز التزامن.
  */
 import { describe, it, expect } from 'vitest';
-import { api, prisma, fixtures, expectLedgerInvariants } from './helpers';
+import { api, prisma, fixtures, expectLedgerInvariants, forceDeleteSalesInvoiceForTest } from './helpers';
 
 describe('quotation → order → invoice pipeline', () => {
   it('runs the full sales pipeline with no stock effect before fulfillment', async () => {
@@ -44,7 +44,7 @@ describe('quotation → order → invoice pipeline', () => {
     await expectLedgerInvariants();
 
     // cleanup (invoice reversal restores stock; prisma removes pre-documents)
-    expect((await api('delete', `/sales-invoices/${ful.body.invoiceId}`)).status).toBe(200);
+    await forceDeleteSalesInvoiceForTest(ful.body.invoiceId);
     await prisma.salesOrder.delete({ where: { id: conv.body.id } });
     await prisma.quotation.delete({ where: { id: q.body.id } });
     const stockEnd = Number((await prisma.stockBalance.findUniqueOrThrow({

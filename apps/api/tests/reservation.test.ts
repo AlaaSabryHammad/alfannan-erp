@@ -3,7 +3,7 @@
  * وتنفيذ الأمر نفسه يستهلك حجزه، والإلغاء يحرره.
  */
 import { describe, it, expect } from 'vitest';
-import { api, prisma, fixtures, expectLedgerInvariants } from './helpers';
+import { api, prisma, fixtures, expectLedgerInvariants, forceDeleteSalesInvoiceForTest } from './helpers';
 
 describe('stock reservations', () => {
   it('pending orders reserve stock; fulfilling consumes own reservation; cancel releases', async () => {
@@ -86,11 +86,11 @@ describe('stock reservations', () => {
     expect(saleAfterCancel.status).toBe(201);
 
     // cleanup
-    await api('delete', `/sales-invoices/${saleAfterCancel.body.id}`);
+    await forceDeleteSalesInvoiceForTest(saleAfterCancel.body.id);
     await api('delete', `/sales-orders/${orderD.body.id}`);
-    await api('delete', `/sales-invoices/${ful.body.invoiceId}`);
+    await forceDeleteSalesInvoiceForTest(ful.body.invoiceId);
     await prisma.salesOrder.delete({ where: { id: orderA.body.id } });
-    await api('delete', `/sales-invoices/${okSale.body.id}`);
+    await forceDeleteSalesInvoiceForTest(okSale.body.id);
     for (const id of [po2.body.id, po.body.id]) {
       expect((await api('delete', `/purchase-invoices/${id}`)).status).toBe(200);
     }

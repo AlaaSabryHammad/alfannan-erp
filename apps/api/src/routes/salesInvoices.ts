@@ -1,10 +1,8 @@
 import { Router, Request, Response, NextFunction } from 'express';
 import { z } from 'zod';
-import { JournalSource } from '@prisma/client';
 import prisma from '../lib/prisma';
 import { requireAuth, requirePermission } from '../middleware/auth';
 import { getPagination, paginatedResponse } from '../lib/paginate';
-import { reverseJournalEntryBySource, ACCT } from '../lib/ledger';
 import { getSalesInvoiceSettlement } from '../lib/settlement';
 import { createSalesInvoiceInTx, SALES_INVOICE_USER_ERRORS } from '../lib/salesInvoiceService';
 import { runWithRetry } from '../lib/retry';
@@ -133,103 +131,16 @@ router.post('/', requirePermission('sales.create'), async (req: Request, res: Re
   }
 });
 
-// DELETE /api/sales-invoices/:id — hard delete (items cascade via schema onDelete: Cascade)
-router.delete('/:id', requirePermission('sales.delete'), async (req: Request, res: Response, next: NextFunction) => {
-  try {
-    const id = parseInt(req.params.id);
-
-    const invoice = await prisma.salesInvoice.findUniqueOrThrow({
-      where: { id },
-      include: { items: true },
-    });
-
-    // Vouchers linked to this invoice already moved treasury money and the
-    // customer balance; deleting the invoice underneath them would orphan the
-    // vouchers (FK is SET NULL) and double-reverse the customer balance.
-    const [linkedVouchers, linkedReturns] = await Promise.all([
-      prisma.voucher.count({ where: { salesInvoiceId: id } }),
-      prisma.salesReturn.count({ where: { salesInvoiceId: id } }),
-    ]);
-    if (linkedVouchers > 0) {
-      res.status(400).json({ error: 'لا يمكن حذف الفاتورة: توجد سندات قبض/خصم مرتبطة بها — احذف السندات أولاً' });
-      return;
-    }
-    if (linkedReturns > 0) {
-      res.status(400).json({ error: 'لا يمكن حذف الفاتورة: توجد مرتجعات مرتبطة بها — احذف المرتجعات أولاً' });
-      return;
-    }
-
-    await prisma.$transaction(async (tx) => {
-      // Did creation raise the customer balance? The creation-time journal entry
-      // is the reliable record — it debits AR (3000) exactly when the balance was
-      // raised. paidStatus can't be trusted here: vouchers recompute it later.
-      // Must be read BEFORE reverseJournalEntryBySource deletes the entry.
-      const creationEntry = await tx.journalEntry.findFirst({
-        where: { sourceType: JournalSource.SALES_INVOICE, sourceId: id },
-        include: { lines: { include: { account: { select: { code: true } } } } },
-      });
-      const raisedBalance = creationEntry
-        ? creationEntry.lines.some((l) => l.account.code === ACCT.AR && Number(l.debit) > 0)
-        : invoice.paymentMethod === 'CREDIT' || invoice.paidStatus !== 'PAID';
-
-      // Reverse ledger entry first
-      await reverseJournalEntryBySource(tx, JournalSource.SALES_INVOICE, id);
-
-      // Reverse stock that was decremented on creation & write IN movements back.
-      for (const item of invoice.items) {
-        const balance = await tx.stockBalance.upsert({
-          where: { productId_warehouseId: { productId: item.productId, warehouseId: invoice.warehouseId } },
-          update: { quantity: { increment: item.qty } },
-          create: { productId: item.productId, warehouseId: invoice.warehouseId, quantity: item.qty },
-        });
-        await tx.stockMovement.create({
-          data: {
-            productId: item.productId,
-            warehouseId: invoice.warehouseId,
-            type: 'IN',
-            quantity: Number(item.qty),
-            balanceAfter: Number(balance.quantity),
-            refType: 'INVOICE',
-            refId: invoice.id,
-            reason: `حذف فاتورة بيع ${invoice.refNo}`,
-            createdById: req.user!.userId,
-          },
-        });
-      }
-
-      // Reverse customer balance if it was raised as credit on creation
-      if (raisedBalance) {
-        await tx.customer.update({
-          where: { id: invoice.customerId },
-          data: { currentBalance: { decrement: invoice.total } },
-        });
-      }
-
-      // Reverse loyalty points earned/redeemed by this invoice, and the coupon usage
-      const pointsEarned = Number(invoice.pointsEarned);
-      const pointsRedeemed = Number(invoice.pointsRedeemed);
-      if (pointsEarned !== 0 || pointsRedeemed !== 0) {
-        await tx.customer.update({
-          where: { id: invoice.customerId },
-          data: { loyaltyPoints: { increment: pointsRedeemed - pointsEarned } },
-        });
-      }
-      if (invoice.couponId) {
-        await tx.coupon.update({ where: { id: invoice.couponId }, data: { usedCount: { decrement: 1 } } });
-      }
-      await tx.loyaltyTransaction.deleteMany({ where: { salesInvoiceId: id } });
-
-      // Then delete the invoice
-      await tx.salesInvoice.delete({ where: { id } });
-    });
-    res.json({ success: true });
-  } catch (err: any) {
-    if (err?.code === 'P2003' || err?.code === 'P2014') {
-      res.status(400).json({ error: 'لا يمكن الحذف لارتباطه بسجلات أخرى' });
-      return;
-    }
-    next(err);
-  }
+// DELETE /api/sales-invoices/:id — DISABLED by policy.
+// A sales invoice is a permanent, sequentially-numbered legal document (and,
+// once reported to ZATCA, a tax record). It must never be deleted — corrections
+// and cancellations are done exclusively through a sales return / credit note
+// (إشعار دائن), which keeps both documents in the audit trail. The endpoint is
+// kept so any old client gets a clear explanation instead of a 404.
+router.delete('/:id', requirePermission('sales.delete'), async (_req: Request, res: Response) => {
+  res.status(400).json({
+    error: 'لا يمكن حذف فاتورة المبيعات — الفاتورة مستند قانوني دائم. لإلغائها أو تصحيحها أنشئ «مرتجع مبيعات» (إشعار دائن).',
+  });
 });
 
 export default router;
