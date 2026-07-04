@@ -321,7 +321,13 @@ type SectionKey =
   | 'budget-vs-actual'
   | 'ar-aging'
   | 'ap-aging'
+  | 'control-reconciliation'
   | 'expiring-products';
+
+interface ControlReconciliation {
+  receivables: { subledger: number; generalLedger: number; difference: number; balanced: boolean };
+  payables: { subledger: number; generalLedger: number; difference: number; balanced: boolean };
+}
 
 const sections: { key: SectionKey; label: string; icon: React.ReactNode; group?: string }[] = [
   { key: 'summary', label: 'الملخص والتحليلات العامة', icon: <BarChart2 size={16} /> },
@@ -344,6 +350,7 @@ const sections: { key: SectionKey; label: string; icon: React.ReactNode; group?:
   { key: 'budget-vs-actual', label: 'الموازنة مقابل الفعلي', icon: <Scale size={16} />, group: 'القوائم المالية' },
   { key: 'ar-aging', label: 'تعمير ذمم العملاء', icon: <Clock size={16} />, group: 'الذمم' },
   { key: 'ap-aging', label: 'تعمير ذمم الموردين', icon: <Clock size={16} />, group: 'الذمم' },
+  { key: 'control-reconciliation', label: 'تسوية حسابات المراقبة', icon: <Scale size={16} />, group: 'الذمم' },
 ];
 
 const DONUT_COLORS = ['#0e9384', '#f97316', '#3b82f6', '#8b5cf6', '#ec4899', '#14b8a6', '#f59e0b', '#10b981'];
@@ -630,6 +637,12 @@ export function ReportsPage() {
     queryKey: ['reports-ap-aging'],
     queryFn: async () => (await apiClient.get<AgingData>('/reports/ap-aging')).data,
     enabled: canView && activeSection === 'ap-aging',
+  });
+
+  const { data: controlRecon, isLoading: controlReconLoading } = useQuery({
+    queryKey: ['reports-control-reconciliation'],
+    queryFn: async () => (await apiClient.get<ControlReconciliation>('/reports/control-reconciliation')).data,
+    enabled: canView && activeSection === 'control-reconciliation',
   });
 
   if (!canView) {
@@ -1777,6 +1790,52 @@ export function ReportsPage() {
                 nameHeader="المورد"
                 emptyText="لا توجد مستحقات للموردين حالياً"
               />
+            </Card>
+          )}
+
+          {activeSection === 'control-reconciliation' && (
+            <Card padding="none" className="p-5">
+              <CardHeader title="تسوية حسابات المراقبة" subtitle="مطابقة إجمالي أرصدة العملاء/الموردين مع حسابي العملاء (3000) والموردين (2000) في الأستاذ العام" />
+              {controlReconLoading ? (
+                <div className="py-16 text-center text-app-muted text-sm">جارٍ التحميل...</div>
+              ) : !controlRecon ? (
+                <div className="py-16 text-center text-app-muted text-sm">تعذّر تحميل التقرير</div>
+              ) : (
+                <div dir="rtl" className="overflow-x-auto">
+                  <table className="w-full text-sm">
+                    <thead className="bg-gray-50">
+                      <tr>
+                        <th className="px-4 py-3 text-right text-xs font-semibold text-app-muted">الحساب</th>
+                        <th className="px-4 py-3 text-left text-xs font-semibold text-app-muted">الدفتر المساعد</th>
+                        <th className="px-4 py-3 text-left text-xs font-semibold text-app-muted">الأستاذ العام</th>
+                        <th className="px-4 py-3 text-left text-xs font-semibold text-app-muted">الفرق</th>
+                        <th className="px-4 py-3 text-center text-xs font-semibold text-app-muted">الحالة</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {([
+                        { label: 'ذمم العملاء (3000)', row: controlRecon.receivables },
+                        { label: 'ذمم الموردين (2000)', row: controlRecon.payables },
+                      ]).map(({ label, row }) => (
+                        <tr key={label} className="border-t border-app-border">
+                          <td className="px-4 py-3 font-medium">{label}</td>
+                          <td className="px-4 py-3 text-left font-mono">{formatMoney(row.subledger)}</td>
+                          <td className="px-4 py-3 text-left font-mono">{formatMoney(row.generalLedger)}</td>
+                          <td className={`px-4 py-3 text-left font-mono font-semibold ${row.balanced ? 'text-app-muted' : 'text-danger'}`}>{formatMoney(row.difference)}</td>
+                          <td className="px-4 py-3 text-center">
+                            <Badge variant={row.balanced ? 'success' : 'danger'}>{row.balanced ? 'متطابق' : 'يوجد فرق'}</Badge>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                  {(!controlRecon.receivables.balanced || !controlRecon.payables.balanced) && (
+                    <p className="text-xs text-app-muted mt-4 px-1">
+                      الفرق يعود عادةً لعملاء/موردين أُنشئوا بأرصدة افتتاحية قبل تفعيل قيد الرصيد الافتتاحي التلقائي. القيود الجديدة تبقى متطابقة.
+                    </p>
+                  )}
+                </div>
+              )}
             </Card>
           )}
         </div>
