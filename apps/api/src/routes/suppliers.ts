@@ -3,6 +3,7 @@ import { z } from 'zod';
 import prisma from '../lib/prisma';
 import { requireAuth, requirePermission } from '../middleware/auth';
 import { getPagination, paginatedResponse } from '../lib/paginate';
+import { postOpeningBalanceEntry } from '../lib/ledger';
 
 const router = Router();
 router.use(requireAuth);
@@ -145,7 +146,14 @@ router.post('/', requirePermission('suppliers.create'), async (req: Request, res
     if (data.currentBalance === undefined) {
       data.currentBalance = data.openingBalance ?? 0;
     }
-    const supplier = await prisma.supplier.create({ data });
+    const userId = req.user!.userId;
+    const supplier = await prisma.$transaction(async (tx) => {
+      const created = await tx.supplier.create({ data });
+      // Post the opening balance to the AP control account so the GL matches
+      // the subledger from creation (offset to opening-balance equity).
+      await postOpeningBalanceEntry(tx, 'SUPPLIER', created.nameAr, Number(created.openingBalance), userId);
+      return created;
+    });
     res.status(201).json(supplier);
   } catch (err) {
     next(err);

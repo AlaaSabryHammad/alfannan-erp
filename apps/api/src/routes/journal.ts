@@ -12,7 +12,7 @@ import { JournalSource } from '@prisma/client';
 import prisma from '../lib/prisma';
 import { requireAuth, requirePermission } from '../middleware/auth';
 import { getPagination, paginatedResponse } from '../lib/paginate';
-import { postJournalEntry, previewYearClose, closeFiscalYear } from '../lib/ledger';
+import { postJournalEntry, previewYearClose, closeFiscalYear, assertNoControlAccounts, CONTROL_ACCOUNT_ERROR } from '../lib/ledger';
 import { parseDateRange } from '../lib/dateRange';
 
 const router = Router();
@@ -144,6 +144,7 @@ router.post('/', requirePermission('accounts.create'), async (req: Request, res:
     const date   = body.date ? new Date(body.date) : new Date();
 
     const created = await prisma.$transaction(async (tx) => {
+      await assertNoControlAccounts(tx, body.lines.map((l) => l.accountId).filter((x): x is number => x != null));
       return postJournalEntry(tx, {
         date,
         description: body.description,
@@ -166,7 +167,7 @@ router.post('/', requirePermission('accounts.create'), async (req: Request, res:
 
     res.status(201).json(entry);
   } catch (err: any) {
-    if (err?.message?.includes('القيد غير متوازن')) {
+    if (err?.message?.includes('القيد غير متوازن') || err?.message === CONTROL_ACCOUNT_ERROR) {
       res.status(400).json({ error: err.message });
       return;
     }

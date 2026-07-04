@@ -7,6 +7,33 @@ const router = Router();
 router.use(requireAuth);
 router.use(requirePermission('reports.view'));
 
+// GET /api/reports/control-reconciliation — تسوية الدفتر المساعد مع الأستاذ العام
+// Compares the customer/supplier subledger totals against the AR (3000) / AP
+// (2000) control-account balances in the GL. They should always match now that
+// opening balances post entries and manual postings to control accounts are
+// blocked; any residual difference flags legacy data that needs correcting.
+router.get('/control-reconciliation', async (_req: Request, res: Response, next: NextFunction) => {
+  try {
+    const round2 = (n: number) => Math.round(n * 100) / 100;
+    const [custAgg, suppAgg, ar, ap] = await Promise.all([
+      prisma.customer.aggregate({ _sum: { currentBalance: true } }),
+      prisma.supplier.aggregate({ _sum: { currentBalance: true } }),
+      prisma.account.findUnique({ where: { code: '3000' }, select: { currentBalance: true } }),
+      prisma.account.findUnique({ where: { code: '2000' }, select: { currentBalance: true } }),
+    ]);
+    const arSub = round2(Number(custAgg._sum.currentBalance ?? 0));
+    const arGL = round2(Number(ar?.currentBalance ?? 0));
+    const apSub = round2(Number(suppAgg._sum.currentBalance ?? 0));
+    const apGL = round2(Number(ap?.currentBalance ?? 0));
+    res.json({
+      receivables: { subledger: arSub, generalLedger: arGL, difference: round2(arSub - arGL), balanced: Math.abs(arSub - arGL) < 0.01 },
+      payables:    { subledger: apSub, generalLedger: apGL, difference: round2(apSub - apGL), balanced: Math.abs(apSub - apGL) < 0.01 },
+    });
+  } catch (err) {
+    next(err);
+  }
+});
+
 // GET /api/reports/sales-log
 router.get('/sales-log', async (req: Request, res: Response, next: NextFunction) => {
   try {

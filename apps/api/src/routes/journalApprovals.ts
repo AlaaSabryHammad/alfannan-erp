@@ -20,7 +20,7 @@ import { JournalSource, ApprovalStatus } from '@prisma/client';
 import prisma from '../lib/prisma';
 import { requireAuth, requirePermission } from '../middleware/auth';
 import { getPagination, paginatedResponse } from '../lib/paginate';
-import { postJournalEntry } from '../lib/ledger';
+import { postJournalEntry, assertNoControlAccounts, CONTROL_ACCOUNT_ERROR } from '../lib/ledger';
 
 const router = Router();
 router.use(requireAuth);
@@ -93,6 +93,12 @@ router.post('/', requirePermission('accounts.create'), async (req: Request, res:
       res.status(400).json({ error: 'القيد غير متوازن' });
       return;
     }
+    try {
+      await assertNoControlAccounts(prisma, body.lines.map((l) => l.accountId));
+    } catch {
+      res.status(400).json({ error: CONTROL_ACCOUNT_ERROR });
+      return;
+    }
 
     const created = await prisma.journalEntryApproval.create({
       data: {
@@ -142,6 +148,12 @@ router.put('/:id', requirePermission('accounts.create'), async (req: Request, re
     const totalCredit = body.lines.reduce((s, l) => s + l.credit, 0);
     if (Math.abs(totalDebit - totalCredit) > 0.001) {
       res.status(400).json({ error: 'القيد غير متوازن' });
+      return;
+    }
+    try {
+      await assertNoControlAccounts(prisma, body.lines.map((l) => l.accountId));
+    } catch {
+      res.status(400).json({ error: CONTROL_ACCOUNT_ERROR });
       return;
     }
 

@@ -29,7 +29,29 @@ export const ACCT: Record<string, string> = {
   SALES_RETURNS:    '4200',     // مردودات المبيعات (REVENUE contra — debit-normal usage)
   DISCOUNT_ALLOWED: '5100',     // الخصم المسموح به (EXPENSE)
   RETAINED_EARNINGS: '7900',    // الأرباح المرحلة (EQUITY)
+  OPENING_EQUITY:    '7910',    // رصيد افتتاحي (EQUITY) — مقابل الأرصدة الافتتاحية للعملاء/الموردين
 };
+
+/**
+ * Control (subledger) accounts: their balance is owned by the customer/supplier
+ * subledgers and must only move through invoices/vouchers/returns — never a
+ * direct manual journal entry, or the subledger and the GL would silently
+ * diverge. Manual-entry endpoints reject lines that target these.
+ */
+export const CONTROL_ACCOUNT_CODES = [ACCT.AR, ACCT.AP];
+export const CONTROL_ACCOUNT_ERROR =
+  'لا يمكن التقييد اليدوي المباشر على حساب العملاء (3000) أو الموردين (2000) — استخدم الفواتير والسندات';
+
+/** Throws CONTROL_ACCOUNT_ERROR if any of the given account ids is a control account. */
+export async function assertNoControlAccounts(
+  db: Prisma.TransactionClient,
+  accountIds: number[],
+): Promise<void> {
+  const ids = [...new Set(accountIds)];
+  if (ids.length === 0) return;
+  const hits = await db.account.count({ where: { id: { in: ids }, code: { in: CONTROL_ACCOUNT_CODES } } });
+  if (hits > 0) throw new Error(CONTROL_ACCOUNT_ERROR);
+}
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -287,6 +309,51 @@ async function getOrCreateRetainedEarningsAccount(tx: Prisma.TransactionClient) 
       nameAr: 'الأرباح المرحلة',
       type: AccountType.EQUITY,
     },
+  });
+}
+
+/** Opening-balance equity account (7910) — the offset for customer/supplier opening balances. */
+export async function getOrCreateOpeningEquityAccount(tx: Prisma.TransactionClient) {
+  const existing = await tx.account.findUnique({ where: { code: ACCT.OPENING_EQUITY } });
+  if (existing) return existing;
+  return tx.account.create({
+    data: { code: ACCT.OPENING_EQUITY, nameAr: 'رصيد افتتاحي', type: AccountType.EQUITY },
+  });
+}
+
+/**
+ * Posts the opening journal entry for a party's opening balance so the AR/AP
+ * control account matches the subledger from day one:
+ *   customer owed (positive): Dr AR / Cr opening-equity
+ *   supplier owed (positive): Cr AP / Dr opening-equity
+ * Negative balances flip the sides. Zero posts nothing.
+ */
+export async function postOpeningBalanceEntry(
+  tx: Prisma.TransactionClient,
+  party: 'CUSTOMER' | 'SUPPLIER',
+  name: string,
+  openingBalance: number,
+  createdById: number | null,
+): Promise<void> {
+  if (Math.abs(openingBalance) < 0.005) return;
+  const equity = await getOrCreateOpeningEquityAccount(tx);
+  const controlCode = party === 'CUSTOMER' ? ACCT.AR : ACCT.AP;
+  const amt = Math.abs(openingBalance);
+  const positive = openingBalance > 0;
+
+  // customer positive → Dr AR ; supplier positive → Cr AP
+  const controlDebit = party === 'CUSTOMER' ? positive : !positive;
+
+  await postJournalEntry(tx, {
+    date: new Date(),
+    description: `رصيد افتتاحي — ${party === 'CUSTOMER' ? 'عميل' : 'مورّد'} ${name}`,
+    sourceType: JournalSource.OPENING,
+    sourceId: null,
+    createdById,
+    lines: [
+      { accountCode: controlCode, debit: controlDebit ? amt : 0, credit: controlDebit ? 0 : amt },
+      { accountId: equity.id,     debit: controlDebit ? 0 : amt, credit: controlDebit ? amt : 0 },
+    ],
   });
 }
 
