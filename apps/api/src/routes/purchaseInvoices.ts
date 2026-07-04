@@ -190,6 +190,15 @@ router.post('/:id/receive', requirePermission('purchases.create'), async (req: R
       const creditAccountCode =
         invoice.paymentStatus === 'PAID' && voucherCount === 0 ? ACCT.CASH : ACCT.AP;
 
+      // Raise the supplier balance now (it wasn't raised while PENDING) so the
+      // subledger matches the AP credit posted below.
+      if (invoice.paymentStatus !== 'PAID') {
+        await tx.supplier.update({
+          where: { id: invoice.supplierId },
+          data: { currentBalance: { increment: invoice.total } },
+        });
+      }
+
       const taxAmount = Number(invoice.tax);
       const ledgerLines = [
         { accountCode: ACCT.INVENTORY, debit: subtotal - discount, credit: 0, description: `مخزون ${invoice.refNo}` },
@@ -263,9 +272,12 @@ router.delete('/:id', requirePermission('purchases.delete'), async (req: Request
         where: { sourceType: JournalSource.PURCHASE_INVOICE, sourceId: id },
         include: { lines: { include: { account: { select: { code: true } } } } },
       });
+      // The supplier balance is raised only when AP is credited (RECEIVED &&
+      // unpaid). A PENDING invoice has no journal entry and never raised it, so
+      // there is nothing to reverse.
       const raisedBalance = creationEntry
         ? creationEntry.lines.some((l) => l.account.code === ACCT.AP && Number(l.credit) > 0)
-        : invoice.paymentStatus !== 'PAID';
+        : false;
 
       // Reverse ledger entry if one exists
       await reverseJournalEntryBySource(tx, JournalSource.PURCHASE_INVOICE, id);

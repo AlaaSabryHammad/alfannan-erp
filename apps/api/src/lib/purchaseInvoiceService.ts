@@ -107,10 +107,11 @@ export async function createPurchaseInvoiceInTx(tx: Prisma.TransactionClient, bo
     }
   }
 
-  // Increment supplier balance only if this invoice actually creates a payable
-  // (matches the sales-invoice side, which only touches customer balance for
-  // CREDIT/unpaid invoices — an invoice paid in full at creation owes nothing).
-  if (body.paymentStatus !== 'PAID') {
+  // Raise the supplier balance only when a payable actually exists in the GL:
+  // i.e. the goods are RECEIVED (AP is credited) and it isn't paid at creation.
+  // A PENDING order owes nothing yet — the payable (and this balance) are raised
+  // on receipt, so the supplier subledger stays in step with the AP account.
+  if (body.receiveStatus === 'RECEIVED' && body.paymentStatus !== 'PAID') {
     await tx.supplier.update({
       where: { id: body.supplierId },
       data: { currentBalance: { increment: total } },

@@ -954,8 +954,10 @@ router.get('/ap-aging', async (req: Request, res: Response, next: NextFunction) 
   try {
     const asOf = req.query.asOf ? new Date(req.query.asOf as string) : new Date();
 
+    // Only RECEIVED invoices are actual payables — a PENDING order isn't owed
+    // yet and never hit AP/the supplier balance, so it must not be aged either.
     const invoices = await prisma.purchaseInvoice.findMany({
-      where: { paymentStatus: { not: 'PAID' } },
+      where: { paymentStatus: { not: 'PAID' }, receiveStatus: 'RECEIVED' },
       include: { supplier: { select: { id: true, nameAr: true } } },
     });
     const invoiceIds = invoices.map((i) => i.id);
