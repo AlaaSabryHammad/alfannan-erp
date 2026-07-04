@@ -153,6 +153,9 @@ export async function createSalesInvoiceInTx(tx: Prisma.TransactionClient, body:
           productId: item.productId,
           qty: item.qty,
           unitPrice: item.unitPrice,
+          // snapshot the moving-average cost at sale time so a later return can
+          // reverse the exact COGS this sale booked, not a since-drifted average
+          unitCost: Number(productMap.get(item.productId)?.costPrice ?? 0),
           lineTotal: item.qty * item.unitPrice,
         })),
       },

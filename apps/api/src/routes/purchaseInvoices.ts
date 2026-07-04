@@ -5,7 +5,7 @@ import prisma from '../lib/prisma';
 import { requireAuth, requirePermission } from '../middleware/auth';
 import { getPagination, paginatedResponse } from '../lib/paginate';
 import { postJournalEntry, reverseJournalEntryBySource, ACCT } from '../lib/ledger';
-import { applyMovingAverageCost } from '../lib/costing';
+import { applyMovingAverageCost, reverseMovingAverageCost } from '../lib/costing';
 import { getPurchaseInvoiceSettlement } from '../lib/settlement';
 import { createPurchaseInvoiceInTx } from '../lib/purchaseInvoiceService';
 import { runWithRetry } from '../lib/retry';
@@ -274,7 +274,13 @@ router.delete('/:id', requirePermission('purchases.delete'), async (req: Request
       // If the stock was already consumed elsewhere (sold/transferred), refuse the
       // delete rather than silently corrupting the balance into a fake negative.
       if (invoice.receiveStatus === 'RECEIVED') {
+        // net unit cost that was averaged in on receipt (after the invoice discount)
+        const sub = Number(invoice.subtotal);
+        const netFactor = sub > 0 ? (sub - Number(invoice.discount)) / sub : 1;
         for (const item of invoice.items) {
+          // Undo this receipt's effect on the moving average BEFORE removing stock
+          await reverseMovingAverageCost(tx, item.productId, Number(item.qty), Number(item.unitCost) * netFactor);
+
           const balance = await tx.stockBalance.upsert({
             where: { productId_warehouseId: { productId: item.productId, warehouseId: invoice.warehouseId } },
             update: { quantity: { decrement: item.qty } },

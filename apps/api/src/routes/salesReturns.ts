@@ -266,10 +266,22 @@ router.post('/', requirePermission('sales.create'), async (req: Request, res: Re
       }
       ledgerLines.push({ accountCode: creditAccountCode, debit: 0, credit: total, description: `ردّ قيمة مرتجع ${refNo}` });
 
-      // Reverse COGS for the restocked goods: Dr inventory / Cr COGS
+      // Reverse COGS for the restocked goods at the cost booked WHEN SOLD
+      // (stored per line at sale time), so the reversal exactly offsets the
+      // original COGS. Falls back to the current average for legacy invoices
+      // created before unitCost was stored.
+      const saleItems = await tx.salesInvoiceItem.findMany({
+        where: { invoiceId: invoice.id },
+        select: { productId: true, unitCost: true },
+      });
+      const costAtSale = new Map<number, number>();
+      for (const si of saleItems) {
+        if (!costAtSale.has(si.productId)) costAtSale.set(si.productId, Number(si.unitCost));
+      }
       const cogs = round2(lines.reduce((s, l) => {
-        const prod = productMap.get(l.productId);
-        return s + (prod ? Number(prod.costPrice) * l.qty : 0);
+        let unit = costAtSale.get(l.productId) ?? 0;
+        if (unit <= 0) unit = Number(productMap.get(l.productId)?.costPrice ?? 0);
+        return s + unit * l.qty;
       }, 0));
       if (cogs > 0) {
         ledgerLines.push({ accountCode: ACCT.INVENTORY, debit: cogs, credit: 0, description: `إعادة مخزون ${refNo}` });

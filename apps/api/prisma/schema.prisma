@@ -489,6 +489,7 @@ model SalesInvoiceItem {
   productId Int
   qty       Decimal @db.Decimal(12, 2)
   unitPrice Decimal @db.Decimal(12, 2)
+  unitCost  Decimal @db.Decimal(12, 2) @default(0) // متوسط تكلفة الوحدة وقت البيع — لعكس تكلفة البضاعة عند المرتجع بدقة
   lineTotal Decimal @db.Decimal(12, 2)
 
   invoice SalesInvoice @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
