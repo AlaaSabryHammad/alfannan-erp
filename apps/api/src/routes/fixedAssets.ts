@@ -151,6 +151,23 @@ router.post('/:id/depreciate', requirePermission('assets.create'), async (req: R
         throw new Error('الأصل غير نشط (تم التخلص منه)');
       }
 
+      // Once per calendar month only — mirrors the scheduler's guard so the
+      // manual button can't double-depreciate an asset within the same month.
+      const monthStart = new Date(depDate.getFullYear(), depDate.getMonth(), 1);
+      const nextMonth = new Date(depDate.getFullYear(), depDate.getMonth() + 1, 1);
+      const already = await tx.journalEntry.findFirst({
+        where: {
+          sourceType: JournalSource.DEPRECIATION,
+          sourceId: asset.id,
+          date: { gte: monthStart, lt: nextMonth },
+          description: { startsWith: 'إهلاك شهري' },
+        },
+        select: { id: true },
+      });
+      if (already) {
+        throw new Error('تم إهلاك هذا الأصل بالفعل خلال هذا الشهر');
+      }
+
       const cost = Number(asset.purchaseCost);
       const salvage = Number(asset.salvageValue);
       const lifeMonths = asset.usefulLifeMonths;
@@ -192,7 +209,7 @@ router.post('/:id/depreciate', requirePermission('assets.create'), async (req: R
 
     res.json(result);
   } catch (err: any) {
-    if (typeof err?.message === 'string' && (err.message.includes('غير نشط') || err.message.includes('قيمته المتبقية'))) {
+    if (typeof err?.message === 'string' && (err.message.includes('غير نشط') || err.message.includes('قيمته المتبقية') || err.message.includes('خلال هذا الشهر'))) {
       res.status(400).json({ error: err.message });
       return;
     }
