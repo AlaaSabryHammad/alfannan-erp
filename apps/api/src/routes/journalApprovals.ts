@@ -118,6 +118,65 @@ router.post('/', requirePermission('accounts.create'), async (req: Request, res:
   }
 });
 
+// PUT /api/journal-approvals/:id — maker edits their own request and (re)submits it.
+// Works while PENDING (fixing before review) and after REJECTED (fix + resubmit):
+// a rejected entry returns to PENDING with its rejection metadata cleared. The
+// entry has never touched the ledger, so editing it is safe.
+router.put('/:id', requirePermission('accounts.create'), async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const id = parseInt(req.params.id);
+    const body = createSchema.parse(req.body);
+    const userId = req.user!.userId;
+
+    const existing = await prisma.journalEntryApproval.findUniqueOrThrow({ where: { id } });
+    if (existing.createdById !== userId) {
+      res.status(403).json({ error: 'يمكنك تعديل طلباتك الخاصة فقط' });
+      return;
+    }
+    if (existing.status === 'APPROVED') {
+      res.status(400).json({ error: 'لا يمكن تعديل قيد تم اعتماده وترحيله' });
+      return;
+    }
+
+    const totalDebit = body.lines.reduce((s, l) => s + l.debit, 0);
+    const totalCredit = body.lines.reduce((s, l) => s + l.credit, 0);
+    if (Math.abs(totalDebit - totalCredit) > 0.001) {
+      res.status(400).json({ error: 'القيد غير متوازن' });
+      return;
+    }
+
+    const updated = await prisma.$transaction(async (tx) => {
+      await tx.journalEntryApprovalLine.deleteMany({ where: { requestId: id } });
+      return tx.journalEntryApproval.update({
+        where: { id },
+        data: {
+          description: body.description,
+          date: body.date ? new Date(body.date) : new Date(),
+          // resubmit: back to PENDING, clear the prior review outcome
+          status: 'PENDING',
+          rejectReason: null,
+          reviewedById: null,
+          reviewedAt: null,
+          lines: {
+            create: body.lines.map((l) => ({
+              accountId: l.accountId,
+              costCenterId: l.costCenterId ?? null,
+              debit: l.debit,
+              credit: l.credit,
+              description: l.description ?? null,
+            })),
+          },
+        },
+        include: { lines: { include: { account: { select: { code: true, nameAr: true } } } } },
+      });
+    });
+
+    res.json(updated);
+  } catch (err) {
+    next(err);
+  }
+});
+
 // POST /api/journal-approvals/:id/approve — checker approves → posts the real entry
 router.post('/:id/approve', requirePermission('accounts.edit'), async (req: Request, res: Response, next: NextFunction) => {
   try {
@@ -219,8 +278,10 @@ router.delete('/:id', requirePermission('accounts.create'), async (req: Request,
 
     const request = await prisma.journalEntryApproval.findUniqueOrThrow({ where: { id } });
 
-    if (request.status !== 'PENDING') {
-      res.status(400).json({ error: 'لا يمكن حذف طلب تمت مراجعته مسبقاً' });
+    // Approved requests posted a real ledger entry — they are a permanent record.
+    // Pending (cancel) and rejected (discard) requests may be removed by the maker.
+    if (request.status === 'APPROVED') {
+      res.status(400).json({ error: 'لا يمكن حذف قيد تم اعتماده وترحيله' });
       return;
     }
     if (request.createdById !== userId) {

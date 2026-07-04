@@ -1,8 +1,9 @@
 import { useState } from 'react';
 import { useQuery, useMutation } from '@tanstack/react-query';
 import {
-  AlertTriangle, Bell, CheckCircle, Package, FileText, ShoppingCart, Filter, UserX, ShieldCheck, CalendarClock, MessageCircle,
+  AlertTriangle, Bell, CheckCircle, Package, FileText, ShoppingCart, Filter, UserX, ShieldCheck, CalendarClock, MessageCircle, XCircle,
 } from 'lucide-react';
+import { useAuth } from '../../contexts/AuthContext';
 import { PageHeader } from '../../components/ui/PageHeader';
 import { Badge } from '../../components/ui/Badge';
 import { Button } from '../../components/ui/Button';
@@ -73,6 +74,7 @@ interface JournalApproval {
   description: string;
   date: string;
   createdById: number;
+  rejectReason?: string | null;
   lines: { debit: number; credit: number }[];
 }
 
@@ -90,7 +92,7 @@ interface ExpiringProduct {
 }
 
 // ─── Alert types ──────────────────────────────────────────────────────────────
-type AlertType = 'low-stock' | 'unpaid-sale' | 'pending-purchase' | 'over-credit-limit' | 'pending-approval' | 'expiring-product';
+type AlertType = 'low-stock' | 'unpaid-sale' | 'pending-purchase' | 'over-credit-limit' | 'pending-approval' | 'rejected-entry' | 'expiring-product';
 
 interface AlertItem {
   id: string;
@@ -111,6 +113,7 @@ const filterLabels: Record<FilterType, string> = {
   'pending-purchase': 'توريدات معلقة',
   'over-credit-limit': 'تجاوز حد الائتمان',
   'pending-approval': 'قيود تحتاج اعتماد',
+  'rejected-entry': 'قيودي المرفوضة',
   'expiring-product': 'قرب/انتهاء الصلاحية',
 };
 
@@ -120,6 +123,7 @@ const typeIcons: Record<AlertType, React.ReactNode> = {
   'pending-purchase': <ShoppingCart size={18} />,
   'over-credit-limit': <UserX size={18} />,
   'pending-approval': <ShieldCheck size={18} />,
+  'rejected-entry': <XCircle size={18} />,
   'expiring-product': <CalendarClock size={18} />,
 };
 
@@ -136,6 +140,7 @@ function Skeleton({ className = '' }: { className?: string }) {
 // ─── Main Component ────────────────────────────────────────────────────────────
 export function AlertsPage() {
   const [filter, setFilter] = useState<FilterType>('all');
+  const { user } = useAuth();
 
   const { data: lowStock, isLoading: lowLoading } = useQuery({
     queryKey: ['alerts-low-stock'],
@@ -166,12 +171,18 @@ export function AlertsPage() {
       (await apiClient.get<PaginatedApprovals>('/journal-approvals', { params: { status: 'PENDING', page: 1, pageSize: 200 } })).data,
   });
 
+  const { data: rejectedData, isLoading: rejectedLoading } = useQuery({
+    queryKey: ['journal-approvals', 'rejected', 'alerts'],
+    queryFn: async () =>
+      (await apiClient.get<PaginatedApprovals>('/journal-approvals', { params: { status: 'REJECTED', page: 1, pageSize: 200 } })).data,
+  });
+
   const { data: expiringProducts, isLoading: expiringLoading } = useQuery({
     queryKey: ['reports-expiring-products', 'alerts'],
     queryFn: async () => (await apiClient.get<ExpiringProduct[]>('/reports/expiring-products', { params: { days: 30 } })).data,
   });
 
-  const isLoading = lowLoading || salesLoading || purchasesLoading || customersLoading || approvalsLoading || expiringLoading;
+  const isLoading = lowLoading || salesLoading || purchasesLoading || customersLoading || approvalsLoading || rejectedLoading || expiringLoading;
 
   // ─── Build alerts list ────────────────────────────────────────────────────
   const alerts: AlertItem[] = [];
@@ -247,6 +258,21 @@ export function AlertsPage() {
       date: a.date,
     });
   });
+
+  // My own journal entries that were rejected — need me to fix and resubmit
+  (rejectedData?.data ?? [])
+    .filter((a) => a.createdById === user?.id)
+    .forEach((a) => {
+      const amount = a.lines.reduce((s, l) => s + Number(l.debit), 0);
+      alerts.push({
+        id: `rejected-entry-${a.id}`,
+        type: 'rejected-entry',
+        severity: 'danger',
+        title: `قيدك مرفوض: ${a.description}`,
+        message: `القيمة: ${formatMoney(amount)}${a.rejectReason ? ` — السبب: ${a.rejectReason}` : ''} — عدّله وأعد إرساله من شاشة اعتماد القيود`,
+        date: a.date,
+      });
+    });
 
   // Products expired or expiring soon
   (expiringProducts ?? []).forEach((p) => {
