@@ -186,7 +186,8 @@
       "PowerShell(schtasks /Create /TN \"AlfannanDbBackup\" /TR \"powershell -ExecutionPolicy Bypass -File D:\\\\projects\\\\Alfannan\\\\scripts\\\\backup-db.ps1\" /SC DAILY /ST 03:00 /F; schtasks /Query /TN \"AlfannanDbBackup\" 2>&1 | Select-Object -Last 3)",
       "Bash(curl -s -o /dev/null -w \"%{http_code}\" http://localhost:4000/health)",
       "PowerShell(cd D:\\\\projects\\\\Alfannan\\\\apps\\\\api; npx prisma validate 2>&1 | Select-Object -Last 1; npx prisma migrate diff --from-url \"postgresql://postgres:1359@localhost:5432/alfannan?schema=public\" --to-schema-datamodel prisma/schema.prisma --script > \"$env:TEMP\\\\mig6.sql\"; $dir = \"D:\\\\projects\\\\Alfannan\\\\apps\\\\api\\\\prisma\\\\migrations\\\\20260704060000_add_zatca_signature_qr\"; New-Item -ItemType Directory -Force $dir | Out-Null; Copy-Item \"$env:TEMP\\\\mig6.sql\" \"$dir\\\\migration.sql\"; npx prisma migrate deploy 2>&1 | Select-Object -Last 2; npx prisma generate 2>&1 | Select-String \"Generated\")",
-      "PowerShell($conn = Get-NetTCPConnection -LocalPort 4000 -State Listen -ErrorAction SilentlyContinue; if \\($conn\\) { $conn.OwningProcess | Select-Object -Unique | ForEach-Object { Stop-Process -Id $_ -Force -ErrorAction SilentlyContinue; \"killed PID $_\" } } else { \"no listener on 4000\" })"
+      "PowerShell($conn = Get-NetTCPConnection -LocalPort 4000 -State Listen -ErrorAction SilentlyContinue; if \\($conn\\) { $conn.OwningProcess | Select-Object -Unique | ForEach-Object { Stop-Process -Id $_ -Force -ErrorAction SilentlyContinue; \"killed PID $_\" } } else { \"no listener on 4000\" })",
+      "PowerShell($conn = Get-NetTCPConnection -LocalPort 4000 -State Listen -ErrorAction SilentlyContinue; if \\($conn\\) { $conn.OwningProcess | Select-Object -Unique | ForEach-Object { Stop-Process -Id $_ -Force -ErrorAction SilentlyContinue } }; Start-Sleep 1; \"restarting\")"
     ]
   }
 }
