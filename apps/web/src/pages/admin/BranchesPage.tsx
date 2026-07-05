@@ -111,9 +111,9 @@ function BranchFormModal({ open, onClose, editTarget }: { open: boolean; onClose
 
 export function BranchesPage() {
   const qc = useQueryClient();
-  const canEdit = usePermission('warehouses.edit');
-  const canCreate = usePermission('warehouses.create');
-  const canDelete = usePermission('warehouses.delete');
+  const canEdit = usePermission('branches.edit');
+  const canCreate = usePermission('branches.create');
+  const canDelete = usePermission('branches.delete');
   const [formOpen, setFormOpen] = useState(false);
   const [editTarget, setEditTarget] = useState<Branch | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<Branch | null>(null);

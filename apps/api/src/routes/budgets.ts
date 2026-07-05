@@ -9,7 +9,7 @@ router.use(requireAuth);
 // GET /api/budgets/grid?year=2026
 // One row per REVENUE/EXPENSE account with its 12 monthly budget amounts
 // (account-level only — costCenterId is always null from this endpoint).
-router.get('/grid', requirePermission('accounts.view'), async (req: Request, res: Response, next: NextFunction) => {
+router.get('/grid', requirePermission('budgets.view'), async (req: Request, res: Response, next: NextFunction) => {
   try {
     const year = parseInt(req.query.year as string) || new Date().getFullYear();
 
@@ -51,7 +51,7 @@ const gridSaveSchema = z.object({
   months: z.array(z.number().nonnegative()).length(12),
 });
 
-router.post('/grid', requirePermission('accounts.edit'), async (req: Request, res: Response, next: NextFunction) => {
+router.post('/grid', requirePermission('budgets.edit'), async (req: Request, res: Response, next: NextFunction) => {
   try {
     const body = gridSaveSchema.parse(req.body);
 

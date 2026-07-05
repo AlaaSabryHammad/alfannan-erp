@@ -159,8 +159,8 @@ function MatchModal({ recon, open, onClose, onChanged }: {
 
 export function BankReconciliationPage() {
   const qc = useQueryClient();
-  const canCreate = usePermission('treasury.create');
-  const canDelete = usePermission('treasury.delete');
+  const canCreate = usePermission('reconciliation.create');
+  const canDelete = usePermission('reconciliation.delete');
 
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);

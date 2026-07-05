@@ -60,7 +60,7 @@ const orderInclude = {
 };
 
 // GET /api/sales-orders
-router.get('/', requirePermission('sales.view'), async (req: Request, res: Response, next: NextFunction) => {
+router.get('/', requirePermission('salesorders.view'), async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { page, pageSize, search, skip } = getPagination(req);
     const where: Record<string, unknown> = {};
@@ -86,7 +86,7 @@ router.get('/', requirePermission('sales.view'), async (req: Request, res: Respo
 });
 
 // GET /api/sales-orders/:id
-router.get('/:id', requirePermission('sales.view'), async (req: Request, res: Response, next: NextFunction) => {
+router.get('/:id', requirePermission('salesorders.view'), async (req: Request, res: Response, next: NextFunction) => {
   try {
     const order = await prisma.salesOrder.findUniqueOrThrow({ where: { id: parseInt(req.params.id) }, include: orderInclude });
     res.json(order);
@@ -96,7 +96,7 @@ router.get('/:id', requirePermission('sales.view'), async (req: Request, res: Re
 });
 
 // POST /api/sales-orders — manual order (without a quotation)
-router.post('/', requirePermission('sales.create'), async (req: Request, res: Response, next: NextFunction) => {
+router.post('/', requirePermission('salesorders.create'), async (req: Request, res: Response, next: NextFunction) => {
   try {
     const body = orderSchema.parse(req.body);
     const userId = req.user!.userId;
@@ -167,7 +167,7 @@ const fulfillSchema = z.object({
   paidStatus: z.enum(['PAID', 'UNPAID', 'PARTIAL']).optional().default('PAID'),
 });
 
-router.post('/:id/fulfill', requirePermission('sales.create'), async (req: Request, res: Response, next: NextFunction) => {
+router.post('/:id/fulfill', requirePermission('salesorders.create'), async (req: Request, res: Response, next: NextFunction) => {
   try {
     const id = parseInt(req.params.id);
     const body = fulfillSchema.parse(req.body ?? {});
@@ -219,7 +219,7 @@ router.post('/:id/fulfill', requirePermission('sales.create'), async (req: Reque
 });
 
 // POST /api/sales-orders/:id/cancel
-router.post('/:id/cancel', requirePermission('sales.create'), async (req: Request, res: Response, next: NextFunction) => {
+router.post('/:id/cancel', requirePermission('salesorders.create'), async (req: Request, res: Response, next: NextFunction) => {
   try {
     const id = parseInt(req.params.id);
     const claimed = await prisma.salesOrder.updateMany({
@@ -238,7 +238,7 @@ router.post('/:id/cancel', requirePermission('sales.create'), async (req: Reques
 });
 
 // DELETE /api/sales-orders/:id — only non-fulfilled; frees the quotation back to ACCEPTED
-router.delete('/:id', requirePermission('sales.delete'), async (req: Request, res: Response, next: NextFunction) => {
+router.delete('/:id', requirePermission('salesorders.delete'), async (req: Request, res: Response, next: NextFunction) => {
   try {
     const id = parseInt(req.params.id);
     await prisma.$transaction(async (tx) => {

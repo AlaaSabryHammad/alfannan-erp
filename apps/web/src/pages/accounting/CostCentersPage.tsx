@@ -49,9 +49,9 @@ function toast(msg: string, type: 'success' | 'error' = 'success') {
 // --- Component ---
 export function CostCentersPage() {
   const qc = useQueryClient();
-  const canCreate = usePermission('accounts.create');
-  const canEdit = usePermission('accounts.edit');
-  const canDelete = usePermission('accounts.delete');
+  const canCreate = usePermission('costcenters.create');
+  const canEdit = usePermission('costcenters.edit');
+  const canDelete = usePermission('costcenters.delete');
 
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);

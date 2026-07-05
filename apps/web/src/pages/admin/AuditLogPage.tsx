@@ -77,7 +77,7 @@ const fetchAuditLogs = async (params: {
 // ─── Main Component ────────────────────────────────────────────────────────────
 
 export function AuditLogPage() {
-  const canView = usePermission('users.view');
+  const canView = usePermission('audit.view');
   const { from, to } = useDateRange();
 
   const [page, setPage] = useState(1);

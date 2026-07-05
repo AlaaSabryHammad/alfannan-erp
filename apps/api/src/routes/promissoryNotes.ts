@@ -75,7 +75,7 @@ async function resolvePartyNames(notes: Array<{ partyType: string | null; partyI
 }
 
 // ── GET /api/promissory-notes — list ──────────────────────────────────────────
-router.get('/', requirePermission('treasury.view'), async (req: Request, res: Response, next: NextFunction) => {
+router.get('/', requirePermission('promissory.view'), async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { page, pageSize, skip, search } = getPagination(req);
     const typeFilter = req.query.type as NoteType | undefined;
@@ -115,7 +115,7 @@ router.get('/', requirePermission('treasury.view'), async (req: Request, res: Re
 });
 
 // ── GET /api/promissory-notes/:id ─────────────────────────────────────────────
-router.get('/:id', requirePermission('treasury.view'), async (req: Request, res: Response, next: NextFunction) => {
+router.get('/:id', requirePermission('promissory.view'), async (req: Request, res: Response, next: NextFunction) => {
   try {
     const id = parseInt(req.params.id);
     const note = await prisma.promissoryNote.findUniqueOrThrow({ where: { id } });
@@ -140,7 +140,7 @@ router.get('/:id', requirePermission('treasury.view'), async (req: Request, res:
 });
 
 // ── POST /api/promissory-notes ────────────────────────────────────────────────
-router.post('/', requirePermission('treasury.create'), async (req: Request, res: Response, next: NextFunction) => {
+router.post('/', requirePermission('promissory.create'), async (req: Request, res: Response, next: NextFunction) => {
   try {
     const body = createNoteSchema.parse(req.body);
     const userId = req.user!.userId;
@@ -178,7 +178,7 @@ router.post('/', requirePermission('treasury.create'), async (req: Request, res:
 });
 
 // ── POST /api/promissory-notes/:id/settle — collect (RECEIVABLE) or pay (PAYABLE)
-router.post('/:id/settle', requirePermission('treasury.create'), async (req: Request, res: Response, next: NextFunction) => {
+router.post('/:id/settle', requirePermission('promissory.create'), async (req: Request, res: Response, next: NextFunction) => {
   try {
     const id = parseInt(req.params.id);
     const body = settleNoteSchema.parse(req.body);
@@ -283,7 +283,7 @@ router.post('/:id/settle', requirePermission('treasury.create'), async (req: Req
 // No money ever moved for a bounced instrument (it was never actually
 // collected/paid), so unlike /settle this has no ledger or party-balance effect
 // — it's purely a status flag so the outstanding receivable/payable stays open.
-router.post('/:id/bounce', requirePermission('treasury.create'), async (req: Request, res: Response, next: NextFunction) => {
+router.post('/:id/bounce', requirePermission('promissory.create'), async (req: Request, res: Response, next: NextFunction) => {
   try {
     const id = parseInt(req.params.id);
     const body = bounceNoteSchema.parse(req.body ?? {});
@@ -315,7 +315,7 @@ router.post('/:id/bounce', requirePermission('treasury.create'), async (req: Req
 });
 
 // ── DELETE /api/promissory-notes/:id ──────────────────────────────────────────
-router.delete('/:id', requirePermission('treasury.delete'), async (req: Request, res: Response, next: NextFunction) => {
+router.delete('/:id', requirePermission('promissory.delete'), async (req: Request, res: Response, next: NextFunction) => {
   try {
     const id = parseInt(req.params.id);
     await prisma.$transaction(async (tx) => {

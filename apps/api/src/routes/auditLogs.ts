@@ -1,7 +1,7 @@
 /**
  * Audit log route — سجل التدقيق
  *
- * GET /api/audit-logs   requirePermission('users.view')
+ * GET /api/audit-logs   requirePermission('audit.view')
  *   Query params (all optional):
  *     page, pageSize   — pagination
  *     from, to         — YYYY-MM-DD range on createdAt
@@ -17,7 +17,7 @@ import { parseDateRange } from '../lib/dateRange';
 const router = Router();
 router.use(requireAuth);
 
-router.get('/', requirePermission('users.view'), async (req: Request, res: Response, next: NextFunction) => {
+router.get('/', requirePermission('audit.view'), async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { page, pageSize, skip } = getPagination(req);
 

@@ -88,8 +88,8 @@ function isOverdue(dueDate: string, status: NoteStatusT): boolean {
 
 export function PromissoryNotesPage() {
   const qc = useQueryClient();
-  const canCreate = usePermission('treasury.create');
-  const canDelete = usePermission('treasury.delete');
+  const canCreate = usePermission('promissory.create');
+  const canDelete = usePermission('promissory.delete');
 
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);

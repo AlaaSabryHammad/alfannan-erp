@@ -14,7 +14,7 @@ const costCenterSchema = z.object({
 });
 
 // GET /api/cost-centers
-router.get('/', requirePermission('accounts.view'), async (req: Request, res: Response, next: NextFunction) => {
+router.get('/', requirePermission('costcenters.view'), async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { page, pageSize, search, skip } = getPagination(req);
     const where = search
@@ -31,7 +31,7 @@ router.get('/', requirePermission('accounts.view'), async (req: Request, res: Re
 });
 
 // POST /api/cost-centers
-router.post('/', requirePermission('accounts.create'), async (req: Request, res: Response, next: NextFunction) => {
+router.post('/', requirePermission('costcenters.create'), async (req: Request, res: Response, next: NextFunction) => {
   try {
     const data = costCenterSchema.parse(req.body);
     const costCenter = await prisma.costCenter.create({ data });
@@ -42,7 +42,7 @@ router.post('/', requirePermission('accounts.create'), async (req: Request, res:
 });
 
 // PUT /api/cost-centers/:id
-router.put('/:id', requirePermission('accounts.edit'), async (req: Request, res: Response, next: NextFunction) => {
+router.put('/:id', requirePermission('costcenters.edit'), async (req: Request, res: Response, next: NextFunction) => {
   try {
     const data = costCenterSchema.partial().parse(req.body);
     const costCenter = await prisma.costCenter.update({ where: { id: parseInt(req.params.id) }, data });
@@ -53,7 +53,7 @@ router.put('/:id', requirePermission('accounts.edit'), async (req: Request, res:
 });
 
 // DELETE /api/cost-centers/:id
-router.delete('/:id', requirePermission('accounts.delete'), async (req: Request, res: Response, next: NextFunction) => {
+router.delete('/:id', requirePermission('costcenters.delete'), async (req: Request, res: Response, next: NextFunction) => {
   try {
     await prisma.costCenter.delete({ where: { id: parseInt(req.params.id) } });
     res.json({ success: true });

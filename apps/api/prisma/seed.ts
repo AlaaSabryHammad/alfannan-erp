@@ -223,6 +223,67 @@ async function main() {
     { code: 'marketing.view', group: 'marketing', nameAr: 'عرض كوبونات الخصم ونقاط الولاء' },
     { code: 'marketing.create', group: 'marketing', nameAr: 'إنشاء وتعديل كوبونات الخصم' },
     { code: 'marketing.delete', group: 'marketing', nameAr: 'حذف كوبونات الخصم' },
+    // Quotations — عروض الأسعار
+    { code: 'quotations.view', group: 'quotations', nameAr: 'عرض عروض الأسعار' },
+    { code: 'quotations.create', group: 'quotations', nameAr: 'إنشاء وإدارة عروض الأسعار' },
+    { code: 'quotations.delete', group: 'quotations', nameAr: 'حذف عروض الأسعار' },
+    // Sales Orders — أوامر البيع
+    { code: 'salesorders.view', group: 'salesorders', nameAr: 'عرض أوامر البيع' },
+    { code: 'salesorders.create', group: 'salesorders', nameAr: 'إنشاء وتنفيذ أوامر البيع' },
+    { code: 'salesorders.delete', group: 'salesorders', nameAr: 'حذف أوامر البيع' },
+    // Sales Returns — مرتجعات المبيعات
+    { code: 'salesreturns.view', group: 'salesreturns', nameAr: 'عرض مرتجعات المبيعات' },
+    { code: 'salesreturns.create', group: 'salesreturns', nameAr: 'إنشاء مرتجعات المبيعات' },
+    { code: 'salesreturns.delete', group: 'salesreturns', nameAr: 'حذف مرتجعات المبيعات' },
+    // Purchase Orders — أوامر الشراء
+    { code: 'purchaseorders.view', group: 'purchaseorders', nameAr: 'عرض أوامر الشراء' },
+    { code: 'purchaseorders.create', group: 'purchaseorders', nameAr: 'إنشاء وتحويل أوامر الشراء' },
+    { code: 'purchaseorders.delete', group: 'purchaseorders', nameAr: 'حذف أوامر الشراء' },
+    // Purchase Returns — مرتجعات المشتريات
+    { code: 'purchasereturns.view', group: 'purchasereturns', nameAr: 'عرض مرتجعات المشتريات' },
+    { code: 'purchasereturns.create', group: 'purchasereturns', nameAr: 'إنشاء مرتجعات المشتريات' },
+    { code: 'purchasereturns.delete', group: 'purchasereturns', nameAr: 'حذف مرتجعات المشتريات' },
+    // Journal — دفتر اليومية
+    { code: 'journal.view', group: 'journal', nameAr: 'عرض دفتر اليومية' },
+    { code: 'journal.create', group: 'journal', nameAr: 'إنشاء قيود اليومية' },
+    // Cost Centers — مراكز التكلفة
+    { code: 'costcenters.view', group: 'costcenters', nameAr: 'عرض مراكز التكلفة' },
+    { code: 'costcenters.create', group: 'costcenters', nameAr: 'إضافة مركز تكلفة' },
+    { code: 'costcenters.edit', group: 'costcenters', nameAr: 'تعديل مركز تكلفة' },
+    { code: 'costcenters.delete', group: 'costcenters', nameAr: 'حذف مركز تكلفة' },
+    // Budgets — الموازنات التقديرية
+    { code: 'budgets.view', group: 'budgets', nameAr: 'عرض الموازنات التقديرية' },
+    { code: 'budgets.edit', group: 'budgets', nameAr: 'تعديل الموازنات التقديرية' },
+    // Recurring Entries — القيود المتكررة
+    { code: 'recurring.view', group: 'recurring', nameAr: 'عرض القيود المتكررة' },
+    { code: 'recurring.create', group: 'recurring', nameAr: 'إنشاء وتوليد القيود المتكررة' },
+    { code: 'recurring.edit', group: 'recurring', nameAr: 'تعديل القيود المتكررة' },
+    { code: 'recurring.delete', group: 'recurring', nameAr: 'حذف القيود المتكررة' },
+    // Journal Approvals — اعتماد القيود
+    { code: 'approvals.view', group: 'approvals', nameAr: 'عرض طلبات اعتماد القيود' },
+    { code: 'approvals.create', group: 'approvals', nameAr: 'تقديم قيد للاعتماد' },
+    { code: 'approvals.review', group: 'approvals', nameAr: 'اعتماد أو رفض القيود' },
+    // Fiscal Periods — الفترات المحاسبية
+    { code: 'fiscalperiods.view', group: 'fiscalperiods', nameAr: 'عرض الفترات المحاسبية' },
+    { code: 'fiscalperiods.edit', group: 'fiscalperiods', nameAr: 'إقفال وفتح الفترات المحاسبية' },
+    // Promissory Notes — الكمبيالات والشيكات
+    { code: 'promissory.view', group: 'promissory', nameAr: 'عرض الكمبيالات والشيكات' },
+    { code: 'promissory.create', group: 'promissory', nameAr: 'إنشاء وتحصيل الكمبيالات والشيكات' },
+    { code: 'promissory.delete', group: 'promissory', nameAr: 'حذف الكمبيالات والشيكات' },
+    // Bank Reconciliation — التسوية البنكية
+    { code: 'reconciliation.view', group: 'reconciliation', nameAr: 'عرض التسويات البنكية' },
+    { code: 'reconciliation.create', group: 'reconciliation', nameAr: 'إنشاء ومطابقة التسوية البنكية' },
+    { code: 'reconciliation.delete', group: 'reconciliation', nameAr: 'حذف التسوية البنكية' },
+    // Stock Count — الجرد المخزني
+    { code: 'stockcount.view', group: 'stockcount', nameAr: 'عرض الجرد المخزني' },
+    { code: 'stockcount.adjust', group: 'stockcount', nameAr: 'تنفيذ وتسوية الجرد المخزني' },
+    // Branches — الفروع ومزامنة البيانات
+    { code: 'branches.view', group: 'branches', nameAr: 'عرض الفروع ومزامنة البيانات' },
+    { code: 'branches.create', group: 'branches', nameAr: 'إضافة فرع' },
+    { code: 'branches.edit', group: 'branches', nameAr: 'تعديل الفرع ومزامنة البيانات' },
+    { code: 'branches.delete', group: 'branches', nameAr: 'حذف فرع' },
+    // Audit Log — سجل التدقيق
+    { code: 'audit.view', group: 'audit', nameAr: 'عرض سجل التدقيق' },
   ];
 
   const permissions: Record<string, { id: number }> = {};
@@ -251,6 +312,21 @@ async function main() {
     'assets.view', 'assets.create', 'assets.delete',
     'hr.view', 'hr.create', 'hr.delete',
     'marketing.view',
+    // Split-out sections (previously covered by the coarse codes above)
+    'quotations.view', 'quotations.create', 'quotations.delete',
+    'salesorders.view', 'salesorders.create', 'salesorders.delete',
+    'salesreturns.view', 'salesreturns.create', 'salesreturns.delete',
+    'purchaseorders.view', 'purchaseorders.create',
+    'purchasereturns.view', 'purchasereturns.create',
+    'journal.view', 'journal.create',
+    'costcenters.view', 'costcenters.create', 'costcenters.edit',
+    'budgets.view', 'budgets.edit',
+    'recurring.view', 'recurring.create', 'recurring.edit',
+    'approvals.view', 'approvals.create', 'approvals.review',
+    'fiscalperiods.view', 'fiscalperiods.edit',
+    'promissory.view', 'promissory.create', 'promissory.delete',
+    'reconciliation.view', 'reconciliation.create', 'reconciliation.delete',
+    'stockcount.view',
   ];
   const storekeeperCodes = [
     'products.view', 'departments.view', 'brands.view', 'units.view',
@@ -259,6 +335,11 @@ async function main() {
     'suppliers.view', 'purchases.view', 'purchases.create',
     'transfers.view', 'transfers.create',
     'manufacturing.view', 'manufacturing.create',
+    // Split-out sections (previously covered by the coarse codes above)
+    'purchaseorders.view', 'purchaseorders.create',
+    'purchasereturns.view', 'purchasereturns.create',
+    'stockcount.view', 'stockcount.adjust',
+    'branches.view',
   ];
   const cashierCodes = ['products.view', 'stock.view', 'sales.view', 'sales.create', 'customers.view', 'dashboard.view'];
 

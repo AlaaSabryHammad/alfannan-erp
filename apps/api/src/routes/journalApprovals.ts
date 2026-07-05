@@ -40,7 +40,7 @@ const createSchema = z.object({
 });
 
 // GET /api/journal-approvals
-router.get('/', requirePermission('accounts.view'), async (req: Request, res: Response, next: NextFunction) => {
+router.get('/', requirePermission('approvals.view'), async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { page, pageSize, skip } = getPagination(req);
     const status = req.query.status as ApprovalStatus | undefined;
@@ -67,7 +67,7 @@ router.get('/', requirePermission('accounts.view'), async (req: Request, res: Re
 });
 
 // GET /api/journal-approvals/:id
-router.get('/:id', requirePermission('accounts.view'), async (req: Request, res: Response, next: NextFunction) => {
+router.get('/:id', requirePermission('approvals.view'), async (req: Request, res: Response, next: NextFunction) => {
   try {
     const request = await prisma.journalEntryApproval.findUniqueOrThrow({
       where: { id: parseInt(req.params.id) },
@@ -82,7 +82,7 @@ router.get('/:id', requirePermission('accounts.view'), async (req: Request, res:
 });
 
 // POST /api/journal-approvals — maker submits a request (no ledger effect yet)
-router.post('/', requirePermission('accounts.create'), async (req: Request, res: Response, next: NextFunction) => {
+router.post('/', requirePermission('approvals.create'), async (req: Request, res: Response, next: NextFunction) => {
   try {
     const body = createSchema.parse(req.body);
     const userId = req.user!.userId;
@@ -128,7 +128,7 @@ router.post('/', requirePermission('accounts.create'), async (req: Request, res:
 // Works while PENDING (fixing before review) and after REJECTED (fix + resubmit):
 // a rejected entry returns to PENDING with its rejection metadata cleared. The
 // entry has never touched the ledger, so editing it is safe.
-router.put('/:id', requirePermission('accounts.create'), async (req: Request, res: Response, next: NextFunction) => {
+router.put('/:id', requirePermission('approvals.create'), async (req: Request, res: Response, next: NextFunction) => {
   try {
     const id = parseInt(req.params.id);
     const body = createSchema.parse(req.body);
@@ -190,7 +190,7 @@ router.put('/:id', requirePermission('accounts.create'), async (req: Request, re
 });
 
 // POST /api/journal-approvals/:id/approve — checker approves → posts the real entry
-router.post('/:id/approve', requirePermission('accounts.edit'), async (req: Request, res: Response, next: NextFunction) => {
+router.post('/:id/approve', requirePermission('approvals.review'), async (req: Request, res: Response, next: NextFunction) => {
   try {
     const id = parseInt(req.params.id);
     const userId = req.user!.userId;
@@ -249,7 +249,7 @@ router.post('/:id/approve', requirePermission('accounts.edit'), async (req: Requ
 // POST /api/journal-approvals/:id/reject
 const rejectSchema = z.object({ reason: z.string().optional() });
 
-router.post('/:id/reject', requirePermission('accounts.edit'), async (req: Request, res: Response, next: NextFunction) => {
+router.post('/:id/reject', requirePermission('approvals.review'), async (req: Request, res: Response, next: NextFunction) => {
   try {
     const id = parseInt(req.params.id);
     const userId = req.user!.userId;
@@ -283,7 +283,7 @@ router.post('/:id/reject', requirePermission('accounts.edit'), async (req: Reque
 });
 
 // DELETE /api/journal-approvals/:id — maker cancels their own still-pending request
-router.delete('/:id', requirePermission('accounts.create'), async (req: Request, res: Response, next: NextFunction) => {
+router.delete('/:id', requirePermission('approvals.create'), async (req: Request, res: Response, next: NextFunction) => {
   try {
     const id = parseInt(req.params.id);
     const userId = req.user!.userId;

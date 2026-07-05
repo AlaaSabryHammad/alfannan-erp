@@ -116,7 +116,7 @@ function EditBudgetModal({
 
 // --- Component ---
 export function BudgetsPage() {
-  const canEdit = usePermission('accounts.edit');
+  const canEdit = usePermission('budgets.edit');
   const currentYear = new Date().getFullYear();
   const [year, setYear] = useState(currentYear);
   const [editRow, setEditRow] = useState<BudgetRow | null>(null);

@@ -22,7 +22,7 @@ const branchSchema = z.object({
 });
 
 // GET /api/branches
-router.get('/', requirePermission('warehouses.view'), async (req: Request, res: Response, next: NextFunction) => {
+router.get('/', requirePermission('branches.view'), async (req: Request, res: Response, next: NextFunction) => {
   try {
     const branches = await prisma.branch.findMany({
       orderBy: { id: 'asc' },
@@ -37,7 +37,7 @@ router.get('/', requirePermission('warehouses.view'), async (req: Request, res: 
 });
 
 // GET /api/branches/sync-status — لوحة حالة المزامنة: ملخص لحظي لكل فرع
-router.get('/sync-status', requirePermission('warehouses.view'), async (req: Request, res: Response, next: NextFunction) => {
+router.get('/sync-status', requirePermission('branches.view'), async (req: Request, res: Response, next: NextFunction) => {
   try {
     const branches = await prisma.branch.findMany({
       where: { isActive: true },
@@ -85,7 +85,7 @@ router.get('/sync-status', requirePermission('warehouses.view'), async (req: Req
 });
 
 // GET /api/branches/:id
-router.get('/:id', requirePermission('warehouses.view'), async (req: Request, res: Response, next: NextFunction) => {
+router.get('/:id', requirePermission('branches.view'), async (req: Request, res: Response, next: NextFunction) => {
   try {
     const branch = await prisma.branch.findUniqueOrThrow({
       where: { id: parseInt(req.params.id) },
@@ -101,7 +101,7 @@ router.get('/:id', requirePermission('warehouses.view'), async (req: Request, re
 });
 
 // POST /api/branches
-router.post('/', requirePermission('warehouses.create'), async (req: Request, res: Response, next: NextFunction) => {
+router.post('/', requirePermission('branches.create'), async (req: Request, res: Response, next: NextFunction) => {
   try {
     const body = branchSchema.parse(req.body);
     const branch = await prisma.branch.create({ data: body });
@@ -112,7 +112,7 @@ router.post('/', requirePermission('warehouses.create'), async (req: Request, re
 });
 
 // PUT /api/branches/:id
-router.put('/:id', requirePermission('warehouses.edit'), async (req: Request, res: Response, next: NextFunction) => {
+router.put('/:id', requirePermission('branches.edit'), async (req: Request, res: Response, next: NextFunction) => {
   try {
     const body = branchSchema.partial().parse(req.body);
     const branch = await prisma.branch.update({ where: { id: parseInt(req.params.id) }, data: body });
@@ -123,7 +123,7 @@ router.put('/:id', requirePermission('warehouses.edit'), async (req: Request, re
 });
 
 // DELETE /api/branches/:id — soft delete (preserve warehouse/user history)
-router.delete('/:id', requirePermission('warehouses.delete'), async (req: Request, res: Response, next: NextFunction) => {
+router.delete('/:id', requirePermission('branches.delete'), async (req: Request, res: Response, next: NextFunction) => {
   try {
     await prisma.branch.update({ where: { id: parseInt(req.params.id) }, data: { isActive: false } });
     res.json({ success: true });
@@ -133,7 +133,7 @@ router.delete('/:id', requirePermission('warehouses.delete'), async (req: Reques
 });
 
 // POST /api/branches/:id/sync — فحص تكامل فعلي + تحديث وقت آخر مزامنة
-router.post('/:id/sync', requirePermission('warehouses.edit'), async (req: Request, res: Response, next: NextFunction) => {
+router.post('/:id/sync', requirePermission('branches.edit'), async (req: Request, res: Response, next: NextFunction) => {
   try {
     const id = parseInt(req.params.id);
     const branch = await prisma.branch.findUniqueOrThrow({ where: { id }, include: { warehouses: { select: { id: true } } } });

@@ -54,7 +54,7 @@ const reconInclude = {
 };
 
 // GET /api/bank-reconciliations
-router.get('/', requirePermission('treasury.view'), async (req: Request, res: Response, next: NextFunction) => {
+router.get('/', requirePermission('reconciliation.view'), async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { page, pageSize, skip } = getPagination(req);
     const where: Record<string, unknown> = {};
@@ -73,7 +73,7 @@ router.get('/', requirePermission('treasury.view'), async (req: Request, res: Re
 });
 
 // GET /api/bank-reconciliations/:id — session + its matched lines
-router.get('/:id', requirePermission('treasury.view'), async (req: Request, res: Response, next: NextFunction) => {
+router.get('/:id', requirePermission('reconciliation.view'), async (req: Request, res: Response, next: NextFunction) => {
   try {
     const recon = await prisma.bankReconciliation.findUniqueOrThrow({
       where: { id: parseInt(req.params.id) },
@@ -86,7 +86,7 @@ router.get('/:id', requirePermission('treasury.view'), async (req: Request, res:
 });
 
 // GET /api/bank-reconciliations/:id/unreconciled — candidate lines for matching
-router.get('/:id/unreconciled', requirePermission('treasury.view'), async (req: Request, res: Response, next: NextFunction) => {
+router.get('/:id/unreconciled', requirePermission('reconciliation.view'), async (req: Request, res: Response, next: NextFunction) => {
   try {
     const recon = await prisma.bankReconciliation.findUniqueOrThrow({ where: { id: parseInt(req.params.id) } });
     const lines = await prisma.journalLine.findMany({
@@ -119,7 +119,7 @@ const createSchema = z.object({
   notes: z.string().optional().nullable(),
 });
 
-router.post('/', requirePermission('treasury.create'), async (req: Request, res: Response, next: NextFunction) => {
+router.post('/', requirePermission('reconciliation.create'), async (req: Request, res: Response, next: NextFunction) => {
   try {
     const body = createSchema.parse(req.body);
     const userId = req.user!.userId;
@@ -160,7 +160,7 @@ router.post('/', requirePermission('treasury.create'), async (req: Request, res:
 // PUT /api/bank-reconciliations/:id/lines — replace the matched set (DRAFT only)
 const linesSchema = z.object({ journalLineIds: z.array(z.number().int().positive()) });
 
-router.put('/:id/lines', requirePermission('treasury.create'), async (req: Request, res: Response, next: NextFunction) => {
+router.put('/:id/lines', requirePermission('reconciliation.create'), async (req: Request, res: Response, next: NextFunction) => {
   try {
     const id = parseInt(req.params.id);
     const body = linesSchema.parse(req.body);
@@ -209,7 +209,7 @@ router.put('/:id/lines', requirePermission('treasury.create'), async (req: Reque
 });
 
 // POST /api/bank-reconciliations/:id/complete
-router.post('/:id/complete', requirePermission('treasury.create'), async (req: Request, res: Response, next: NextFunction) => {
+router.post('/:id/complete', requirePermission('reconciliation.create'), async (req: Request, res: Response, next: NextFunction) => {
   try {
     const id = parseInt(req.params.id);
 
@@ -239,7 +239,7 @@ router.post('/:id/complete', requirePermission('treasury.create'), async (req: R
 });
 
 // DELETE /api/bank-reconciliations/:id — DRAFT only (frees its lines)
-router.delete('/:id', requirePermission('treasury.delete'), async (req: Request, res: Response, next: NextFunction) => {
+router.delete('/:id', requirePermission('reconciliation.delete'), async (req: Request, res: Response, next: NextFunction) => {
   try {
     const id = parseInt(req.params.id);
     const recon = await prisma.bankReconciliation.findUniqueOrThrow({ where: { id } });

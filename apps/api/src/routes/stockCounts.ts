@@ -35,7 +35,7 @@ async function generateCountNo(): Promise<string> {
 }
 
 // GET /api/stock-counts — list
-router.get('/', requirePermission('stock.view'), async (req: Request, res: Response, next: NextFunction) => {
+router.get('/', requirePermission('stockcount.view'), async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { page, pageSize, skip } = getPagination(req);
     const status = req.query.status as string | undefined;
@@ -69,7 +69,7 @@ router.get('/', requirePermission('stock.view'), async (req: Request, res: Respo
 });
 
 // GET /api/stock-counts/:id — detail with lines
-router.get('/:id', requirePermission('stock.view'), async (req: Request, res: Response, next: NextFunction) => {
+router.get('/:id', requirePermission('stockcount.view'), async (req: Request, res: Response, next: NextFunction) => {
   try {
     const stockCount = await prisma.stockCount.findUniqueOrThrow({
       where: { id: parseInt(req.params.id) },
@@ -93,7 +93,7 @@ const createSchema = z.object({
   notes: z.string().optional().nullable(),
 });
 
-router.post('/', requirePermission('stock.adjust'), async (req: Request, res: Response, next: NextFunction) => {
+router.post('/', requirePermission('stockcount.adjust'), async (req: Request, res: Response, next: NextFunction) => {
   try {
     const body = createSchema.parse(req.body);
     const userId = req.user!.userId;
@@ -121,7 +121,7 @@ const lineSchema = z.object({
   countedQty: z.number().nonnegative(),
 });
 
-router.put('/:id/lines', requirePermission('stock.adjust'), async (req: Request, res: Response, next: NextFunction) => {
+router.put('/:id/lines', requirePermission('stockcount.adjust'), async (req: Request, res: Response, next: NextFunction) => {
   try {
     const stockCountId = parseInt(req.params.id);
     const body = lineSchema.parse(req.body);
@@ -163,7 +163,7 @@ router.put('/:id/lines', requirePermission('stock.adjust'), async (req: Request,
 });
 
 // DELETE /api/stock-counts/:id/lines/:productId — remove a counted line
-router.delete('/:id/lines/:productId', requirePermission('stock.adjust'), async (req: Request, res: Response, next: NextFunction) => {
+router.delete('/:id/lines/:productId', requirePermission('stockcount.adjust'), async (req: Request, res: Response, next: NextFunction) => {
   try {
     const stockCountId = parseInt(req.params.id);
     const productId = parseInt(req.params.productId);
@@ -184,7 +184,7 @@ router.delete('/:id/lines/:productId', requirePermission('stock.adjust'), async 
 });
 
 // POST /api/stock-counts/:id/post — finalize: apply variances as stock adjustments
-router.post('/:id/post', requirePermission('stock.adjust'), async (req: Request, res: Response, next: NextFunction) => {
+router.post('/:id/post', requirePermission('stockcount.adjust'), async (req: Request, res: Response, next: NextFunction) => {
   try {
     const id = parseInt(req.params.id);
     const userId = req.user!.userId;
@@ -264,7 +264,7 @@ router.post('/:id/post', requirePermission('stock.adjust'), async (req: Request,
 });
 
 // DELETE /api/stock-counts/:id — cancel a draft session (posted ones are permanent)
-router.delete('/:id', requirePermission('stock.adjust'), async (req: Request, res: Response, next: NextFunction) => {
+router.delete('/:id', requirePermission('stockcount.adjust'), async (req: Request, res: Response, next: NextFunction) => {
   try {
     const id = parseInt(req.params.id);
     const stockCount = await prisma.stockCount.findUniqueOrThrow({ where: { id } });

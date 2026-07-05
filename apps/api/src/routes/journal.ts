@@ -19,7 +19,7 @@ const router = Router();
 router.use(requireAuth);
 
 // GET /api/journal
-router.get('/', requirePermission('accounts.view'), async (req: Request, res: Response, next: NextFunction) => {
+router.get('/', requirePermission('journal.view'), async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { page, pageSize, skip } = getPagination(req);
     const sourceType = req.query.sourceType as JournalSource | undefined;
@@ -61,7 +61,7 @@ router.get('/', requirePermission('accounts.view'), async (req: Request, res: Re
 
 // GET /api/journal/close-year/preview — preview what the closing entry would look like
 // (registered before /:id so "close-year" is never parsed as an entry id)
-router.get('/close-year/preview', requirePermission('accounts.view'), async (_req: Request, res: Response, next: NextFunction) => {
+router.get('/close-year/preview', requirePermission('journal.view'), async (_req: Request, res: Response, next: NextFunction) => {
   try {
     const preview = await previewYearClose(prisma);
     res.json(preview);
@@ -75,7 +75,7 @@ const closeYearSchema = z.object({
   date: z.string(),
 });
 
-router.post('/close-year', requirePermission('accounts.create'), async (req: Request, res: Response, next: NextFunction) => {
+router.post('/close-year', requirePermission('journal.create'), async (req: Request, res: Response, next: NextFunction) => {
   try {
     const body = closeYearSchema.parse(req.body);
     const userId = req.user!.userId;
@@ -102,7 +102,7 @@ router.post('/close-year', requirePermission('accounts.create'), async (req: Req
 });
 
 // GET /api/journal/:id
-router.get('/:id', requirePermission('accounts.view'), async (req: Request, res: Response, next: NextFunction) => {
+router.get('/:id', requirePermission('journal.view'), async (req: Request, res: Response, next: NextFunction) => {
   try {
     const entry = await prisma.journalEntry.findUniqueOrThrow({
       where: { id: parseInt(req.params.id) },
@@ -137,7 +137,7 @@ const manualEntrySchema = z.object({
   lines:       z.array(manualLineSchema).min(2),
 });
 
-router.post('/', requirePermission('accounts.create'), async (req: Request, res: Response, next: NextFunction) => {
+router.post('/', requirePermission('journal.create'), async (req: Request, res: Response, next: NextFunction) => {
   try {
     const body   = manualEntrySchema.parse(req.body);
     const userId = req.user!.userId;

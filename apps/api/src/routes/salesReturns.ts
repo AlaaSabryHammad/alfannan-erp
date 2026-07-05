@@ -88,7 +88,7 @@ const returnInclude = {
 };
 
 // GET /api/sales-returns
-router.get('/', requirePermission('sales.view'), async (req: Request, res: Response, next: NextFunction) => {
+router.get('/', requirePermission('salesreturns.view'), async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { page, pageSize, search, skip } = getPagination(req);
     const where: Record<string, unknown> = {};
@@ -114,7 +114,7 @@ router.get('/', requirePermission('sales.view'), async (req: Request, res: Respo
 });
 
 // GET /api/sales-returns/invoice/:invoiceId — what can still be returned (for the create form)
-router.get('/invoice/:invoiceId', requirePermission('sales.view'), async (req: Request, res: Response, next: NextFunction) => {
+router.get('/invoice/:invoiceId', requirePermission('salesreturns.view'), async (req: Request, res: Response, next: NextFunction) => {
   try {
     const invoiceId = parseInt(req.params.invoiceId);
     const invoice = await prisma.salesInvoice.findUniqueOrThrow({
@@ -158,7 +158,7 @@ router.get('/invoice/:invoiceId', requirePermission('sales.view'), async (req: R
 });
 
 // GET /api/sales-returns/:id
-router.get('/:id', requirePermission('sales.view'), async (req: Request, res: Response, next: NextFunction) => {
+router.get('/:id', requirePermission('salesreturns.view'), async (req: Request, res: Response, next: NextFunction) => {
   try {
     const ret = await prisma.salesReturn.findUniqueOrThrow({
       where: { id: parseInt(req.params.id) },
@@ -171,7 +171,7 @@ router.get('/:id', requirePermission('sales.view'), async (req: Request, res: Re
 });
 
 // POST /api/sales-returns
-router.post('/', requirePermission('sales.create'), async (req: Request, res: Response, next: NextFunction) => {
+router.post('/', requirePermission('salesreturns.create'), async (req: Request, res: Response, next: NextFunction) => {
   try {
     const body = createReturnSchema.parse(req.body);
     const userId = req.user!.userId;
@@ -326,7 +326,7 @@ router.post('/', requirePermission('sales.create'), async (req: Request, res: Re
 });
 
 // DELETE /api/sales-returns/:id — full reversal (stock back out, ledger reversed, balance restored)
-router.delete('/:id', requirePermission('sales.delete'), async (req: Request, res: Response, next: NextFunction) => {
+router.delete('/:id', requirePermission('salesreturns.delete'), async (req: Request, res: Response, next: NextFunction) => {
   try {
     const id = parseInt(req.params.id);
     const userId = req.user!.userId;

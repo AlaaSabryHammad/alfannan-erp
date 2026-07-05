@@ -74,7 +74,7 @@ const returnInclude = {
 };
 
 // GET /api/purchase-returns
-router.get('/', requirePermission('purchases.view'), async (req: Request, res: Response, next: NextFunction) => {
+router.get('/', requirePermission('purchasereturns.view'), async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { page, pageSize, search, skip } = getPagination(req);
     const where: Record<string, unknown> = {};
@@ -100,7 +100,7 @@ router.get('/', requirePermission('purchases.view'), async (req: Request, res: R
 });
 
 // GET /api/purchase-returns/invoice/:invoiceId — what can still be returned
-router.get('/invoice/:invoiceId', requirePermission('purchases.view'), async (req: Request, res: Response, next: NextFunction) => {
+router.get('/invoice/:invoiceId', requirePermission('purchasereturns.view'), async (req: Request, res: Response, next: NextFunction) => {
   try {
     const invoiceId = parseInt(req.params.invoiceId);
     const invoice = await prisma.purchaseInvoice.findUniqueOrThrow({
@@ -147,7 +147,7 @@ router.get('/invoice/:invoiceId', requirePermission('purchases.view'), async (re
 });
 
 // GET /api/purchase-returns/:id
-router.get('/:id', requirePermission('purchases.view'), async (req: Request, res: Response, next: NextFunction) => {
+router.get('/:id', requirePermission('purchasereturns.view'), async (req: Request, res: Response, next: NextFunction) => {
   try {
     const ret = await prisma.purchaseReturn.findUniqueOrThrow({
       where: { id: parseInt(req.params.id) },
@@ -160,7 +160,7 @@ router.get('/:id', requirePermission('purchases.view'), async (req: Request, res
 });
 
 // POST /api/purchase-returns
-router.post('/', requirePermission('purchases.create'), async (req: Request, res: Response, next: NextFunction) => {
+router.post('/', requirePermission('purchasereturns.create'), async (req: Request, res: Response, next: NextFunction) => {
   try {
     const body = createReturnSchema.parse(req.body);
     const userId = req.user!.userId;
@@ -293,7 +293,7 @@ router.post('/', requirePermission('purchases.create'), async (req: Request, res
 });
 
 // DELETE /api/purchase-returns/:id — full reversal (stock back in, ledger reversed, balance restored)
-router.delete('/:id', requirePermission('purchases.delete'), async (req: Request, res: Response, next: NextFunction) => {
+router.delete('/:id', requirePermission('purchasereturns.delete'), async (req: Request, res: Response, next: NextFunction) => {
   try {
     const id = parseInt(req.params.id);
     const userId = req.user!.userId;

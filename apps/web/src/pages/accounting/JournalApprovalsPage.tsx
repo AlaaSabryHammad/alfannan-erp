@@ -237,7 +237,7 @@ function EditApprovalModal({ target, onClose }: { target: Approval | null; onClo
 // --- Component ---
 export function JournalApprovalsPage() {
   const { user } = useAuth();
-  const canReview = usePermission('accounts.edit');
+  const canReview = usePermission('approvals.review');
   const qc = useQueryClient();
   const [status, setStatus] = useState<ApprovalStatus>('PENDING');
   const [rejectTarget, setRejectTarget] = useState<Approval | null>(null);

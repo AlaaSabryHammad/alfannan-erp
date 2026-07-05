@@ -598,7 +598,7 @@ function YearCloseModal({ open, onClose }: { open: boolean; onClose: () => void 
 // ─── Main Journal Page ─────────────────────────────────────────────────────────
 
 export function JournalPage() {
-  const canCreate = usePermission('accounts.create');
+  const canCreate = usePermission('journal.create');
   const { from, to } = useDateRange();
   const [page, setPage] = useState(1);
   const [search, setSearch] = useState('');

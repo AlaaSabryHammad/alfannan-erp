@@ -251,9 +251,9 @@ function TemplateModal({
 // --- Component ---
 export function RecurringEntriesPage() {
   const qc = useQueryClient();
-  const canCreate = usePermission('accounts.create');
-  const canEdit = usePermission('accounts.edit');
-  const canDelete = usePermission('accounts.delete');
+  const canCreate = usePermission('recurring.create');
+  const canEdit = usePermission('recurring.edit');
+  const canDelete = usePermission('recurring.delete');
 
   const [modalOpen, setModalOpen] = useState(false);
   const [editTarget, setEditTarget] = useState<RecurringEntry | null>(null);

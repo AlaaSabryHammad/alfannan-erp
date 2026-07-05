@@ -63,7 +63,7 @@ const quotationInclude = {
 };
 
 // GET /api/quotations
-router.get('/', requirePermission('sales.view'), async (req: Request, res: Response, next: NextFunction) => {
+router.get('/', requirePermission('quotations.view'), async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { page, pageSize, search, skip } = getPagination(req);
     const where: Record<string, unknown> = {};
@@ -89,7 +89,7 @@ router.get('/', requirePermission('sales.view'), async (req: Request, res: Respo
 });
 
 // GET /api/quotations/:id
-router.get('/:id', requirePermission('sales.view'), async (req: Request, res: Response, next: NextFunction) => {
+router.get('/:id', requirePermission('quotations.view'), async (req: Request, res: Response, next: NextFunction) => {
   try {
     const q = await prisma.quotation.findUniqueOrThrow({ where: { id: parseInt(req.params.id) }, include: quotationInclude });
     res.json(q);
@@ -99,7 +99,7 @@ router.get('/:id', requirePermission('sales.view'), async (req: Request, res: Re
 });
 
 // POST /api/quotations
-router.post('/', requirePermission('sales.create'), async (req: Request, res: Response, next: NextFunction) => {
+router.post('/', requirePermission('quotations.create'), async (req: Request, res: Response, next: NextFunction) => {
   try {
     const body = quotationSchema.parse(req.body);
     const userId = req.user!.userId;
@@ -143,7 +143,7 @@ router.post('/', requirePermission('sales.create'), async (req: Request, res: Re
 });
 
 // PUT /api/quotations/:id — editable while DRAFT/SENT
-router.put('/:id', requirePermission('sales.create'), async (req: Request, res: Response, next: NextFunction) => {
+router.put('/:id', requirePermission('quotations.create'), async (req: Request, res: Response, next: NextFunction) => {
   try {
     const id = parseInt(req.params.id);
     const body = quotationSchema.parse(req.body);
@@ -190,7 +190,7 @@ router.put('/:id', requirePermission('sales.create'), async (req: Request, res: 
 // POST /api/quotations/:id/status — SENT / ACCEPTED / REJECTED transitions
 const statusSchema = z.object({ status: z.enum(['SENT', 'ACCEPTED', 'REJECTED']) });
 
-router.post('/:id/status', requirePermission('sales.create'), async (req: Request, res: Response, next: NextFunction) => {
+router.post('/:id/status', requirePermission('quotations.create'), async (req: Request, res: Response, next: NextFunction) => {
   try {
     const id = parseInt(req.params.id);
     const { status } = statusSchema.parse(req.body);
@@ -213,7 +213,7 @@ const convertSchema = z.object({
   deliveryDate: z.string().optional().nullable(),
 });
 
-router.post('/:id/convert', requirePermission('sales.create'), async (req: Request, res: Response, next: NextFunction) => {
+router.post('/:id/convert', requirePermission('quotations.create'), async (req: Request, res: Response, next: NextFunction) => {
   try {
     const id = parseInt(req.params.id);
     const body = convertSchema.parse(req.body);
@@ -284,7 +284,7 @@ router.post('/:id/convert', requirePermission('sales.create'), async (req: Reque
 });
 
 // DELETE /api/quotations/:id — unless converted
-router.delete('/:id', requirePermission('sales.delete'), async (req: Request, res: Response, next: NextFunction) => {
+router.delete('/:id', requirePermission('quotations.delete'), async (req: Request, res: Response, next: NextFunction) => {
   try {
     const id = parseInt(req.params.id);
     const existing = await prisma.quotation.findUniqueOrThrow({ where: { id } });

@@ -57,7 +57,7 @@ const orderInclude = {
 };
 
 // GET /api/purchase-orders
-router.get('/', requirePermission('purchases.view'), async (req: Request, res: Response, next: NextFunction) => {
+router.get('/', requirePermission('purchaseorders.view'), async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { page, pageSize, search, skip } = getPagination(req);
     const where: Record<string, unknown> = {};
@@ -83,7 +83,7 @@ router.get('/', requirePermission('purchases.view'), async (req: Request, res: R
 });
 
 // GET /api/purchase-orders/:id
-router.get('/:id', requirePermission('purchases.view'), async (req: Request, res: Response, next: NextFunction) => {
+router.get('/:id', requirePermission('purchaseorders.view'), async (req: Request, res: Response, next: NextFunction) => {
   try {
     const order = await prisma.purchaseOrder.findUniqueOrThrow({ where: { id: parseInt(req.params.id) }, include: orderInclude });
     res.json(order);
@@ -93,7 +93,7 @@ router.get('/:id', requirePermission('purchases.view'), async (req: Request, res
 });
 
 // POST /api/purchase-orders
-router.post('/', requirePermission('purchases.create'), async (req: Request, res: Response, next: NextFunction) => {
+router.post('/', requirePermission('purchaseorders.create'), async (req: Request, res: Response, next: NextFunction) => {
   try {
     const body = orderSchema.parse(req.body);
     const userId = req.user!.userId;
@@ -148,7 +148,7 @@ const convertSchema = z.object({
   paymentStatus: z.enum(['PAID', 'UNPAID', 'PARTIAL']).optional().default('UNPAID'),
 });
 
-router.post('/:id/convert', requirePermission('purchases.create'), async (req: Request, res: Response, next: NextFunction) => {
+router.post('/:id/convert', requirePermission('purchaseorders.create'), async (req: Request, res: Response, next: NextFunction) => {
   try {
     const id = parseInt(req.params.id);
     const body = convertSchema.parse(req.body ?? {});
@@ -197,7 +197,7 @@ router.post('/:id/convert', requirePermission('purchases.create'), async (req: R
 });
 
 // POST /api/purchase-orders/:id/cancel
-router.post('/:id/cancel', requirePermission('purchases.create'), async (req: Request, res: Response, next: NextFunction) => {
+router.post('/:id/cancel', requirePermission('purchaseorders.create'), async (req: Request, res: Response, next: NextFunction) => {
   try {
     const id = parseInt(req.params.id);
     const claimed = await prisma.purchaseOrder.updateMany({
@@ -216,7 +216,7 @@ router.post('/:id/cancel', requirePermission('purchases.create'), async (req: Re
 });
 
 // DELETE /api/purchase-orders/:id — only non-converted
-router.delete('/:id', requirePermission('purchases.delete'), async (req: Request, res: Response, next: NextFunction) => {
+router.delete('/:id', requirePermission('purchaseorders.delete'), async (req: Request, res: Response, next: NextFunction) => {
   try {
     const id = parseInt(req.params.id);
     const order = await prisma.purchaseOrder.findUniqueOrThrow({ where: { id } });

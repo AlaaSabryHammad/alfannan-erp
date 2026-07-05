@@ -39,7 +39,7 @@ function toast(msg: string, type: 'success' | 'error' = 'success') {
 
 export function FiscalPeriodsPage() {
   const qc = useQueryClient();
-  const canEdit = usePermission('accounts.edit');
+  const canEdit = usePermission('fiscalperiods.edit');
   const [year, setYear] = useState(new Date().getFullYear());
   const [confirmTarget, setConfirmTarget] = useState<PeriodRow | null>(null);
 

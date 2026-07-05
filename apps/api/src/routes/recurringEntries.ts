@@ -36,7 +36,7 @@ function nextDueDate(startDate: Date, dayOfMonth: number, lastRunDate: Date | nu
 }
 
 // GET /api/recurring-entries
-router.get('/', requirePermission('accounts.view'), async (req: Request, res: Response, next: NextFunction) => {
+router.get('/', requirePermission('recurring.view'), async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { page, pageSize, search, skip } = getPagination(req);
     const where = search ? { description: { contains: search, mode: 'insensitive' as const } } : {};
@@ -64,7 +64,7 @@ router.get('/', requirePermission('accounts.view'), async (req: Request, res: Re
 });
 
 // POST /api/recurring-entries
-router.post('/', requirePermission('accounts.create'), async (req: Request, res: Response, next: NextFunction) => {
+router.post('/', requirePermission('recurring.create'), async (req: Request, res: Response, next: NextFunction) => {
   try {
     const body = templateSchema.parse(req.body);
     const userId = req.user!.userId;
@@ -102,7 +102,7 @@ router.post('/', requirePermission('accounts.create'), async (req: Request, res:
 });
 
 // PUT /api/recurring-entries/:id — replaces the template's fields and lines wholesale
-router.put('/:id', requirePermission('accounts.edit'), async (req: Request, res: Response, next: NextFunction) => {
+router.put('/:id', requirePermission('recurring.edit'), async (req: Request, res: Response, next: NextFunction) => {
   try {
     const id = parseInt(req.params.id);
     const body = templateSchema.parse(req.body);
@@ -143,7 +143,7 @@ router.put('/:id', requirePermission('accounts.edit'), async (req: Request, res:
 });
 
 // DELETE /api/recurring-entries/:id
-router.delete('/:id', requirePermission('accounts.delete'), async (req: Request, res: Response, next: NextFunction) => {
+router.delete('/:id', requirePermission('recurring.delete'), async (req: Request, res: Response, next: NextFunction) => {
   try {
     await prisma.recurringEntry.delete({ where: { id: parseInt(req.params.id) } });
     res.json({ success: true });
@@ -159,7 +159,7 @@ router.delete('/:id', requirePermission('accounts.delete'), async (req: Request,
 // POST /api/recurring-entries/:id/run — generate one actual journal entry from the template
 const runSchema = z.object({ date: z.string().optional() });
 
-router.post('/:id/run', requirePermission('accounts.create'), async (req: Request, res: Response, next: NextFunction) => {
+router.post('/:id/run', requirePermission('recurring.create'), async (req: Request, res: Response, next: NextFunction) => {
   try {
     const id = parseInt(req.params.id);
     const body = runSchema.parse(req.body ?? {});

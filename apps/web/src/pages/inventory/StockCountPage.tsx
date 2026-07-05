@@ -163,7 +163,7 @@ function CountDetailModal({
   onClose: () => void;
 }) {
   const qc = useQueryClient();
-  const canAdjust = usePermission('stock.adjust');
+  const canAdjust = usePermission('stockcount.adjust');
   const [search, setSearch] = useState('');
   const [pendingQty, setPendingQty] = useState<Record<number, string>>({});
 
@@ -363,7 +363,7 @@ function CountDetailModal({
 // ─── Main Page ─────────────────────────────────────────────────────────────────
 
 export function StockCountPage() {
-  const canAdjust = usePermission('stock.adjust');
+  const canAdjust = usePermission('stockcount.adjust');
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
   const [newModalOpen, setNewModalOpen] = useState(false);

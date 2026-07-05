@@ -19,7 +19,7 @@ const periodSchema = z.object({
 });
 
 // GET /api/fiscal-periods?year=2026 — all 12 months with their status
-router.get('/', requirePermission('accounts.view'), async (req: Request, res: Response, next: NextFunction) => {
+router.get('/', requirePermission('fiscalperiods.view'), async (req: Request, res: Response, next: NextFunction) => {
   try {
     const year = parseInt((req.query.year as string) ?? '') || new Date().getFullYear();
     const rows = await prisma.fiscalPeriod.findMany({
@@ -57,7 +57,7 @@ router.get('/', requirePermission('accounts.view'), async (req: Request, res: Re
 });
 
 // POST /api/fiscal-periods/lock — lock one month
-router.post('/lock', requirePermission('accounts.edit'), async (req: Request, res: Response, next: NextFunction) => {
+router.post('/lock', requirePermission('fiscalperiods.edit'), async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { year, month } = periodSchema.parse(req.body);
     const userId = req.user!.userId;
@@ -74,7 +74,7 @@ router.post('/lock', requirePermission('accounts.edit'), async (req: Request, re
 });
 
 // POST /api/fiscal-periods/unlock — reopen one month
-router.post('/unlock', requirePermission('accounts.edit'), async (req: Request, res: Response, next: NextFunction) => {
+router.post('/unlock', requirePermission('fiscalperiods.edit'), async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { year, month } = periodSchema.parse(req.body);
 
