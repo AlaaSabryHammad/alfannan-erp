@@ -196,7 +196,9 @@
       "PowerShell(cd D:\\\\projects\\\\Alfannan\\\\apps\\\\api; $env:DATABASE_URL = \"postgresql://postgres:1359@localhost:5432/alfannan?schema=public\"; npx tsx scripts/reconcile-control-accounts.ts --apply)",
       "PowerShell(cd D:\\\\projects\\\\Alfannan\\\\apps\\\\api; $env:DATABASE_URL = \"postgresql://postgres:1359@localhost:5432/alfannan?schema=public\"; npx tsx scripts/reconcile-control-accounts.ts 2>&1 | Select-Object -First 4)",
       "Bash(git add *)",
-      "Bash(git commit -m ' *)"
+      "Bash(git commit -m ' *)",
+      "Bash(node -e \"const p=require\\('./apps/api/package.json'\\); console.log\\(JSON.stringify\\(p.scripts,null,1\\)\\)\")",
+      "Bash(node -e \"const p=require\\('./apps/web/package.json'\\); console.log\\(JSON.stringify\\(p.scripts,null,1\\)\\)\")"
     ]
   }
 }
