@@ -187,7 +187,16 @@
       "Bash(curl -s -o /dev/null -w \"%{http_code}\" http://localhost:4000/health)",
       "PowerShell(cd D:\\\\projects\\\\Alfannan\\\\apps\\\\api; npx prisma validate 2>&1 | Select-Object -Last 1; npx prisma migrate diff --from-url \"postgresql://postgres:1359@localhost:5432/alfannan?schema=public\" --to-schema-datamodel prisma/schema.prisma --script > \"$env:TEMP\\\\mig6.sql\"; $dir = \"D:\\\\projects\\\\Alfannan\\\\apps\\\\api\\\\prisma\\\\migrations\\\\20260704060000_add_zatca_signature_qr\"; New-Item -ItemType Directory -Force $dir | Out-Null; Copy-Item \"$env:TEMP\\\\mig6.sql\" \"$dir\\\\migration.sql\"; npx prisma migrate deploy 2>&1 | Select-Object -Last 2; npx prisma generate 2>&1 | Select-String \"Generated\")",
       "PowerShell($conn = Get-NetTCPConnection -LocalPort 4000 -State Listen -ErrorAction SilentlyContinue; if \\($conn\\) { $conn.OwningProcess | Select-Object -Unique | ForEach-Object { Stop-Process -Id $_ -Force -ErrorAction SilentlyContinue; \"killed PID $_\" } } else { \"no listener on 4000\" })",
-      "PowerShell($conn = Get-NetTCPConnection -LocalPort 4000 -State Listen -ErrorAction SilentlyContinue; if \\($conn\\) { $conn.OwningProcess | Select-Object -Unique | ForEach-Object { Stop-Process -Id $_ -Force -ErrorAction SilentlyContinue } }; Start-Sleep 1; \"restarting\")"
+      "PowerShell($conn = Get-NetTCPConnection -LocalPort 4000 -State Listen -ErrorAction SilentlyContinue; if \\($conn\\) { $conn.OwningProcess | Select-Object -Unique | ForEach-Object { Stop-Process -Id $_ -Force -ErrorAction SilentlyContinue } }; Start-Sleep 1; \"restarting\")",
+      "PowerShell(cd D:\\\\projects\\\\Alfannan\\\\apps\\\\api; npx prisma validate 2>&1 | Select-Object -Last 1; npx prisma migrate diff --from-url \"postgresql://postgres:1359@localhost:5432/alfannan?schema=public\" --to-schema-datamodel prisma/schema.prisma --script > \"$env:TEMP\\\\mig7.sql\"; $dir = \"D:\\\\projects\\\\Alfannan\\\\apps\\\\api\\\\prisma\\\\migrations\\\\20260704120000_add_sales_item_unit_cost\"; New-Item -ItemType Directory -Force $dir | Out-Null; Copy-Item \"$env:TEMP\\\\mig7.sql\" \"$dir\\\\migration.sql\"; Get-Content \"$dir\\\\migration.sql\")",
+      "PowerShell($conn = Get-NetTCPConnection -LocalPort 4000 -State Listen -ErrorAction SilentlyContinue; if \\($conn\\) { $conn.OwningProcess | Select-Object -Unique | ForEach-Object { Stop-Process -Id $_ -Force -ErrorAction SilentlyContinue } }; Start-Sleep 1; cd D:\\\\projects\\\\Alfannan\\\\apps\\\\api; npx prisma migrate deploy 2>&1 | Select-Object -Last 2; npx prisma generate 2>&1 | Select-String \"Generated\")",
+      "Bash(curl -s -o /dev/null -w \"api:%{http_code}\\\\n\" http://localhost:4000/health)",
+      "Bash(curl -s -o /dev/null -w \"web:%{http_code}\\\\n\" http://localhost:5173/)",
+      "PowerShell(cd D:\\\\projects\\\\Alfannan\\\\apps\\\\api; $env:DATABASE_URL = \"postgresql://postgres:1359@localhost:5432/alfannan?schema=public\"; npx tsx scripts/reconcile-control-accounts.ts)",
+      "PowerShell(cd D:\\\\projects\\\\Alfannan\\\\apps\\\\api; $env:DATABASE_URL = \"postgresql://postgres:1359@localhost:5432/alfannan?schema=public\"; npx tsx scripts/reconcile-control-accounts.ts --apply)",
+      "PowerShell(cd D:\\\\projects\\\\Alfannan\\\\apps\\\\api; $env:DATABASE_URL = \"postgresql://postgres:1359@localhost:5432/alfannan?schema=public\"; npx tsx scripts/reconcile-control-accounts.ts 2>&1 | Select-Object -First 4)",
+      "Bash(git add *)",
+      "Bash(git commit -m ' *)"
     ]
   }
 }
