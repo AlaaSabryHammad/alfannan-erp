@@ -198,7 +198,13 @@
       "Bash(git add *)",
       "Bash(git commit -m ' *)",
       "Bash(node -e \"const p=require\\('./apps/api/package.json'\\); console.log\\(JSON.stringify\\(p.scripts,null,1\\)\\)\")",
-      "Bash(node -e \"const p=require\\('./apps/web/package.json'\\); console.log\\(JSON.stringify\\(p.scripts,null,1\\)\\)\")"
+      "Bash(node -e \"const p=require\\('./apps/web/package.json'\\); console.log\\(JSON.stringify\\(p.scripts,null,1\\)\\)\")",
+      "Bash(gh auth *)",
+      "Bash(gh api *)",
+      "Bash(grep -iE \"\\\\.env$|\\\\.env\\\\.|secret|credential\")",
+      "Bash(gh repo *)",
+      "Bash(git branch *)",
+      "Bash(git ls-tree *)"
     ]
   }
 }
