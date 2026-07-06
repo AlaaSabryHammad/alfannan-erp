@@ -1,6 +1,9 @@
 # الفنان ERP — الخادم الخلفي (build context = جذر المستودع)
 FROM node:20-alpine
 
+# Prisma's engine binaries need the system OpenSSL lib; alpine doesn't ship it by default.
+RUN apk add --no-cache openssl
+
 WORKDIR /app
 COPY package.json package-lock.json ./
 COPY apps/api ./apps/api
