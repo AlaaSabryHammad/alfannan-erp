@@ -171,6 +171,12 @@ router.get('/trial-balance', async (req: Request, res: Response, next: NextFunct
           ? opening + totalDebit - totalCredit
           : opening + totalCredit - totalDebit;
 
+        // Trial balance columns reflect the account's closing balance (opening
+        // balance included), not just ledger postings — a contra (negative)
+        // balance flips to the opposite column.
+        const debit  = isDebitNorm ? Math.max(balance, 0)  : Math.max(-balance, 0);
+        const credit = isDebitNorm ? Math.max(-balance, 0) : Math.max(balance, 0);
+
         return {
           id:            acct.id,
           code:          acct.code,
@@ -180,12 +186,14 @@ router.get('/trial-balance', async (req: Request, res: Response, next: NextFunct
           totalDebit,
           totalCredit,
           balance,
+          debit,
+          credit,
         };
       }),
     );
 
-    const grandTotalDebit  = rows.reduce((s, r) => s + r.totalDebit,  0);
-    const grandTotalCredit = rows.reduce((s, r) => s + r.totalCredit, 0);
+    const grandTotalDebit  = rows.reduce((s, r) => s + r.debit,  0);
+    const grandTotalCredit = rows.reduce((s, r) => s + r.credit, 0);
     const balanced         = Math.abs(grandTotalDebit - grandTotalCredit) < 0.01;
 
     res.json({
