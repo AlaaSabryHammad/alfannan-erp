@@ -1,4 +1,4 @@
-import { Fragment, useState } from 'react';
+import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -27,7 +27,7 @@ import apiClient from '../../lib/api';
 
 type AccountType = 'ASSET' | 'LIABILITY' | 'EQUITY' | 'REVENUE' | 'EXPENSE';
 
-interface AccountChild {
+interface Account {
   id: number;
   code: string;
   nameAr: string;
@@ -36,16 +36,17 @@ interface AccountChild {
   openingBalance: number;
   currentBalance: number;
   isActive: boolean;
-}
-
-interface AccountRoot extends AccountChild {
-  children: AccountChild[];
+  children: Account[];
 }
 
 interface AccountGroup {
   type: AccountType;
-  accounts: AccountRoot[];
+  accounts: Account[];
   total: number;
+}
+
+function countAccounts(accounts: Account[]): number {
+  return accounts.reduce((sum, a) => sum + 1 + countAccounts(a.children), 0);
 }
 
 // Flat list item (from /api/accounts for parent select)
@@ -159,18 +160,18 @@ function KpiCard({
 
 function AccountRow({
   account,
-  isChild,
+  depth,
   onEdit,
   onDelete,
   onLedger,
   canEdit,
   canDelete,
 }: {
-  account: AccountRoot | AccountChild;
-  isChild: boolean;
-  onEdit: (a: AccountRoot | AccountChild) => void;
-  onDelete: (a: AccountRoot | AccountChild) => void;
-  onLedger: (a: AccountRoot | AccountChild) => void;
+  account: Account;
+  depth: number;
+  onEdit: (a: Account) => void;
+  onDelete: (a: Account) => void;
+  onLedger: (a: Account) => void;
   canEdit: boolean;
   canDelete: boolean;
 }) {
@@ -180,8 +181,11 @@ function AccountRow({
         {account.code}
       </td>
       <td className="py-3 px-4 text-sm text-app-text">
-        {isChild ? (
-          <span className="inline-flex items-center gap-1">
+        {depth > 0 ? (
+          <span
+            className="inline-flex items-center gap-1"
+            style={{ paddingRight: depth * 20 }}
+          >
             <span className="text-app-muted text-xs ml-2 pl-2">└ ─</span>
             {account.nameAr}
           </span>
@@ -240,6 +244,23 @@ function AccountRow({
 
 // ─── Account Group Section ────────────────────────────────────────────────────
 
+function renderAccountRows(
+  accounts: Account[],
+  depth: number,
+  props: {
+    onEdit: (a: Account) => void;
+    onDelete: (a: Account) => void;
+    onLedger: (a: Account) => void;
+    canEdit: boolean;
+    canDelete: boolean;
+  }
+): React.ReactNode[] {
+  return accounts.flatMap((a) => [
+    <AccountRow key={a.id} account={a} depth={depth} {...props} />,
+    ...renderAccountRows(a.children, depth + 1, props),
+  ]);
+}
+
 function AccountGroupSection({
   group,
   onEdit,
@@ -249,17 +270,14 @@ function AccountGroupSection({
   canDelete,
 }: {
   group: AccountGroup;
-  onEdit: (a: AccountRoot | AccountChild) => void;
-  onDelete: (a: AccountRoot | AccountChild) => void;
-  onLedger: (a: AccountRoot | AccountChild) => void;
+  onEdit: (a: Account) => void;
+  onDelete: (a: Account) => void;
+  onLedger: (a: Account) => void;
   canEdit: boolean;
   canDelete: boolean;
 }) {
   const meta = TYPE_META[group.type];
-  const accountCount = group.accounts.reduce(
-    (sum, a) => sum + 1 + a.children.length,
-    0
-  );
+  const accountCount = countAccounts(group.accounts);
 
   return (
     <div className="bg-white rounded-2xl border border-app-border shadow-sm overflow-hidden mb-4">
@@ -313,31 +331,13 @@ function AccountGroupSection({
               </tr>
             </thead>
             <tbody>
-              {group.accounts.map((root) => (
-                <Fragment key={root.id}>
-                  <AccountRow
-                    account={root}
-                    isChild={false}
-                    onEdit={onEdit}
-                    onDelete={onDelete}
-                    onLedger={onLedger}
-                    canEdit={canEdit}
-                    canDelete={canDelete}
-                  />
-                  {root.children.map((child) => (
-                    <AccountRow
-                      key={child.id}
-                      account={child}
-                      isChild={true}
-                      onEdit={onEdit}
-                      onDelete={onDelete}
-                      onLedger={onLedger}
-                      canEdit={canEdit}
-                      canDelete={canDelete}
-                    />
-                  ))}
-                </Fragment>
-              ))}
+              {renderAccountRows(group.accounts, 0, {
+                onEdit,
+                onDelete,
+                onLedger,
+                canEdit,
+                canDelete,
+              })}
             </tbody>
           </table>
         </div>
@@ -467,9 +467,9 @@ export function AccountsPage() {
   const canDelete = usePermission('accounts.delete');
 
   const [modalOpen, setModalOpen] = useState(false);
-  const [editTarget, setEditTarget] = useState<AccountRoot | AccountChild | null>(null);
-  const [deleteTarget, setDeleteTarget] = useState<AccountRoot | AccountChild | null>(null);
-  const [ledgerTarget, setLedgerTarget] = useState<AccountRoot | AccountChild | null>(null);
+  const [editTarget, setEditTarget] = useState<Account | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<Account | null>(null);
+  const [ledgerTarget, setLedgerTarget] = useState<Account | null>(null);
 
   // Fetch grouped tree
   const { data: treeData, isLoading } = useQuery<AccountGroup[]>({
@@ -559,7 +559,7 @@ export function AccountsPage() {
     setModalOpen(true);
   };
 
-  const openEdit = (a: AccountRoot | AccountChild) => {
+  const openEdit = (a: Account) => {
     setEditTarget(a);
     reset({
       code: a.code,

@@ -14,9 +14,32 @@ const accountSchema = z.object({
   type: z.enum(['ASSET', 'LIABILITY', 'EQUITY', 'REVENUE', 'EXPENSE']),
   parentId: z.number().int().positive().optional().nullable(),
   openingBalance: z.number().optional().default(0),
-  currentBalance: z.number().optional().default(0),
   isActive: z.boolean().optional().default(true),
 });
+
+// currentBalance is always derived (opening balance + ledger activity), never
+// set directly by the client — recalculated here after every create/update.
+async function recalcAccountBalance(accountId: number) {
+  const acct = await prisma.account.findUniqueOrThrow({ where: { id: accountId } });
+  const agg = await prisma.journalLine.aggregate({
+    where: { accountId },
+    _sum: { debit: true, credit: true },
+  });
+
+  const totalDebit  = Number(agg._sum.debit  ?? 0);
+  const totalCredit = Number(agg._sum.credit ?? 0);
+  const opening     = Number(acct.openingBalance);
+  const isDebitNorm = acct.type === 'ASSET' || acct.type === 'EXPENSE';
+
+  const newBalance = isDebitNorm
+    ? opening + totalDebit - totalCredit
+    : opening + totalCredit - totalDebit;
+
+  return prisma.account.update({
+    where: { id: accountId },
+    data: { currentBalance: new Prisma.Decimal(newBalance) },
+  });
+}
 
 // GET /api/accounts — returns flat list (paginated)
 router.get('/', requirePermission('accounts.view'), async (req: Request, res: Response, next: NextFunction) => {
@@ -50,25 +73,31 @@ router.get('/', requirePermission('accounts.view'), async (req: Request, res: Re
   }
 });
 
-// GET /api/accounts/tree — hierarchical tree grouped by type
+// GET /api/accounts/tree — hierarchical tree grouped by type (any depth)
 router.get('/tree', requirePermission('accounts.view'), async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const accounts = await prisma.account.findMany({
-      orderBy: { code: 'asc' },
-      include: { children: { orderBy: { code: 'asc' } } },
-    });
+    const accounts = await prisma.account.findMany({ orderBy: { code: 'asc' } });
 
-    // Only root accounts (parentId null) with their children already populated
-    const roots = accounts.filter(a => a.parentId === null);
+    type Node = (typeof accounts)[number] & { children: Node[] };
+    const nodeById = new Map<number, Node>();
+    for (const a of accounts) nodeById.set(a.id, { ...a, children: [] });
+
+    const roots: Node[] = [];
+    for (const a of accounts) {
+      const node = nodeById.get(a.id)!;
+      const parent = a.parentId !== null ? nodeById.get(a.parentId) : undefined;
+      if (parent) parent.children.push(node);
+      else roots.push(node);
+    }
+
+    const sumBalance = (node: Node): number =>
+      Number(node.currentBalance) + node.children.reduce((s, c) => s + sumBalance(c), 0);
 
     // Group by type with totals
     const typeOrder = ['ASSET', 'LIABILITY', 'EQUITY', 'REVENUE', 'EXPENSE'] as const;
     const tree = typeOrder.map(type => {
       const typeRoots = roots.filter(a => a.type === type);
-      const total = typeRoots.reduce((sum, a) => {
-        const childrenSum = a.children.reduce((s, c) => s + Number(c.currentBalance), 0);
-        return sum + Number(a.currentBalance) + childrenSum;
-      }, 0);
+      const total = typeRoots.reduce((sum, a) => sum + sumBalance(a), 0);
       return { type, accounts: typeRoots, total };
     });
 
@@ -82,32 +111,11 @@ router.get('/tree', requirePermission('accounts.view'), async (req: Request, res
 // Must come BEFORE /:id route so it's not matched as an id
 router.post('/recompute', requirePermission('accounts.edit'), async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const accounts = await prisma.account.findMany();
-
-    let updated = 0;
+    const accounts = await prisma.account.findMany({ select: { id: true } });
     for (const acct of accounts) {
-      const agg = await prisma.journalLine.aggregate({
-        where: { accountId: acct.id },
-        _sum: { debit: true, credit: true },
-      });
-
-      const totalDebit  = Number(agg._sum.debit  ?? 0);
-      const totalCredit = Number(agg._sum.credit ?? 0);
-      const opening     = Number(acct.openingBalance);
-      const isDebitNorm = acct.type === 'ASSET' || acct.type === 'EXPENSE';
-
-      const newBalance = isDebitNorm
-        ? opening + totalDebit - totalCredit
-        : opening + totalCredit - totalDebit;
-
-      await prisma.account.update({
-        where: { id: acct.id },
-        data: { currentBalance: new Prisma.Decimal(newBalance) },
-      });
-      updated++;
+      await recalcAccountBalance(acct.id);
     }
-
-    res.json({ success: true, accountsUpdated: updated });
+    res.json({ success: true, accountsUpdated: accounts.length });
   } catch (err) {
     next(err);
   }
@@ -199,7 +207,8 @@ router.post('/', requirePermission('accounts.create'), async (req: Request, res:
   try {
     const data = accountSchema.parse(req.body);
     const account = await prisma.account.create({ data });
-    res.status(201).json(account);
+    const updated = await recalcAccountBalance(account.id);
+    res.status(201).json(updated);
   } catch (err) {
     next(err);
   }
@@ -209,8 +218,10 @@ router.post('/', requirePermission('accounts.create'), async (req: Request, res:
 router.put('/:id', requirePermission('accounts.edit'), async (req: Request, res: Response, next: NextFunction) => {
   try {
     const data = accountSchema.partial().parse(req.body);
-    const account = await prisma.account.update({ where: { id: parseInt(req.params.id) }, data });
-    res.json(account);
+    const id = parseInt(req.params.id);
+    await prisma.account.update({ where: { id }, data });
+    const updated = await recalcAccountBalance(id);
+    res.json(updated);
   } catch (err) {
     next(err);
   }
