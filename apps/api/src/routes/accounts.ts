@@ -90,14 +90,23 @@ router.get('/tree', requirePermission('accounts.view'), async (req: Request, res
       else roots.push(node);
     }
 
-    const sumBalance = (node: Node): number =>
-      Number(node.currentBalance) + node.children.reduce((s, c) => s + sumBalance(c), 0);
+    // A parent/group account (e.g. "الاصول الثابتة") usually has no postings of
+    // its own — its displayed balance should roll up everything under it, not
+    // just its own ledger balance.
+    const rollup = (node: Node): number =>
+      Number(node.currentBalance) + node.children.reduce((s, c) => s + rollup(c), 0);
+
+    const withRollup = (node: Node): Node => ({
+      ...node,
+      currentBalance: new Prisma.Decimal(rollup(node)),
+      children: node.children.map(withRollup),
+    });
 
     // Group by type with totals
     const typeOrder = ['ASSET', 'LIABILITY', 'EQUITY', 'REVENUE', 'EXPENSE'] as const;
     const tree = typeOrder.map(type => {
-      const typeRoots = roots.filter(a => a.type === type);
-      const total = typeRoots.reduce((sum, a) => sum + sumBalance(a), 0);
+      const typeRoots = roots.filter(a => a.type === type).map(withRollup);
+      const total = typeRoots.reduce((sum, a) => sum + Number(a.currentBalance), 0);
       return { type, accounts: typeRoots, total };
     });
 
