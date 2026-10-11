@@ -875,11 +875,28 @@ router.get('/budget-vs-actual', async (req: Request, res: Response, next: NextFu
       };
     });
 
+    // Revenue and expense rows are never summed together: a single mixed
+    // total has no accounting meaning. Report each side plus the net.
+    const sideTotals = (type: 'REVENUE' | 'EXPENSE') => {
+      const side = rows.filter((r) => r.type === type);
+      const budget = side.reduce((s, r) => s + r.budget, 0);
+      const actual = side.reduce((s, r) => s + r.actual, 0);
+      const variance = actual - budget;
+      return { budget, actual, variance, variancePct: budget !== 0 ? (variance / budget) * 100 : 0 };
+    };
+    const revenue = sideTotals('REVENUE');
+    const expense = sideTotals('EXPENSE');
+    const netBudget = revenue.budget - expense.budget;
+    const netActual = revenue.actual - expense.actual;
+
     res.json({
       year, month: month ?? null,
       rows,
-      totalBudget: rows.reduce((s, r) => s + r.budget, 0),
-      totalActual: rows.reduce((s, r) => s + r.actual, 0),
+      totals: {
+        revenue,
+        expense,
+        net: { budget: netBudget, actual: netActual, variance: netActual - netBudget },
+      },
     });
   } catch (err) {
     next(err);
