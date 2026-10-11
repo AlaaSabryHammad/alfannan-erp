@@ -24,6 +24,8 @@ export default defineConfig({
       NODE_ENV: 'test',
       // Fixture code that talks to prisma outside a request lands in the seeded tenant (id 1).
       TENANT_FALLBACK_ID: '1',
+      // run the whole suite with plan limits really enforced
+      SUBSCRIPTION_ENFORCEMENT: 'enforce',
       DATABASE_URL: testDatabaseUrl('DATABASE_URL'),
       DIRECT_DATABASE_URL: testDatabaseUrl('DIRECT_DATABASE_URL'),
     },

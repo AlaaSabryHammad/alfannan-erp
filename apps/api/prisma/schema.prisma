@@ -1750,6 +1750,7 @@ model Tenant {
   employeeRows Employee[]
   payrollRunRows PayrollRun[]
   payrollItemRows PayrollItem[]
+  subscription Subscription?
 }
 
 // ── PLATFORM ADMINS (SaaS owner console — not tenant users, no tenantId, no RLS) ──────────────
@@ -1778,4 +1779,50 @@ model PlatformAuditLog {
 
   @@index([tenantId])
   @@index([createdAt])
+}
+
+// ── PLANS & SUBSCRIPTIONS (SaaS billing) ──────────────────────────────────────────────────────
+// Plan is global (managed by the platform owner). Subscription is per tenant and read-only for the
+// tenant application role: only the owner console changes plans, periods and overrides.
+
+enum SubscriptionStatus {
+  TRIALING
+  ACTIVE
+  PAST_DUE
+  EXPIRED
+  CANCELED
+}
+
+model Plan {
+  id           Int      @id @default(autoincrement())
+  code         String   @unique
+  nameAr       String
+  priceMonthly Decimal  @default(0) @db.Decimal(12, 2)
+  priceYearly  Decimal  @default(0) @db.Decimal(12, 2)
+  currency     String   @default("SAR")
+  trialDays    Int      @default(0)
+  limits       Json // { users, branches, warehouses, products, salesInvoicesPerMonth } — null = unlimited
+  features     Json // { zatca, manufacturing, advancedReports } — true/false
+  isActive     Boolean  @default(true)
+  sortOrder    Int      @default(0)
+  createdAt    DateTime @default(now())
+
+  subscriptions Subscription[]
+}
+
+model Subscription {
+  id                 Int                @id @default(autoincrement())
+  tenantId           Int                @unique @default(dbgenerated("(current_setting('app.tenant_id'::text))::integer"))
+  tenant             Tenant             @relation(fields: [tenantId], references: [id])
+  planId             Int
+  plan               Plan               @relation(fields: [planId], references: [id])
+  status             SubscriptionStatus @default(TRIALING)
+  trialEndsAt        DateTime?
+  currentPeriodStart DateTime?
+  currentPeriodEnd   DateTime?
+  limitOverrides     Json? // per-company limits that win over the plan's
+  featureOverrides   Json?
+  notes              String?
+  createdAt          DateTime           @default(now())
+  updatedAt          DateTime           @updatedAt
 }

@@ -7,6 +7,7 @@
  * stock, mirroring the stock-count post pattern (upsert + negative-balance guard
  * inside one transaction).
  */
+import { requireFeature } from '../middleware/subscription';
 import { Router, Request, Response, NextFunction } from 'express';
 import { z } from 'zod';
 import { Prisma } from '@prisma/client';
@@ -16,6 +17,7 @@ import { getPagination, paginatedResponse } from '../lib/paginate';
 
 const router = Router();
 router.use(requireAuth);
+router.use(requireFeature('manufacturing'));
 
 const createWorkOrderSchema = z.object({
   bomId: z.number().int().positive(),

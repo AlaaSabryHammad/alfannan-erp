@@ -1,3 +1,4 @@
+import { enforceLimit } from '../middleware/subscription';
 import { Router, Request, Response, NextFunction } from 'express';
 import { z } from 'zod';
 import prisma from '../lib/prisma';
@@ -102,7 +103,7 @@ router.get('/:id', requirePermission('sales.view'), async (req: Request, res: Re
 });
 
 // POST /api/sales-invoices
-router.post('/', requirePermission('sales.create'), async (req: Request, res: Response, next: NextFunction) => {
+router.post('/', requirePermission('sales.create'), enforceLimit('salesInvoicesPerMonth'), async (req: Request, res: Response, next: NextFunction) => {
   try {
     const body = createInvoiceSchema.parse(req.body);
     const cashierId = req.user!.userId;

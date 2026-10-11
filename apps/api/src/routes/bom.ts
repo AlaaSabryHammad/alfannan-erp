@@ -1,4 +1,5 @@
 // قوائم المكونات (Bill of Materials) — تعريف المواد الخام اللازمة لتصنيع كل منتج نهائي
+import { requireFeature } from '../middleware/subscription';
 import { Router, Request, Response, NextFunction } from 'express';
 import { z } from 'zod';
 import prisma from '../lib/prisma';
@@ -6,6 +7,7 @@ import { requireAuth, requirePermission } from '../middleware/auth';
 
 const router = Router();
 router.use(requireAuth);
+router.use(requireFeature('manufacturing'));
 
 const bomLineSchema = z.object({
   componentId: z.number().int().positive(),

@@ -37,6 +37,8 @@ services:
       CORS_ORIGIN: ${CORS_ORIGIN:-http://localhost:8080}
       # SaaS: allow anyone to create a new company from the login screen (off by default)
       ALLOW_SIGNUP: ${ALLOW_SIGNUP:-false}
+      # Plans/subscriptions: off | log (record what would be blocked, block nothing) | enforce (HTTP 402)
+      SUBSCRIPTION_ENFORCEMENT: ${SUBSCRIPTION_ENFORCEMENT:-log}
     volumes:
       - uploads:/app/apps/api/uploads
     depends_on:
