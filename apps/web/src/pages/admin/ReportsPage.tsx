@@ -24,7 +24,7 @@ interface PnlData {
   revenue: number;
   cogs: number;
   grossProfit: number;
-  expenses: number;
+  operatingExpenses: number;
   purchases: number;
   netProfit: number;
   grossMarginPct: number;
@@ -392,7 +392,7 @@ function SummaryPanel({ pnl, topProducts }: { pnl: PnlData | undefined; topProdu
   const barData = pnl ? [
     { name: 'المبيعات', value: pnl.revenue },
     { name: 'المشتريات', value: pnl.purchases },
-    { name: 'المصروفات', value: pnl.expenses },
+    { name: 'المصروفات', value: pnl.operatingExpenses },
     { name: 'صافي الربح', value: Math.max(pnl.netProfit, 0) },
   ] : [];
 
@@ -693,7 +693,7 @@ export function ReportsPage() {
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
           <KpiCard label="إجمالي المبيعات (صافي)" value={formatMoney(pnl.revenue)} icon={<TrendingUp size={20} className="text-primary" />} iconBg="bg-primary-50" />
           <KpiCard label="كلفة المبيعات (COGS)" value={formatMoney(pnl.cogs)} icon={<ShoppingCart size={20} className="text-blue-600" />} iconBg="bg-blue-50" />
-          <KpiCard label="إجمالي المصروفات التشغيلية" value={formatMoney(pnl.expenses)} icon={<Receipt size={20} className="text-danger" />} iconBg="bg-danger-bg" />
+          <KpiCard label="إجمالي المصروفات التشغيلية" value={formatMoney(pnl.operatingExpenses)} icon={<Receipt size={20} className="text-danger" />} iconBg="bg-danger-bg" />
           <KpiCard label="صافي الأرباح (P&L)" value={formatMoney(pnl.netProfit)} icon={<DollarSign size={20} className={pnl.netProfit >= 0 ? 'text-success' : 'text-danger'} />} iconBg={pnl.netProfit >= 0 ? 'bg-success-bg' : 'bg-danger-bg'} />
         </div>
       )}
@@ -837,7 +837,7 @@ export function ReportsPage() {
                     { label: 'إيرادات المبيعات', value: pnl.revenue, color: 'text-success', bold: false },
                     { label: 'تكلفة البضاعة المباعة (COGS)', value: -pnl.cogs, color: 'text-danger', bold: false },
                     { label: 'إجمالي الربح', value: pnl.grossProfit, color: pnl.grossProfit >= 0 ? 'text-success' : 'text-danger', bold: true },
-                    { label: 'المصروفات التشغيلية', value: -pnl.expenses, color: 'text-danger', bold: false },
+                    { label: 'المصروفات التشغيلية', value: -pnl.operatingExpenses, color: 'text-danger', bold: false },
                     { label: 'صافي الربح / الخسارة', value: pnl.netProfit, color: pnl.netProfit >= 0 ? 'text-success' : 'text-danger', bold: true },
                   ].map((row, i) => (
                     <div key={i} className={`flex items-center justify-between py-3 border-b border-app-border ${row.bold ? 'bg-gray-50 px-3 rounded-lg font-bold' : ''}`}>

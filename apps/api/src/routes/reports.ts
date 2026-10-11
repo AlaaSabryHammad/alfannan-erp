@@ -334,8 +334,9 @@ async function incomeStatementHandler(req: Request, res: Response, next: NextFun
       ? Math.round((grossProfit / totalRevenue) * 100 * 10) / 10
       : 0;
 
-    // Backward-compatible keys used by the dashboard (/reports/pnl)
-    const generalExpense = expenses.filter(e => e.code !== '5000');
+    // Operating expenses = all expense accounts except COGS (5000), so that
+    // grossProfit − operatingExpenses = netProfit.
+    const operatingExpenses = totalExpenses - cogsBalance;
 
     res.json({
       // New structured keys (income-statement)
@@ -348,6 +349,7 @@ async function incomeStatementHandler(req: Request, res: Response, next: NextFun
       revenue: totalRevenue,
       cogs: cogsAccount?.balance ?? 0,
       grossProfit,
+      operatingExpenses,
       grossMarginPct,
       purchases: 0, // deprecated — use purchases-log
       expenses_total: totalExpenses, // alias
