@@ -27,7 +27,11 @@ services:
       dockerfile: deploy/api.Dockerfile
     restart: unless-stopped
     environment:
-      DATABASE_URL: postgresql://postgres:${DB_PASSWORD}@db:5432/alfannan?schema=public
+      # The app runs as the non-superuser role alfannan_app so Row-Level Security (tenant isolation)
+      # is enforced by the database; migrations use the owner connection (DIRECT_DATABASE_URL).
+      DATABASE_URL: postgresql://alfannan_app:${APP_DB_PASSWORD:?set APP_DB_PASSWORD in .env.docker}@db:5432/alfannan?schema=public
+      DIRECT_DATABASE_URL: postgresql://postgres:${DB_PASSWORD}@db:5432/alfannan?schema=public
+      APP_DB_PASSWORD: ${APP_DB_PASSWORD}
       JWT_SECRET: ${JWT_SECRET:?set JWT_SECRET in .env.docker}
       PORT: "4000"
       CORS_ORIGIN: ${CORS_ORIGIN:-http://localhost:8080}

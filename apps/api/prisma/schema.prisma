@@ -4,7 +4,8 @@ generator client {
 
 datasource db {
   provider = "postgresql"
-  url      = env("DATABASE_URL")
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_DATABASE_URL") // owner connection used by `prisma migrate` (the app itself runs as alfannan_app under RLS)
 }
 
 // ── RBAC ─────────────────────────────────────────────────────────────────────

@@ -55,6 +55,9 @@ export async function provisionTenant(input: ProvisionInput): Promise<{ tenantId
   return prisma.$transaction(
     async (tx) => {
       const tenant = await tx.tenant.create({ data: { name: input.companyName.trim(), slug } });
+      // This transaction started without a tenant (nobody is logged in yet): point it at the new one
+      // so Row-Level Security accepts the rows created below.
+      await tx.$executeRaw`SELECT set_config('app.tenant_id', ${String(tenant.id)}, true)`;
 
       return runWithTenant(tenant.id, async () => {
         // Permissions are global: make sure the catalog exists (a fresh database may not be seeded yet).

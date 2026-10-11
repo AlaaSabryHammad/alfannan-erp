@@ -30,12 +30,13 @@ router.get('/', requirePermission('fiscalperiods.view'), async (req: Request, re
     const byMonth = new Map(rows.map((r) => [r.month, r]));
 
     // Count journal entries per month so the UI can show activity next to the lock
-    const entryCounts = await prisma.$queryRaw<Array<{ month: number; count: bigint }>>`
+    // raw SQL goes through a transaction so the RLS tenant setting is applied to it
+    const entryCounts = await prisma.$transaction((tx) => tx.$queryRaw<Array<{ month: number; count: bigint }>>`
       SELECT EXTRACT(MONTH FROM "date")::int AS month, COUNT(*) AS count
       FROM "JournalEntry"
       WHERE "tenantId" = ${currentTenantId()} AND EXTRACT(YEAR FROM "date") = ${year}
       GROUP BY 1
-    `;
+    `);
     const countByMonth = new Map(entryCounts.map((r) => [r.month, Number(r.count)]));
 
     const months = Array.from({ length: 12 }, (_, i) => {
