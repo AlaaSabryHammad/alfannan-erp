@@ -10,7 +10,7 @@ describe('sales cycle', () => {
     // credit sales need a credit limit (0 = cash-only), so give the fixture one
     await prisma.customer.update({ where: { id: customer.id }, data: { creditLimit: 1_000_000 } });
     const custBefore = Number(customer.currentBalance);
-    const cash = await prisma.account.findUniqueOrThrow({ where: { code: '1000' } });
+    const cash = await prisma.account.findFirstOrThrow({ where: { code: '1000' } });
 
     // credit invoice: 4 × 100 + tax 60 = 460
     const inv = await api('post', '/sales-invoices', {

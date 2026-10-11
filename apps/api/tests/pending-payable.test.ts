@@ -6,7 +6,7 @@ import { describe, it, expect } from 'vitest';
 import { api, prisma, fixtures, expectLedgerInvariants } from './helpers';
 
 const supplierBalance = async (id: number) => Number((await prisma.supplier.findUniqueOrThrow({ where: { id } })).currentBalance);
-const apBalance = async () => Number((await prisma.account.findUniqueOrThrow({ where: { code: '2000' } })).currentBalance);
+const apBalance = async () => Number((await prisma.account.findFirstOrThrow({ where: { code: '2000' } })).currentBalance);
 
 describe('pending purchase is not a payable until received', () => {
   it('raises supplier balance and AP only on receipt, and both move together', async () => {

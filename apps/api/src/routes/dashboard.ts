@@ -158,8 +158,8 @@ router.get('/', requirePermission('dashboard.view'), async (req: Request, res: R
     const num = (v: unknown) => Number(v ?? 0);
     const [cashAccts, arAcct, invAcct] = await Promise.all([
       prisma.account.findMany({ where: { code: { in: ['1000', '1100'] } }, select: { currentBalance: true } }),
-      prisma.account.findUnique({ where: { code: '3000' }, select: { currentBalance: true } }),
-      prisma.account.findUnique({ where: { code: '1200' }, select: { currentBalance: true } }),
+      prisma.account.findFirst({ where: { code: '3000' }, select: { currentBalance: true } }),
+      prisma.account.findFirst({ where: { code: '1200' }, select: { currentBalance: true } }),
     ]);
     const ledgerCash = cashAccts.reduce((s, a) => s + num(a.currentBalance), 0);
     const ledgerReceivables = num(arAcct?.currentBalance);

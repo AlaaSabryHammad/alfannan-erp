@@ -22,6 +22,13 @@ export function errorHandler(err: unknown, _req: Request, res: Response, _next: 
     return;
   }
 
+  // findUniqueOrThrow / update / delete on a row that doesn't exist — or that belongs to another
+  // tenant, which is indistinguishable by design — is a plain 404.
+  if (err && typeof err === 'object' && (err as { code?: unknown }).code === 'P2025') {
+    res.status(404).json({ error: 'السجل غير موجود' });
+    return;
+  }
+
   if (isFKViolation(err)) {
     res.status(400).json({ error: 'لا يمكن الحذف لارتباطه بسجلات أخرى' });
     return;

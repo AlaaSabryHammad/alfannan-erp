@@ -10,6 +10,7 @@
  * ones to HTTP 400.
  */
 import { Prisma, JournalSource } from '@prisma/client';
+import type { Tx } from './prisma';
 import { postJournalEntry, ACCT } from './ledger';
 import { getReservedQty } from './reservation';
 import { validateCoupon, computeCouponDiscount } from '../routes/coupons';
@@ -56,7 +57,7 @@ function generateRefNo(): string {
   return `INV-${y}${m}${d}-${seq}`;
 }
 
-export async function createSalesInvoiceInTx(tx: Prisma.TransactionClient, body: CreateSalesInvoiceInput) {
+export async function createSalesInvoiceInTx(tx: Tx, body: CreateSalesInvoiceInput) {
   const cashierId = body.cashierId;
 
   // Calculate totals
@@ -72,7 +73,7 @@ export async function createSalesInvoiceInTx(tx: Prisma.TransactionClient, body:
   let coupon: { id: number; usedCount: number } | null = null;
   let couponDiscount = 0;
   if (body.couponCode) {
-    const found = await tx.coupon.findUnique({ where: { code: body.couponCode.trim().toUpperCase() } });
+    const found = await tx.coupon.findFirst({ where: { code: body.couponCode.trim().toUpperCase() } });
     const invalidReason = validateCoupon(found, subtotal);
     if (invalidReason) throw new Error(invalidReason);
     coupon = found!;
@@ -86,7 +87,7 @@ export async function createSalesInvoiceInTx(tx: Prisma.TransactionClient, body:
     if (redeemPoints > Number(customer.loyaltyPoints)) {
       throw new Error(`نقاط الولاء غير كافية — الرصيد الحالي ${Number(customer.loyaltyPoints)} نقطة`);
     }
-    const pointValueSetting = await tx.setting.findUnique({ where: { key: 'loyaltyPointValue' } });
+    const pointValueSetting = await tx.setting.findFirst({ where: { key: 'loyaltyPointValue' } });
     pointsValue = redeemPoints * parseFloat(pointValueSetting?.value ?? '0.05');
   }
 
@@ -117,8 +118,8 @@ export async function createSalesInvoiceInTx(tx: Prisma.TransactionClient, body:
   }
 
   // ── Loyalty points earned on this sale ───────────────────────────────────
-  const loyaltyEnabledSetting = await tx.setting.findUnique({ where: { key: 'loyaltyEnabled' } });
-  const loyaltyEarnRateSetting = await tx.setting.findUnique({ where: { key: 'loyaltyEarnRate' } });
+  const loyaltyEnabledSetting = await tx.setting.findFirst({ where: { key: 'loyaltyEnabled' } });
+  const loyaltyEarnRateSetting = await tx.setting.findFirst({ where: { key: 'loyaltyEarnRate' } });
   const loyaltyEnabled = (loyaltyEnabledSetting?.value ?? 'true') === 'true';
   const pointsEarned = loyaltyEnabled ? Math.floor(total * parseFloat(loyaltyEarnRateSetting?.value ?? '0.1')) : 0;
 

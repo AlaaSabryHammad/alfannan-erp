@@ -17,6 +17,7 @@
  */
 import { Prisma, JournalSource } from '@prisma/client';
 import prisma from './prisma';
+import { runWithTenant, tryTenantId } from './tenantContext';
 import { postJournalEntry, ACCT } from './ledger';
 
 const round2 = (n: number) => Math.round(n * 100) / 100;
@@ -28,16 +29,18 @@ export interface JobRunResult {
   errors: string[];
 }
 
-// Kept in memory for the /status endpoint — resets on server restart.
-let lastRun: JobRunResult | null = null;
+// Kept in memory for the /status endpoint — resets on server restart. One entry per tenant.
+const lastRunByTenant = new Map<number, JobRunResult>();
 let running = false;
 
+/** Last run of the current request's tenant (null outside a tenant context). */
 export function getLastRun(): JobRunResult | null {
-  return lastRun;
+  const id = tryTenantId();
+  return id == null ? null : lastRunByTenant.get(id) ?? null;
 }
 
 async function isSchedulerEnabled(): Promise<boolean> {
-  const row = await prisma.setting.findUnique({ where: { key: 'schedulerEnabled' } });
+  const row = await prisma.setting.findFirst({ where: { key: 'schedulerEnabled' } });
   return (row?.value ?? 'true') === 'true';
 }
 
@@ -182,15 +185,29 @@ export async function runScheduledJobs(opts: { minDepreciationDay?: number } = {
   }
   running = true;
   try {
-    if (!(await isSchedulerEnabled())) {
-      result.errors.push('المجدول التلقائي معطّل من الإعدادات (schedulerEnabled)');
-      return result;
+    // Inside a request only the caller's tenant runs; the hourly tick (no context) runs every active tenant.
+    const current = tryTenantId();
+    const tenantIds = current != null
+      ? [current]
+      : (await prisma.tenant.findMany({ where: { isActive: true }, select: { id: true } })).map((t) => t.id);
+
+    for (const tenantId of tenantIds) {
+      const own: JobRunResult = { ranAt: now, recurringPosted: 0, depreciationPosted: 0, errors: [] };
+      await runWithTenant(tenantId, async () => {
+        if (!(await isSchedulerEnabled())) {
+          own.errors.push('المجدول التلقائي معطّل من الإعدادات (schedulerEnabled)');
+          return;
+        }
+        own.recurringPosted = await runDueRecurringEntries(now, own.errors);
+        own.depreciationPosted = await runMonthlyDepreciation(now, own.errors, { minDay: opts.minDepreciationDay });
+      });
+      lastRunByTenant.set(tenantId, own);
+      result.recurringPosted += own.recurringPosted;
+      result.depreciationPosted += own.depreciationPosted;
+      result.errors.push(...own.errors);
     }
-    result.recurringPosted = await runDueRecurringEntries(now, result.errors);
-    result.depreciationPosted = await runMonthlyDepreciation(now, result.errors, { minDay: opts.minDepreciationDay });
   } finally {
     running = false;
-    lastRun = result;
   }
   return result;
 }

@@ -6,6 +6,7 @@ import { BranchProvider } from './contexts/BranchContext';
 import { ProtectedRoute } from './components/ProtectedRoute';
 import { AppShell } from './layouts/AppShell';
 import { LoginPage } from './pages/auth/LoginPage';
+import { RegisterPage } from './pages/auth/RegisterPage';
 import { DashboardPage } from './pages/DashboardPage';
 import { UnderConstruction } from './pages/UnderConstruction';
 import { ProductsPage } from './pages/products/ProductsPage';
@@ -71,6 +72,7 @@ export function App() {
           <Routes>
             {/* Public routes */}
             <Route path="/login" element={<LoginPage />} />
+            <Route path="/register" element={<RegisterPage />} />
 
             {/* Protected routes — all inside the AppShell */}
             <Route

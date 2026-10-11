@@ -23,8 +23,8 @@ async function reviewerToken(): Promise<string> {
 describe('journal approvals — maker/checker with edit & resubmit', () => {
   it('reject → maker edits & resubmits → different user approves → posted, balanced', async () => {
     const [exp, cash] = await Promise.all([
-      prisma.account.findUniqueOrThrow({ where: { code: '6000' } }),
-      prisma.account.findUniqueOrThrow({ where: { code: '1000' } }),
+      prisma.account.findFirstOrThrow({ where: { code: '6000' } }),
+      prisma.account.findFirstOrThrow({ where: { code: '1000' } }),
     ]);
 
     // maker (admin) submits a request

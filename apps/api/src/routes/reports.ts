@@ -18,8 +18,8 @@ router.get('/control-reconciliation', async (_req: Request, res: Response, next:
     const [custAgg, suppAgg, ar, ap] = await Promise.all([
       prisma.customer.aggregate({ _sum: { currentBalance: true } }),
       prisma.supplier.aggregate({ _sum: { currentBalance: true } }),
-      prisma.account.findUnique({ where: { code: '3000' }, select: { currentBalance: true } }),
-      prisma.account.findUnique({ where: { code: '2000' }, select: { currentBalance: true } }),
+      prisma.account.findFirst({ where: { code: '3000' }, select: { currentBalance: true } }),
+      prisma.account.findFirst({ where: { code: '2000' }, select: { currentBalance: true } }),
     ]);
     const arSub = round2(Number(custAgg._sum.currentBalance ?? 0));
     const arGL = round2(Number(ar?.currentBalance ?? 0));

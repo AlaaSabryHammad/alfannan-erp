@@ -9,7 +9,7 @@
 import { Router, Request, Response, NextFunction } from 'express';
 import { z } from 'zod';
 import { Prisma } from '@prisma/client';
-import prisma from '../lib/prisma';
+import prisma, { type Tx } from '../lib/prisma';
 import { requireAuth, requirePermission } from '../middleware/auth';
 import { getPagination, paginatedResponse } from '../lib/paginate';
 
@@ -18,7 +18,7 @@ router.use(requireAuth);
 
 const round2 = (n: number) => Math.round(n * 100) / 100;
 
-async function generateReconNo(tx: Prisma.TransactionClient, date: Date): Promise<string> {
+async function generateReconNo(tx: Tx, date: Date): Promise<string> {
   const y = date.getFullYear();
   const m = String(date.getMonth() + 1).padStart(2, '0');
   const d = String(date.getDate()).padStart(2, '0');

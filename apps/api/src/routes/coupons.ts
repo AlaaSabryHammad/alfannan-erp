@@ -42,7 +42,7 @@ router.get('/validate', requirePermission('sales.create'), async (req: Request, 
     const code = String(req.query.code ?? '').trim().toUpperCase();
     const subtotal = parseFloat(req.query.subtotal as string) || 0;
 
-    const coupon = await prisma.coupon.findUnique({ where: { code } });
+    const coupon = await prisma.coupon.findFirst({ where: { code } });
     const invalid = validateCoupon(coupon, subtotal);
     if (invalid) {
       res.status(400).json({ error: invalid });

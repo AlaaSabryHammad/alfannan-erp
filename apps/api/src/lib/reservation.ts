@@ -7,6 +7,7 @@
  * drift: fulfilling or cancelling the order releases them automatically.
  */
 import { Prisma } from '@prisma/client';
+import type { Tx } from './prisma';
 
 /**
  * Total quantity of a product reserved by PENDING sales orders on a warehouse.
@@ -14,7 +15,7 @@ import { Prisma } from '@prisma/client';
  * since it is entitled to consume its own reservation.
  */
 export async function getReservedQty(
-  tx: Prisma.TransactionClient,
+  tx: Tx,
   productId: number,
   warehouseId: number,
   excludeOrderId?: number,

@@ -52,7 +52,7 @@ router.post('/', requirePermission('roles.edit'), async (req: Request, res: Resp
     });
     const data = schema.parse(req.body);
 
-    const exists = await prisma.role.findUnique({ where: { code: data.code } });
+    const exists = await prisma.role.findFirst({ where: { code: data.code } });
     if (exists) {
       res.status(400).json({ error: 'يوجد دور بنفس الرمز بالفعل' });
       return;

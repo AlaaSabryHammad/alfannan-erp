@@ -1,7 +1,7 @@
 import { Router, Request, Response, NextFunction } from 'express';
 import { z } from 'zod';
 import { Prisma, JournalSource, NoteType, NoteStatus } from '@prisma/client';
-import prisma from '../lib/prisma';
+import prisma, { type Tx } from '../lib/prisma';
 import { requireAuth, requirePermission } from '../middleware/auth';
 import { getPagination, paginatedResponse } from '../lib/paginate';
 import { parseDateRange } from '../lib/dateRange';
@@ -35,7 +35,7 @@ const settleNoteSchema = z.object({
 
 /** Build a Note number: PN-YYYYMMDD-NNNN for promissory notes, CHQ-YYYYMMDD-NNNN for cheques. */
 async function generateNoteNo(
-  tx: Prisma.TransactionClient,
+  tx: Tx,
   date: Date,
   instrumentType: 'PROMISSORY_NOTE' | 'CHEQUE' = 'PROMISSORY_NOTE',
 ): Promise<string> {
@@ -223,8 +223,8 @@ router.post('/:id/settle', requirePermission('promissory.create'), async (req: R
             create: [
               {
                 accountId: note.type === 'RECEIVABLE'
-                  ? (await tx.account.findUniqueOrThrow({ where: { code: ACCT.AR }, select: { id: true } })).id
-                  : (await tx.account.findUniqueOrThrow({ where: { code: ACCT.AP }, select: { id: true } })).id,
+                  ? (await tx.account.findFirstOrThrow({ where: { code: ACCT.AR }, select: { id: true } })).id
+                  : (await tx.account.findFirstOrThrow({ where: { code: ACCT.AP }, select: { id: true } })).id,
                 amount: new Prisma.Decimal(amount),
                 description: `تسوية كمبيالة ${note.noteNo}`,
               },

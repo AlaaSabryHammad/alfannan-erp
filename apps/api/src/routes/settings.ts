@@ -6,6 +6,7 @@
  */
 
 import { Router, Request, Response, NextFunction } from 'express';
+import { currentTenantId } from '../lib/tenantContext';
 import prisma from '../lib/prisma';
 import { requireAuth, requirePermission } from '../middleware/auth';
 
@@ -82,7 +83,7 @@ router.put('/', requirePermission('settings.edit'), async (req: Request, res: Re
     for (const [key, val] of Object.entries(body)) {
       if (typeof val !== 'string') continue; // skip non-string values
       await prisma.setting.upsert({
-        where:  { key },
+        where:  { tenantId_key: { tenantId: currentTenantId(), key } },
         update: { value: val },
         create: { key, value: val },
       });

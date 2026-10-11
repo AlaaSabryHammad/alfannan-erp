@@ -74,13 +74,13 @@ router.post('/sales-invoices/:id/whatsapp', async (req: Request, res: Response, 
 // POST /api/notifications/low-stock-alert — إرسال ملخص الأصناف المنخفضة للجوال الإداري المُعرَّف بالإعدادات
 router.post('/low-stock-alert', async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const adminPhoneSetting = await prisma.setting.findUnique({ where: { key: 'notificationAdminPhone' } });
+    const adminPhoneSetting = await prisma.setting.findFirst({ where: { key: 'notificationAdminPhone' } });
     const adminPhone = adminPhoneSetting?.value;
     if (!adminPhone) {
       res.status(400).json({ error: 'لم يتم ضبط رقم جوال المسؤول لاستقبال التنبيهات في شاشة الإعدادات' });
       return;
     }
-    const thresholdSetting = await prisma.setting.findUnique({ where: { key: 'lowStockThreshold' } });
+    const thresholdSetting = await prisma.setting.findFirst({ where: { key: 'lowStockThreshold' } });
     const threshold = parseFloat(thresholdSetting?.value ?? '10');
 
     const lowBalances = await prisma.stockBalance.findMany({
@@ -98,7 +98,7 @@ router.post('/low-stock-alert', async (req: Request, res: Response, next: NextFu
     const lines = lowBalances.map((b) => `- ${b.product.nameAr}: ${Number(b.quantity)}`).join('\n');
     const message = `تنبيه نواقص المخزون:\n\n${lines}`;
 
-    const channel = (await prisma.setting.findUnique({ where: { key: 'whatsappEnabled' } }))?.value === 'true' ? sendWhatsAppMessage : sendSms;
+    const channel = (await prisma.setting.findFirst({ where: { key: 'whatsappEnabled' } }))?.value === 'true' ? sendWhatsAppMessage : sendSms;
     const result = await channel(adminPhone, message);
     if (!result.success) {
       res.status(400).json({ error: result.error });

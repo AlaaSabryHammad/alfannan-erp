@@ -1,9 +1,10 @@
 import { Request, Response, NextFunction } from 'express';
 import jwt from 'jsonwebtoken';
-import prisma from '../lib/prisma';
+import { enterTenant } from '../lib/tenantContext';
 
 export interface AuthPayload {
   userId: number;
+  tenantId: number;
   email: string;
   roleCode: string;
   permissions: string[];
@@ -27,8 +28,14 @@ export async function requireAuth(req: Request, res: Response, next: NextFunctio
   const token = authHeader.split(' ')[1];
   try {
     const decoded = jwt.verify(token, process.env.JWT_SECRET!) as AuthPayload;
+    // Tokens issued before multi-tenancy carry no tenant — force a fresh login.
+    if (typeof decoded.tenantId !== 'number') {
+      res.status(401).json({ error: 'الجلسة منتهية — الرجاء تسجيل الدخول مجدداً' });
+      return;
+    }
     req.user = decoded;
-    next();
+    // Everything downstream (routes, services, transactions) runs scoped to this tenant.
+    enterTenant(decoded.tenantId, next);
   } catch {
     res.status(401).json({ error: 'الجلسة منتهية — الرجاء تسجيل الدخول مجدداً' });
   }

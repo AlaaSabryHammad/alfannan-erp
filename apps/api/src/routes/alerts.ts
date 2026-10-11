@@ -21,7 +21,7 @@ router.get('/summary', async (req: Request, res: Response, next: NextFunction) =
 
     // «تفعيل الإشعارات» off → the bell counter shows nothing. The detailed
     // alerts page and the underlying data are untouched.
-    const notif = await prisma.setting.findUnique({ where: { key: 'enableNotifications' } });
+    const notif = await prisma.setting.findFirst({ where: { key: 'enableNotifications' } });
     if (notif?.value === 'false') {
       res.json({
         enabled: false,

@@ -10,6 +10,7 @@
  * caller agrees on the same definition of "remaining".
  */
 import { Prisma } from '@prisma/client';
+import type { Tx } from './prisma';
 
 export interface InvoiceSettlement {
   total: number;
@@ -19,7 +20,7 @@ export interface InvoiceSettlement {
 }
 
 export async function getSalesInvoiceSettlement(
-  tx: Prisma.TransactionClient,
+  tx: Tx,
   salesInvoiceId: number,
 ): Promise<InvoiceSettlement> {
   const [invoice, paidAgg, returnAgg] = await Promise.all([
@@ -34,7 +35,7 @@ export async function getSalesInvoiceSettlement(
 }
 
 export async function getPurchaseInvoiceSettlement(
-  tx: Prisma.TransactionClient,
+  tx: Tx,
   purchaseInvoiceId: number,
 ): Promise<InvoiceSettlement> {
   const [invoice, paidAgg, returnAgg] = await Promise.all([
@@ -55,7 +56,7 @@ function statusFor(s: InvoiceSettlement): 'PAID' | 'PARTIAL' | 'UNPAID' {
 
 /** Re-derive a sales invoice's paidStatus after any voucher or return change. */
 export async function recomputeSalesInvoiceStatus(
-  tx: Prisma.TransactionClient,
+  tx: Tx,
   salesInvoiceId: number,
 ): Promise<void> {
   const settlement = await getSalesInvoiceSettlement(tx, salesInvoiceId);
@@ -64,7 +65,7 @@ export async function recomputeSalesInvoiceStatus(
 
 /** Re-derive a purchase invoice's paymentStatus after any voucher or return change. */
 export async function recomputePurchaseInvoiceStatus(
-  tx: Prisma.TransactionClient,
+  tx: Tx,
   purchaseInvoiceId: number,
 ): Promise<void> {
   const settlement = await getPurchaseInvoiceSettlement(tx, purchaseInvoiceId);

@@ -7,6 +7,7 @@
  */
 
 import { Prisma, AccountType, JournalSource } from '@prisma/client';
+import type { Tx } from './prisma';
 
 // ── Account-code constants ────────────────────────────────────────────────────
 export const ACCT: Record<string, string> = {
@@ -44,7 +45,7 @@ export const CONTROL_ACCOUNT_ERROR =
 
 /** Throws CONTROL_ACCOUNT_ERROR if any of the given account ids is a control account. */
 export async function assertNoControlAccounts(
-  db: Prisma.TransactionClient,
+  db: Tx,
   accountIds: number[],
 ): Promise<void> {
   const ids = [...new Set(accountIds)];
@@ -93,13 +94,13 @@ export class PeriodLockedError extends Error {}
  * entries…) goes through — so one check protects the whole ledger.
  */
 export async function assertPeriodOpen(
-  tx: Prisma.TransactionClient,
+  tx: Tx,
   date: Date,
 ): Promise<void> {
   const year = date.getFullYear();
   const month = date.getMonth() + 1;
-  const period = await tx.fiscalPeriod.findUnique({
-    where: { year_month: { year, month } },
+  const period = await tx.fiscalPeriod.findFirst({
+    where: { year, month },
     select: { status: true },
   });
   if (period?.status === 'LOCKED') {
@@ -111,7 +112,7 @@ export async function assertPeriodOpen(
 
 // ── Entry-number generator: JE-YYYYMMDD-NNNN ─────────────────────────────────
 async function generateEntryNo(
-  tx: Prisma.TransactionClient,
+  tx: Tx,
   date: Date,
 ): Promise<string> {
   const y = date.getFullYear();
@@ -139,7 +140,7 @@ async function generateEntryNo(
  * Updates Account.currentBalance for each touched account.
  */
 export async function postJournalEntry(
-  tx: Prisma.TransactionClient,
+  tx: Tx,
   params: PostEntryParams,
 ) {
   const { date, description, sourceType, sourceId, createdById, lines } = params;
@@ -165,7 +166,7 @@ export async function postJournalEntry(
         select: { id: true, type: true },
       });
     } else if (line.accountCode) {
-      account = await tx.account.findUnique({
+      account = await tx.account.findFirst({
         where: { code: line.accountCode },
         select: { id: true, type: true },
       });
@@ -255,7 +256,7 @@ export async function postJournalEntry(
  * (no audit trail entry needed — the deletion is the event).
  */
 export async function reverseJournalEntryBySource(
-  tx: Prisma.TransactionClient,
+  tx: Tx,
   sourceType: JournalSource,
   sourceId: number,
 ): Promise<void> {
@@ -300,8 +301,8 @@ export async function reverseJournalEntryBySource(
 
 // ── Year-end closing ───────────────────────────────────────────────────────────
 
-async function getOrCreateRetainedEarningsAccount(tx: Prisma.TransactionClient) {
-  const existing = await tx.account.findUnique({ where: { code: ACCT.RETAINED_EARNINGS } });
+async function getOrCreateRetainedEarningsAccount(tx: Tx) {
+  const existing = await tx.account.findFirst({ where: { code: ACCT.RETAINED_EARNINGS } });
   if (existing) return existing;
   return tx.account.create({
     data: {
@@ -313,8 +314,8 @@ async function getOrCreateRetainedEarningsAccount(tx: Prisma.TransactionClient) 
 }
 
 /** Opening-balance equity account (7910) — the offset for customer/supplier opening balances. */
-export async function getOrCreateOpeningEquityAccount(tx: Prisma.TransactionClient) {
-  const existing = await tx.account.findUnique({ where: { code: ACCT.OPENING_EQUITY } });
+export async function getOrCreateOpeningEquityAccount(tx: Tx) {
+  const existing = await tx.account.findFirst({ where: { code: ACCT.OPENING_EQUITY } });
   if (existing) return existing;
   return tx.account.create({
     data: { code: ACCT.OPENING_EQUITY, nameAr: 'رصيد افتتاحي', type: AccountType.EQUITY },
@@ -329,7 +330,7 @@ export async function getOrCreateOpeningEquityAccount(tx: Prisma.TransactionClie
  * Negative balances flip the sides. Zero posts nothing.
  */
 export async function postOpeningBalanceEntry(
-  tx: Prisma.TransactionClient,
+  tx: Tx,
   party: 'CUSTOMER' | 'SUPPLIER',
   name: string,
   openingBalance: number,
@@ -375,7 +376,7 @@ export interface YearClosePreview {
  * every REVENUE/EXPENSE (incl. COGS) account with a non-zero balance,
  * plus the net income/loss that would be transferred to retained earnings.
  */
-export async function previewYearClose(tx: Prisma.TransactionClient): Promise<YearClosePreview> {
+export async function previewYearClose(tx: Tx): Promise<YearClosePreview> {
   const accounts = await tx.account.findMany({
     where: { type: { in: [AccountType.REVENUE, AccountType.EXPENSE] } },
   });
@@ -399,7 +400,7 @@ export async function previewYearClose(tx: Prisma.TransactionClient): Promise<Ye
  * Throws "لا توجد أرصدة لإقفالها" if there is nothing to close.
  */
 export async function closeFiscalYear(
-  tx: Prisma.TransactionClient,
+  tx: Tx,
   params: { date: Date; createdById?: number | null },
 ) {
   const { lines: pnlLines, netIncome } = await previewYearClose(tx);

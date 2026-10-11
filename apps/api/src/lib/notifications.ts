@@ -10,7 +10,7 @@ import prisma from './prisma';
 import { SETTING_DEFAULTS } from '../routes/settings';
 
 async function getSetting(key: string): Promise<string | null> {
-  const row = await prisma.setting.findUnique({ where: { key } });
+  const row = await prisma.setting.findFirst({ where: { key } });
   return row?.value ?? SETTING_DEFAULTS[key] ?? null;
 }
 

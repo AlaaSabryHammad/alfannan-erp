@@ -9,8 +9,8 @@ const YEAR = 2035;
 
 describe('GET /reports/budget-vs-actual', () => {
   it('reports revenue, expense and net totals separately', async () => {
-    const rev = await prisma.account.findUniqueOrThrow({ where: { code: '4000' } });
-    const exp = await prisma.account.findUniqueOrThrow({ where: { code: '6000' } });
+    const rev = await prisma.account.findFirstOrThrow({ where: { code: '4000' } });
+    const exp = await prisma.account.findFirstOrThrow({ where: { code: '6000' } });
 
     // budget: revenue 1000/month, expense 100/month
     for (const [acct, monthly] of [[rev.id, 1000], [exp.id, 100]] as const) {

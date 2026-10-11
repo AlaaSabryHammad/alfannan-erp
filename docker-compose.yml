@@ -31,6 +31,8 @@ services:
       JWT_SECRET: ${JWT_SECRET:?set JWT_SECRET in .env.docker}
       PORT: "4000"
       CORS_ORIGIN: ${CORS_ORIGIN:-http://localhost:8080}
+      # SaaS: allow anyone to create a new company from the login screen (off by default)
+      ALLOW_SIGNUP: ${ALLOW_SIGNUP:-false}
     volumes:
       - uploads:/app/apps/api/uploads
     depends_on:

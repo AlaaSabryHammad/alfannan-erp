@@ -41,7 +41,7 @@ function buildTree(items: DeptNode[]): DeptNode[] {
 router.get('/', requirePermission('departments.view'), async (_req: Request, res: Response, next: NextFunction) => {
   try {
     const all = await prisma.department.findMany({ orderBy: { id: 'asc' } });
-    const tree = buildTree(all as DeptNode[]);
+    const tree = buildTree(all as unknown as DeptNode[]);
     res.json(tree);
   } catch (err) {
     next(err);

@@ -1,7 +1,7 @@
 import { Router, Request, Response, NextFunction } from 'express';
 import { z } from 'zod';
 import { Prisma, JournalSource, AssetCategory } from '@prisma/client';
-import prisma from '../lib/prisma';
+import prisma, { type Tx } from '../lib/prisma';
 import { requireAuth, requirePermission } from '../middleware/auth';
 import { getPagination, paginatedResponse } from '../lib/paginate';
 import { postJournalEntry, reverseJournalEntryBySource, assertPeriodOpen, ACCT } from '../lib/ledger';
@@ -22,7 +22,7 @@ const createAssetSchema = z.object({
 });
 
 /** Build asset code: FA-NNNN (count-based). */
-async function generateAssetCode(tx: Prisma.TransactionClient): Promise<string> {
+async function generateAssetCode(tx: Tx): Promise<string> {
   const count = await tx.fixedAsset.count();
   return `FA-${String(count + 1).padStart(4, '0')}`;
 }
