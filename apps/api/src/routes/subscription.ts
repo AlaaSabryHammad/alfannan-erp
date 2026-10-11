@@ -14,6 +14,9 @@ import { z } from 'zod';
 import prisma from '../lib/prisma';
 import { requireAuth, requirePermission } from '../middleware/auth';
 import { enforcementMode, getEntitlements, getUsage } from '../lib/entitlements';
+import { CheckoutError, settleOrder, startCheckout } from '../lib/paymentService';
+import { paymentsEnabled } from '../lib/payments/provider';
+import { rateLimit } from '../middleware/rateLimit';
 
 const router = Router();
 router.use(requireAuth);
@@ -22,7 +25,7 @@ router.get('/', async (req: Request, res: Response, next: NextFunction) => {
   try {
     const tenantId = req.user!.tenantId;
     const [entitlements, usage] = await Promise.all([getEntitlements(tenantId), getUsage(tenantId)]);
-    res.json({ ...entitlements, usage, enforcement: enforcementMode() });
+    res.json({ ...entitlements, usage, enforcement: enforcementMode(), paymentsEnabled: paymentsEnabled() });
   } catch (err) {
     next(err);
   }
@@ -72,6 +75,61 @@ router.get('/upgrade-requests', async (_req: Request, res: Response, next: NextF
   try {
     const rows = await prisma.upgradeRequest.findMany({ orderBy: { id: 'desc' }, take: 10 });
     res.json(rows);
+  } catch (err) {
+    next(err);
+  }
+});
+
+// ── online checkout ───────────────────────────────────────────────────────────
+
+const checkoutSchema = z.object({
+  planId: z.number().int().positive(),
+  months: z.union([z.literal(1), z.literal(12)]),
+});
+
+router.post(
+  '/checkout',
+  requirePermission('settings.edit'),
+  rateLimit({ name: 'checkout', windowMs: 10 * 60 * 1000, max: 20, message: 'محاولات دفع كثيرة — حاول لاحقًا' }),
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const body = checkoutSchema.parse(req.body);
+      const result = await startCheckout({ userId: req.user!.userId, planId: body.planId, months: body.months });
+      res.status(201).json(result);
+    } catch (err) {
+      if (err instanceof CheckoutError) {
+        res.status(err.status).json({ error: err.message });
+        return;
+      }
+      next(err);
+    }
+  },
+);
+
+// The page the gateway sends the customer back to polls this. If the webhook is late we ask the
+// gateway ourselves (settleOrder is idempotent), so the customer never waits on a missed callback.
+router.get('/checkout/:id', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const id = Number(req.params.id);
+    let order = await prisma.paymentOrder.findFirst({ where: { id } });
+    if (!order) {
+      res.status(404).json({ error: 'الطلب غير موجود' });
+      return;
+    }
+    if (order.status === 'PENDING' && Date.now() - order.createdAt.getTime() > 5_000) {
+      await settleOrder(order.id).catch((e) => console.error('[payments] settle failed:', e instanceof Error ? e.message : e));
+      order = await prisma.paymentOrder.findFirstOrThrow({ where: { id } });
+    }
+    res.json({
+      id: order.id,
+      status: order.status,
+      amount: Number(order.amount),
+      currency: order.currency,
+      months: order.months,
+      planId: order.planId,
+      paidAt: order.paidAt,
+      failureReason: order.status === 'FAILED' ? 'تعذّر إتمام الدفع' : null,
+    });
   } catch (err) {
     next(err);
   }

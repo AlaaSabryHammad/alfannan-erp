@@ -26,6 +26,11 @@ export default defineConfig({
       TENANT_FALLBACK_ID: '1',
       // run the whole suite with plan limits really enforced
       SUBSCRIPTION_ENFORCEMENT: 'enforce',
+      // online payments run against the in-memory fake gateway
+      PAYMENTS_ENABLED: 'true',
+      PAYMENTS_PROVIDER: 'fake',
+      PUBLIC_BASE_URL: 'http://localhost:5173',
+      MOYASAR_WEBHOOK_SECRET: 'whsec-test-0123456789',
       DATABASE_URL: testDatabaseUrl('DATABASE_URL'),
       DIRECT_DATABASE_URL: testDatabaseUrl('DIRECT_DATABASE_URL'),
     },

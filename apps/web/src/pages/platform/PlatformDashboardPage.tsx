@@ -16,6 +16,7 @@ import {
   type LimitKey,
   type PlatformAuditRow,
   type PlatformPayment,
+  type PlatformPaymentOrder,
   type PlatformPlan,
   type PlatformStats,
   type PlatformTenant,
@@ -44,6 +45,8 @@ const ACTION_LABELS: Record<string, string> = {
   SUB_OVERRIDES: 'حدود/مزايا مخصصة',
   UPGRADE_REQUEST_HANDLED: 'معالجة طلب ترقية',
   SUB_AUTO_EXPIRE: 'انتهاء تلقائي للاشتراك',
+  PAYMENT_ONLINE: 'دفع إلكتروني ناجح',
+  PAYMENT_ORDER_SETTLE: 'إعادة فحص طلب دفع',
   SUB_AUTO_PAST_DUE: 'بدء فترة السماح (تلقائي)',
   SUB_REMINDER: 'تذكير قبل الانتهاء',
   LIFECYCLE_RUN: 'تشغيل فحص الاشتراكات',
@@ -625,6 +628,15 @@ export function PlatformDashboardPage() {
     enabled: hasToken && tab === 'payments',
     queryFn: async () => (await platformApi.get<PlatformPayment[]>('/payments')).data,
   });
+  const orders = useQuery({
+    queryKey: ['platform', 'payment-orders'],
+    enabled: hasToken && tab === 'payments',
+    queryFn: async () => (await platformApi.get<PlatformPaymentOrder[]>('/payment-orders')).data,
+  });
+  const recheck = useMutation({
+    mutationFn: async (id: number) => platformApi.post('/payment-orders/' + id + '/settle'),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['platform'] }),
+  });
   const audit = useQuery({
     queryKey: ['platform', 'audit'],
     enabled: hasToken && tab === 'audit',
@@ -858,6 +870,52 @@ export function PlatformDashboardPage() {
                   {payments.data?.length === 0 && <tr><td colSpan={7} className="py-10 text-center text-slate-400">لا توجد دفعات بعد</td></tr>}
                 </tbody>
               </table>
+            </div>
+          )}
+
+          {tab === 'payments' && (
+            <div className="border-t border-slate-200">
+              <p className="px-4 pt-4 pb-2 text-sm font-semibold text-slate-700">طلبات الدفع الإلكتروني</p>
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead className="bg-slate-50 text-slate-500 text-xs">
+                    <tr>{['التاريخ', 'الشركة', 'الباقة', 'المبلغ', 'الحالة', 'البوابة', 'ملاحظة', ''].map((h, i) => (h ? th(h) : <th key={i} />))}</tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100">
+                    {orders.isLoading && <Loading cols={8} />}
+                    {orders.data?.map((o) => (
+                      <tr key={o.id}>
+                        <td className="px-4 py-3 text-slate-500">{fmtDate(o.createdAt)}</td>
+                        <td className="px-4 py-3 font-medium text-slate-900">{o.tenantName}</td>
+                        <td className="px-4 py-3">{o.planName} · {o.months === 12 ? 'سنة' : 'شهر'}</td>
+                        <td className="px-4 py-3">{fmtMoney(o.amount)} {o.currency}</td>
+                        <td className="px-4 py-3">
+                          <span className={'text-xs font-semibold px-2 py-0.5 rounded-full ' + (
+                            o.status === 'PAID' ? 'bg-emerald-50 text-emerald-700'
+                              : o.status === 'PENDING' ? 'bg-amber-50 text-amber-700'
+                                : 'bg-red-50 text-red-700')}>
+                            {o.status === 'PAID' ? 'مدفوع' : o.status === 'PENDING' ? 'قيد الانتظار' : o.status === 'EXPIRED' ? 'منتهي' : 'فشل'}
+                          </span>
+                        </td>
+                        <td className="px-4 py-3 text-slate-500" dir="ltr">{o.provider}</td>
+                        <td className="px-4 py-3 text-slate-500 max-w-xs truncate" dir="ltr">{o.failureReason ?? ''}</td>
+                        <td className="px-4 py-3">
+                          {(o.status === 'PENDING' || o.failureReason?.startsWith('amount_mismatch')) && (
+                            <button
+                              disabled={recheck.isPending}
+                              onClick={() => recheck.mutate(o.id)}
+                              className="text-xs font-semibold text-teal-700 hover:underline disabled:opacity-50"
+                            >
+                              إعادة الفحص
+                            </button>
+                          )}
+                        </td>
+                      </tr>
+                    ))}
+                    {orders.data?.length === 0 && <tr><td colSpan={8} className="py-8 text-center text-slate-400">لا توجد طلبات دفع إلكتروني</td></tr>}
+                  </tbody>
+                </table>
+              </div>
             </div>
           )}
 

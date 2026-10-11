@@ -15,6 +15,7 @@
  */
 import { platformPrisma as db } from './platformPrisma';
 import { invalidateEntitlements } from './entitlements';
+import { reconcilePendingOrders } from './paymentService';
 
 const DAY = 24 * 3600 * 1000;
 const GRACE_DAYS = 7;
@@ -26,6 +27,9 @@ export interface LifecycleResult {
   movedToPastDue: number;
   expired: number;
   reminders: number;
+  /** online payments confirmed / closed by the reconciliation step */
+  paymentsSettled: number;
+  paymentsClosed: number;
   errors: string[];
 }
 
@@ -38,7 +42,8 @@ async function record(action: string, tenantId: number, detail: string): Promise
 
 export async function runSubscriptionLifecycle(now: Date = new Date()): Promise<LifecycleResult> {
   const result: LifecycleResult = {
-    ranAt: now.toISOString(), trialsExpired: 0, movedToPastDue: 0, expired: 0, reminders: 0, errors: [],
+    ranAt: now.toISOString(), trialsExpired: 0, movedToPastDue: 0, expired: 0, reminders: 0,
+    paymentsSettled: 0, paymentsClosed: 0, errors: [],
   };
   const graceCutoff = new Date(now.getTime() - GRACE_DAYS * DAY);
   const touched = new Set<number>();
@@ -123,6 +128,14 @@ export async function runSubscriptionLifecycle(now: Date = new Date()): Promise<
       await record('SUB_REMINDER', r.tenantId, `${key} — ${what} خلال ${daysLeft} يوم`);
       result.reminders += 1;
     }
+  });
+
+  // 5. online payments whose webhook never arrived
+  await step('payments', async () => {
+    const r = await reconcilePendingOrders(now);
+    result.paymentsSettled = r.paid;
+    result.paymentsClosed = r.closed;
+    result.errors.push(...r.errors);
   });
 
   for (const id of touched) invalidateEntitlements(id);

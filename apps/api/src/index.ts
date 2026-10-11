@@ -55,6 +55,7 @@ import schedulerRouter from './routes/scheduler';
 import bankReconciliationsRouter from './routes/bankReconciliations';
 import platformRouter from './routes/platform';
 import subscriptionRouter from './routes/subscription';
+import paymentWebhooksRouter from './routes/paymentWebhooks';
 import { startScheduler } from './lib/scheduler';
 import { auditMiddleware } from './middleware/audit';
 import { errorHandler } from './middleware/errorHandler';
@@ -174,6 +175,8 @@ app.use('/api/bank-reconciliations', bankReconciliationsRouter);
 // SaaS owner console — separate auth (platform token) and owner DB connection
 app.use('/api/platform', platformRouter);
 app.use('/api/subscription', subscriptionRouter);
+// payment gateway notifications: no session — authenticity is checked inside (HMAC / shared secret)
+app.use('/api/webhooks', paymentWebhooksRouter);
 
 // ── 404 handler ───────────────────────────────────────────────────────────────
 app.use((_req, res) => {
