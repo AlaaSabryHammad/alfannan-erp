@@ -859,13 +859,16 @@ export function ReportsPage() {
                   {[
                     { label: 'إيرادات المبيعات', value: pnl.revenue, color: 'text-success', bold: false },
                     { label: 'تكلفة البضاعة المباعة (COGS)', value: -pnl.cogs, color: 'text-danger', bold: false },
-                    { label: 'إجمالي الربح', value: pnl.grossProfit, color: pnl.grossProfit >= 0 ? 'text-success' : 'text-danger', bold: true },
+                    { label: pnl.grossProfit >= 0 ? 'إجمالي الربح' : 'إجمالي الخسارة', value: pnl.grossProfit, color: pnl.grossProfit >= 0 ? 'text-success' : 'text-danger', bold: true, signed: true },
                     { label: 'المصروفات التشغيلية', value: -pnl.operatingExpenses, color: 'text-danger', bold: false },
-                    { label: 'صافي الربح / الخسارة', value: pnl.netProfit, color: pnl.netProfit >= 0 ? 'text-success' : 'text-danger', bold: true },
+                    { label: pnl.netProfit >= 0 ? 'صافي الربح' : 'صافي الخسارة', value: pnl.netProfit, color: pnl.netProfit >= 0 ? 'text-success' : 'text-danger', bold: true, signed: true },
                   ].map((row, i) => (
                     <div key={i} className={`flex items-center justify-between py-3 border-b border-app-border ${row.bold ? 'bg-gray-50 px-3 rounded-lg font-bold' : ''}`}>
                       <span className={`text-sm ${row.bold ? 'font-bold text-app-text' : 'text-app-muted'}`}>{row.label}</span>
-                      <span className={`text-sm font-bold font-mono ${row.color}`}>{formatMoney(Math.abs(row.value))}</span>
+                      {/* deduction rows read as positive amounts; profit/loss rows keep their sign */}
+                      <span dir="ltr" className={`text-sm font-bold font-mono ${row.color}`}>
+                        {formatMoney(row.signed ? row.value : Math.abs(row.value))}
+                      </span>
                     </div>
                   ))}
                   <div className="flex items-center justify-between py-3 bg-primary-50 px-3 rounded-xl">
