@@ -36,9 +36,14 @@ export async function requirePlatformAdmin(req: Request, res: Response, next: Ne
     // still an active platform admin? (revoking an admin takes effect immediately)
     const admin = await platformPrisma.platformAdmin.findUnique({
       where: { id: decoded.adminId },
-      select: { isActive: true },
+      select: { isActive: true, sessionsValidAfter: true },
     });
     if (!admin?.isActive) throw new Error('inactive');
+    // a password change ends every older session (a stolen token, a forgotten browser)
+    if (admin.sessionsValidAfter && (decoded as PlatformPayload & { iat?: number }).iat !== undefined &&
+        ((decoded as PlatformPayload & { iat?: number }).iat as number) < Math.floor(admin.sessionsValidAfter.getTime() / 1000)) {
+      throw new Error('session ended by a password change');
+    }
     req.platformAdmin = decoded;
     next();
   } catch {

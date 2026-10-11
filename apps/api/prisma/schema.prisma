@@ -1774,6 +1774,8 @@ model PlatformAdmin {
   passwordHash String
   isActive     Boolean  @default(true)
   createdAt    DateTime @default(now())
+  // tokens issued before this instant are rejected (set when the password changes)
+  sessionsValidAfter DateTime?
 
   auditLogs PlatformAuditLog[]
 }

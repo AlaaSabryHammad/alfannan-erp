@@ -72,6 +72,50 @@ router.use(requirePlatformAdmin);
 
 router.use(billingRouter);
 
+// Change my own password. Needs the current one; every other session of this account is ended and the
+// caller continues with a fresh token.
+const passwordSchema = z.object({
+  currentPassword: z.string().min(1),
+  newPassword: z
+    .string()
+    .min(12, 'كلمة المرور الجديدة يجب ألا تقل عن 12 حرفًا')
+    .max(128)
+    .refine((p) => /[A-Za-z]/.test(p) && /[0-9]/.test(p), 'يجب أن تحوي حروفًا وأرقامًا'),
+});
+
+router.post(
+  '/me/password',
+  rateLimit({ name: 'platform-password', windowMs: 10 * 60 * 1000, max: 10 }),
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { currentPassword, newPassword } = passwordSchema.parse(req.body);
+      const me = req.platformAdmin!;
+      const admin = await db.platformAdmin.findUniqueOrThrow({ where: { id: me.adminId } });
+
+      if (!(await bcrypt.compare(currentPassword, admin.passwordHash))) {
+        res.status(400).json({ error: 'كلمة المرور الحالية غير صحيحة' });
+        return;
+      }
+      if (await bcrypt.compare(newPassword, admin.passwordHash)) {
+        res.status(400).json({ error: 'كلمة المرور الجديدة يجب أن تختلف عن الحالية' });
+        return;
+      }
+
+      await db.platformAdmin.update({
+        where: { id: admin.id },
+        data: { passwordHash: await bcrypt.hash(newPassword, 12), sessionsValidAfter: new Date() },
+      });
+      await audit(req, 'PLATFORM_PASSWORD_CHANGE', null, admin.email);
+      res.json({
+        success: true,
+        token: signPlatformToken({ adminId: admin.id, email: admin.email, name: admin.name }),
+      });
+    } catch (err) {
+      next(err);
+    }
+  },
+);
+
 router.get('/me', (req: Request, res: Response) => {
   const a = req.platformAdmin!;
   res.json({ id: a.adminId, name: a.name, email: a.email });
