@@ -5,6 +5,7 @@
  * بين الفروع (لا حاجة لمزامنة شبكية فعلية). زر "مزامنة الآن" هنا يقوم بعملية فعلية:
  * فحص تكامل أرصدة المخزون في مستودعات الفرع (لا رصيد سالب) وتحديث وقت آخر تحقق.
  */
+import { enforceLimit } from '../middleware/subscription';
 import { Router, Request, Response, NextFunction } from 'express';
 import { z } from 'zod';
 import prisma from '../lib/prisma';
@@ -101,7 +102,7 @@ router.get('/:id', requirePermission('branches.view'), async (req: Request, res:
 });
 
 // POST /api/branches
-router.post('/', requirePermission('branches.create'), async (req: Request, res: Response, next: NextFunction) => {
+router.post('/', requirePermission('branches.create'), enforceLimit('branches'), async (req: Request, res: Response, next: NextFunction) => {
   try {
     const body = branchSchema.parse(req.body);
     const branch = await prisma.branch.create({ data: body });

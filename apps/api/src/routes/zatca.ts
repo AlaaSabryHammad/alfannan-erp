@@ -1,3 +1,4 @@
+import { requireFeature } from '../middleware/subscription';
 import { Router, Request, Response, NextFunction } from 'express';
 import crypto from 'crypto';
 import prisma from '../lib/prisma';
@@ -10,6 +11,7 @@ import { SETTING_DEFAULTS } from './settings';
 
 const router = Router();
 router.use(requireAuth);
+router.use(requireFeature('zatca'));
 
 // GET /api/zatca/status — هل الفوترة الإلكترونية (المرحلة الثانية) مُهيّأة؟
 router.get('/status', requirePermission('sales.view'), async (req: Request, res: Response, next: NextFunction) => {

@@ -2,6 +2,7 @@ import { Request, Response, NextFunction } from 'express';
 import jwt from 'jsonwebtoken';
 import { enterTenant } from '../lib/tenantContext';
 import { basePrisma } from '../lib/prisma';
+import { enforcementMode, getEntitlements } from '../lib/entitlements';
 
 export interface AuthPayload {
   userId: number;
@@ -18,6 +19,10 @@ declare global {
     }
   }
 }
+
+const SAFE_METHODS = new Set(['GET', 'HEAD', 'OPTIONS']);
+// Self-service account endpoints that must keep working on an expired company.
+const READ_ONLY_EXEMPT = /^\/api\/auth\/change-password/;
 
 // Tenant "is active" lookups are cached briefly so the check costs ~nothing per request.
 const TENANT_ACTIVE_TTL_MS = 15_000;
@@ -58,6 +63,21 @@ export async function requireAuth(req: Request, res: Response, next: NextFunctio
       return;
     }
     req.user = decoded;
+
+    // Expired / canceled companies keep read access (and can export) but cannot write.
+    if (!SAFE_METHODS.has(req.method) && enforcementMode() !== 'off' && !READ_ONLY_EXEMPT.test(req.originalUrl)) {
+      const ent = await getEntitlements(decoded.tenantId);
+      if (ent.readOnly) {
+        if (enforcementMode() === 'enforce') {
+          res.status(402).json({
+            error: 'انتهى اشتراك شركتك — النظام في وضع القراءة فقط. جدّد الاشتراك للمتابعة.',
+            code: 'SUBSCRIPTION_READ_ONLY',
+          });
+          return;
+        }
+        console.warn(`[subscription] would block tenant=${decoded.tenantId} ${req.method} ${req.originalUrl} → SUBSCRIPTION_READ_ONLY`);
+      }
+    }
     // Everything downstream (routes, services, transactions) runs scoped to this tenant.
     enterTenant(decoded.tenantId, next);
   } catch {

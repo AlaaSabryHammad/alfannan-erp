@@ -1,3 +1,4 @@
+import { enforceLimit } from '../middleware/subscription';
 import { Router, Request, Response, NextFunction } from 'express';
 import { z } from 'zod';
 import prisma from '../lib/prisma';
@@ -100,7 +101,7 @@ router.get('/:id', requirePermission('products.view'), async (req: Request, res:
 });
 
 // POST /api/products
-router.post('/', requirePermission('products.create'), async (req: Request, res: Response, next: NextFunction) => {
+router.post('/', requirePermission('products.create'), enforceLimit('products'), async (req: Request, res: Response, next: NextFunction) => {
   try {
     const data = productSchema.parse(req.body);
     const product = await prisma.product.create({ data });

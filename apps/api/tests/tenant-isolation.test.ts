@@ -8,6 +8,7 @@ import bcrypt from 'bcrypt';
 import jwt from 'jsonwebtoken';
 import { app, prisma } from './helpers';
 import { basePrisma } from '../src/lib/prisma';
+import { platformPrisma } from '../src/lib/platformPrisma';
 import { runWithTenant, runUnscoped } from '../src/lib/tenantContext';
 
 const stamp = Date.now();
@@ -27,6 +28,12 @@ async function login(email: string, password: string) {
 beforeAll(async () => {
   const tenant = await basePrisma.tenant.create({ data: { name: 'شركة ب', slug: `tenant-b-${stamp}` } });
   tenantB = tenant.id;
+
+  // a company without a subscription is read-only (fail closed) — give B a normal trial
+  const trial = await platformPrisma.plan.findUniqueOrThrow({ where: { code: 'trial' } });
+  await platformPrisma.subscription.create({
+    data: { tenantId: tenantB, planId: trial.id, status: 'TRIALING', trialEndsAt: new Date(Date.now() + 14 * 24 * 3600 * 1000) },
+  });
 
   await runWithTenant(tenantB, async () => {
     const role = await prisma.role.create({ data: { code: 'ADMIN', nameAr: 'مدير النظام' } }); // same code as tenant 1

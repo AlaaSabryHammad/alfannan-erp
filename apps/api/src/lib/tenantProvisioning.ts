@@ -88,6 +88,16 @@ export async function provisionTenant(input: ProvisionInput): Promise<{ tenantId
           data: { nameAr: 'المستودع الرئيسي', branchId: branch.id, isActive: true },
         });
 
+        const trial = await tx.plan.findUnique({ where: { code: 'trial' } });
+        if (!trial) throw new Error('الباقة التجريبية (trial) غير موجودة — شغّل الـ migrations');
+        await tx.subscription.create({
+          data: {
+            planId: trial.id,
+            status: 'TRIALING',
+            trialEndsAt: new Date(Date.now() + trial.trialDays * 24 * 3600 * 1000),
+          },
+        });
+
         await tx.setting.createMany({
           data: [
             { key: 'companyName', value: input.companyName.trim() },

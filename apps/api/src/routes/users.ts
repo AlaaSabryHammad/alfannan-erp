@@ -1,3 +1,4 @@
+import { enforceLimit } from '../middleware/subscription';
 import { Router, Request, Response, NextFunction } from 'express';
 import { z } from 'zod';
 import bcrypt from 'bcrypt';
@@ -88,7 +89,7 @@ router.get('/:id', requirePermission('users.view'), async (req: Request, res: Re
 });
 
 // POST /api/users
-router.post('/', requirePermission('users.create'), async (req: Request, res: Response, next: NextFunction) => {
+router.post('/', requirePermission('users.create'), enforceLimit('users'), async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { password, ...rest } = createUserSchema.parse(req.body);
     const passwordHash = await bcrypt.hash(password, 10);

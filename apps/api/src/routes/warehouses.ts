@@ -1,3 +1,4 @@
+import { enforceLimit } from '../middleware/subscription';
 import { Router, Request, Response, NextFunction } from 'express';
 import { z } from 'zod';
 import prisma from '../lib/prisma';
@@ -56,7 +57,7 @@ router.get('/:id', requirePermission('warehouses.view'), async (req: Request, re
   }
 });
 
-router.post('/', requirePermission('warehouses.create'), async (req: Request, res: Response, next: NextFunction) => {
+router.post('/', requirePermission('warehouses.create'), enforceLimit('warehouses'), async (req: Request, res: Response, next: NextFunction) => {
   try {
     const data = warehouseSchema.parse(req.body);
     const wh = await prisma.warehouse.create({ data });
