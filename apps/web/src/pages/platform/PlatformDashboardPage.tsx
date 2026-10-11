@@ -520,6 +520,12 @@ function TenantPanel({ tenantId, onClose }: { tenantId: number; onClose: () => v
               </button>
             </div>
 
+            <p className="text-xs text-slate-500 -mt-3 mb-5">
+              {data.termsAcceptedAt
+                ? 'وافقت على الشروط (نسخة ' + data.termsVersion + ') بتاريخ ' + fmtDate(data.termsAcceptedAt) + ' — ' + (data.termsAcceptedBy ?? '')
+                : 'لم توافق على الشروط وسياسة الخصوصية بعد'}
+            </p>
+
             <SubscriptionCard key={`${data.id}-${data.subscription?.planId}-${data.subscription?.status}`} tenant={data} plans={plans.data ?? []} />
 
             <div className="grid grid-cols-2 gap-3 mb-6">

@@ -25,7 +25,7 @@ declare global {
 
 const SAFE_METHODS = new Set(['GET', 'HEAD', 'OPTIONS']);
 // Self-service account endpoints that must keep working on an expired company.
-const READ_ONLY_EXEMPT = /^\/api\/(auth\/change-password|subscription\/(upgrade-request|checkout))/;
+const READ_ONLY_EXEMPT = /^\/api\/(auth\/change-password|subscription\/(upgrade-request|checkout)|legal\/accept)/;
 
 const UNAUTHORIZED = 'الجلسة منتهية — الرجاء تسجيل الدخول مجدداً';
 

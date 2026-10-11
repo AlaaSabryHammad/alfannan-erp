@@ -14,6 +14,7 @@ const registerSchema = z
     email: z.string().trim().email('البريد الإلكتروني غير صحيح'),
     password: z.string().min(8, 'كلمة المرور يجب ألا تقل عن 8 أحرف').max(128),
     confirm: z.string(),
+    acceptTerms: z.literal(true, { errorMap: () => ({ message: 'يجب الموافقة على الشروط وسياسة الخصوصية للمتابعة' }) }),
   })
   .refine((v) => v.password === v.confirm, { path: ['confirm'], message: 'كلمتا المرور غير متطابقتين' });
 
@@ -93,6 +94,19 @@ export function RegisterPage() {
             type: showPassword ? 'text' : 'password',
             autoComplete: 'new-password',
           })}
+
+          <div className="flex flex-col gap-1">
+            <label className="flex items-start gap-2 text-sm text-app-text cursor-pointer">
+              <input type="checkbox" {...register('acceptTerms')} className="mt-1 w-4 h-4 rounded border-app-border" />
+              <span>
+                أوافق على{' '}
+                <Link to="/terms" target="_blank" className="text-primary font-semibold hover:underline">شروط الاستخدام</Link>
+                {' '}و{' '}
+                <Link to="/privacy" target="_blank" className="text-primary font-semibold hover:underline">سياسة الخصوصية</Link>
+              </span>
+            </label>
+            {errors.acceptTerms && <p className="text-xs text-danger">{errors.acceptTerms.message as string}</p>}
+          </div>
 
           {serverError && (
             <div className="bg-danger-bg border border-danger/20 text-danger text-sm rounded-lg px-4 py-3">

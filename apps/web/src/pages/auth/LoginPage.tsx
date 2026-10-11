@@ -221,6 +221,12 @@ export function LoginPage() {
               </button>
             </form>
 
+            <p className="mt-6 text-center text-xs text-app-muted">
+              <Link to="/terms" className="hover:underline">شروط الاستخدام</Link>
+              {' · '}
+              <Link to="/privacy" className="hover:underline">سياسة الخصوصية</Link>
+            </p>
+
             {signupEnabled && (
               <p className="mt-6 text-center text-sm text-app-muted">
                 ليس لديك حساب؟{' '}

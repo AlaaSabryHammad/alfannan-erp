@@ -47,6 +47,9 @@ export interface PlatformTenant {
   slug: string;
   isActive: boolean;
   createdAt: string;
+  termsVersion: string | null;
+  termsAcceptedAt: string | null;
+  termsAcceptedBy: string | null;
   usage: PlatformUsage;
   subscription: PlatformSubscription | null;
 }

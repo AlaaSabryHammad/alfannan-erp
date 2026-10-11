@@ -8,6 +8,7 @@ import { runUnscoped, runWithTenant } from '../lib/tenantContext';
 import { lockRemainingSeconds, recordFailure, recordSuccess } from '../lib/loginThrottle';
 import { provisionTenant, EmailTakenError } from '../lib/tenantProvisioning';
 import { rateLimit } from '../middleware/rateLimit';
+import { LEGAL_VERSION } from '../lib/legal';
 import { invalidateUserSessions } from '../lib/userSession';
 
 const router = Router();
@@ -27,6 +28,7 @@ const registerSchema = z.object({
   adminName: z.string().trim().min(2, 'اسم المدير قصير جدًا').max(100),
   email: z.string().trim().email('بريد إلكتروني غير صالح'),
   password: z.string().min(8, 'كلمة المرور يجب ألا تقل عن 8 أحرف').max(128),
+  acceptTerms: z.literal(true, { errorMap: () => ({ message: 'يجب الموافقة على الشروط وسياسة الخصوصية' }) }),
 });
 
 // Self-service sign-ups are rate-limited per IP (in memory): 5 companies per hour.
@@ -130,7 +132,7 @@ router.post('/login', rateLimit({ name: 'login', windowMs: 10 * 60 * 1000, max: 
 
 // GET /api/auth/config — public flags the login screen needs (no secrets)
 router.get('/config', (_req: Request, res: Response) => {
-  res.json({ signupEnabled: process.env.ALLOW_SIGNUP === 'true' });
+  res.json({ signupEnabled: process.env.ALLOW_SIGNUP === 'true', legalVersion: LEGAL_VERSION });
 });
 
 // POST /api/auth/register-tenant — create a new company with its first admin (public).
@@ -147,7 +149,8 @@ router.post('/register-tenant', rateLimit({ name: 'register', windowMs: 60 * 60 
     }
 
     const input = registerSchema.parse(req.body);
-    const { tenantId, userId } = await provisionTenant(input);
+    const { acceptTerms: _accepted, ...company } = input;
+    const { tenantId, userId } = await provisionTenant({ ...company, acceptedFromIp: req.ip ?? null });
     const result = await runWithTenant(tenantId, () => buildToken(userId));
     res.status(201).json(result);
   } catch (err) {

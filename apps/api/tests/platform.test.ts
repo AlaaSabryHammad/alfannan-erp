@@ -31,7 +31,7 @@ beforeAll(async () => {
 
   const reg = await request(app).post('/api/auth/register-tenant').send({
     companyName: `شركة إكس ${stamp}`,
-    adminName: 'مدير إكس',
+    adminName: 'مدير إكس', acceptTerms: true,
     email: companyEmail,
     password: companyPassword,
   });
