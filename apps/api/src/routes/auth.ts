@@ -7,6 +7,8 @@ import { requireAuth, AuthPayload } from '../middleware/auth';
 import { runUnscoped, runWithTenant } from '../lib/tenantContext';
 import { lockRemainingSeconds, recordFailure, recordSuccess } from '../lib/loginThrottle';
 import { provisionTenant, EmailTakenError } from '../lib/tenantProvisioning';
+import { rateLimit } from '../middleware/rateLimit';
+import { invalidateUserSessions } from '../lib/userSession';
 
 const router = Router();
 
@@ -86,7 +88,7 @@ async function buildToken(userId: number): Promise<{ token: string; user: object
 }
 
 // POST /api/auth/login
-router.post('/login', async (req: Request, res: Response, next: NextFunction) => {
+router.post('/login', rateLimit({ name: 'login', windowMs: 10 * 60 * 1000, max: 30 }), async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { email, password } = loginSchema.parse(req.body);
 
@@ -133,7 +135,7 @@ router.get('/config', (_req: Request, res: Response) => {
 
 // POST /api/auth/register-tenant — create a new company with its first admin (public).
 // Off unless ALLOW_SIGNUP=true, so a private deployment can never be opened up by accident.
-router.post('/register-tenant', async (req: Request, res: Response, next: NextFunction) => {
+router.post('/register-tenant', rateLimit({ name: 'register', windowMs: 60 * 60 * 1000, max: 10 }), async (req: Request, res: Response, next: NextFunction) => {
   try {
     if (process.env.ALLOW_SIGNUP !== 'true') {
       res.status(403).json({ error: 'تسجيل الشركات الجديدة غير مفعّل على هذا الخادم' });
@@ -185,8 +187,12 @@ router.post('/change-password', requireAuth, async (req: Request, res: Response,
     }
 
     const passwordHash = await bcrypt.hash(newPassword, 10);
-    await prisma.user.update({ where: { id: userId }, data: { passwordHash } });
-    res.json({ success: true });
+    // every other session of this user (a stolen token, a forgotten browser) stops working…
+    await prisma.user.update({ where: { id: userId }, data: { passwordHash, sessionsValidAfter: new Date() } });
+    invalidateUserSessions(req.user!.tenantId, userId);
+    // …and this one continues with a fresh token
+    const { token } = await buildToken(userId);
+    res.json({ success: true, token });
   } catch (err) {
     next(err);
   }

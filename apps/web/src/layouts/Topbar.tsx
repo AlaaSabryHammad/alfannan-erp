@@ -20,8 +20,14 @@ function ChangePasswordModal({ open, onClose }: { open: boolean; onClose: () => 
   const [done, setDone] = useState(false);
 
   const mutation = useMutation({
-    mutationFn: () => apiClient.post('/auth/change-password', { currentPassword, newPassword }),
-    onSuccess: () => { setDone(true); setError(''); },
+    mutationFn: async () =>
+      (await apiClient.post<{ success: boolean; token?: string }>('/auth/change-password', { currentPassword, newPassword })).data,
+    onSuccess: (data) => {
+      // the server ended this user's other sessions and issued a fresh token for this one
+      if (data.token) localStorage.setItem('auth_token', data.token);
+      setDone(true);
+      setError('');
+    },
     onError: (err) => setError(getApiErrorMessage(err, 'تعذّر تغيير كلمة المرور')),
   });
 

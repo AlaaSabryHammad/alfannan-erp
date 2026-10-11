@@ -54,6 +54,8 @@ model User {
   roleId       Int
   isActive     Boolean  @default(true)
   createdAt    DateTime @default(now())
+  // sessions (JWTs) issued before this instant are rejected — set when the password is changed/reset
+  sessionsValidAfter DateTime?
 
   branchId     Int?
 

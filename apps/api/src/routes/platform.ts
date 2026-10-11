@@ -22,6 +22,8 @@ import { requirePlatformAdmin, signPlatformToken } from '../middleware/platformA
 import { invalidateTenantActive } from '../middleware/auth';
 import { lockRemainingSeconds, recordFailure, recordSuccess } from '../lib/loginThrottle';
 import { computeEntitlements } from '../lib/entitlements';
+import { rateLimit } from '../middleware/rateLimit';
+import { invalidateUserSessions } from '../lib/userSession';
 import billingRouter from './platformBilling';
 
 const router = Router();
@@ -36,7 +38,7 @@ async function audit(req: Request, action: string, tenantId: number | null, deta
 
 const loginSchema = z.object({ email: z.string().email(), password: z.string().min(1) });
 
-router.post('/auth/login', async (req: Request, res: Response, next: NextFunction) => {
+router.post('/auth/login', rateLimit({ name: 'platform-login', windowMs: 10 * 60 * 1000, max: 20 }), async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { email, password } = loginSchema.parse(req.body);
     const key = `platform:${email.toLowerCase()}`;
@@ -330,8 +332,9 @@ router.post(
       const temporaryPassword = crypto.randomBytes(9).toString('base64url');
       await db.user.update({
         where: { id: user.id },
-        data: { passwordHash: await bcrypt.hash(temporaryPassword, 10) },
+        data: { passwordHash: await bcrypt.hash(temporaryPassword, 10), sessionsValidAfter: new Date() },
       });
+      invalidateUserSessions(tenantId, user.id);
       await audit(req, 'USER_PASSWORD_RESET', tenantId, user.email);
       res.json({ email: user.email, temporaryPassword });
     } catch (err) {

@@ -29,6 +29,22 @@ export function errorHandler(err: unknown, _req: Request, res: Response, _next: 
     return;
   }
 
+  // malformed / oversized request bodies are the client's fault
+  const bodyErr = err as { type?: string; status?: number };
+  if (bodyErr?.type === 'entity.parse.failed') {
+    res.status(400).json({ error: 'صيغة الطلب غير صالحة' });
+    return;
+  }
+  if (bodyErr?.type === 'entity.too.large') {
+    res.status(413).json({ error: 'حجم الطلب كبير جدًا' });
+    return;
+  }
+
+  if (err instanceof Error && err.message.includes('cross-tenant reference')) {
+    res.status(400).json({ error: 'مرجع غير صالح — العنصر المشار إليه غير موجود في شركتك' });
+    return;
+  }
+
   if (isFKViolation(err)) {
     res.status(400).json({ error: 'لا يمكن الحذف لارتباطه بسجلات أخرى' });
     return;
@@ -42,8 +58,13 @@ export function errorHandler(err: unknown, _req: Request, res: Response, _next: 
   }
 
   if (err instanceof Error) {
-    console.error('[API Error]', err.message);
-    res.status(500).json({ error: 'خطأ في الخادم', message: err.message });
+    console.error('[API Error]', err.stack ?? err.message);
+    // Never hand SQL/Prisma/path details to the client in production.
+    res.status(500).json(
+      process.env.NODE_ENV === 'production'
+        ? { error: 'خطأ في الخادم' }
+        : { error: 'خطأ في الخادم', message: err.message },
+    );
     return;
   }
 
