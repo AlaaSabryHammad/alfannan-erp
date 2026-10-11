@@ -275,6 +275,44 @@ router.put('/tenants/:id/subscription/overrides', async (req: Request, res: Resp
   }
 });
 
+// ── upgrade requests (filed by companies from inside the app) ─────────────────
+
+router.get('/upgrade-requests', async (_req: Request, res: Response, next: NextFunction) => {
+  try {
+    const [rows, plans] = await Promise.all([
+      db.upgradeRequest.findMany({
+        orderBy: [{ status: 'asc' }, { id: 'desc' }],
+        take: 100,
+        include: { tenant: { select: { name: true } } },
+      }),
+      db.plan.findMany({ select: { id: true, nameAr: true } }),
+    ]);
+    const planName = new Map(plans.map((p) => [p.id, p.nameAr]));
+    res.json(rows.map((r) => ({ ...r, tenantName: r.tenant.name, planName: planName.get(r.requestedPlanId) ?? '—' })));
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.post('/upgrade-requests/:id/handle', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const id = Number(req.params.id);
+    const existing = await db.upgradeRequest.findUnique({ where: { id } });
+    if (!existing) {
+      res.status(404).json({ error: 'الطلب غير موجود' });
+      return;
+    }
+    const updated = await db.upgradeRequest.update({
+      where: { id },
+      data: { status: 'HANDLED', handledAt: new Date(), handledByName: req.platformAdmin?.name ?? null },
+    });
+    await audit(req, 'UPGRADE_REQUEST_HANDLED', existing.tenantId, String(existing.requestedPlanId));
+    res.json(updated);
+  } catch (err) {
+    next(err);
+  }
+});
+
 // ── payments ──────────────────────────────────────────────────────────────────
 
 router.get('/payments', async (req: Request, res: Response, next: NextFunction) => {

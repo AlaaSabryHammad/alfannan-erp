@@ -22,7 +22,7 @@ declare global {
 
 const SAFE_METHODS = new Set(['GET', 'HEAD', 'OPTIONS']);
 // Self-service account endpoints that must keep working on an expired company.
-const READ_ONLY_EXEMPT = /^\/api\/auth\/change-password/;
+const READ_ONLY_EXEMPT = /^\/api\/(auth\/change-password|subscription\/upgrade-request)/;
 
 // Tenant "is active" lookups are cached briefly so the check costs ~nothing per request.
 const TENANT_ACTIVE_TTL_MS = 15_000;

@@ -1752,6 +1752,7 @@ model Tenant {
   payrollItemRows PayrollItem[]
   subscription Subscription?
   subscriptionPayments SubscriptionPayment[]
+  upgradeRequests UpgradeRequest[]
 }
 
 // ── PLATFORM ADMINS (SaaS owner console — not tenant users, no tenantId, no RLS) ──────────────
@@ -1848,4 +1849,23 @@ model SubscriptionPayment {
 
   @@index([tenantId])
   @@index([createdAt])
+}
+
+// A company asks for a plan change from inside the app; the owner sees it in the platform console.
+// The company can create and read its own requests, never edit them (handled by the owner only).
+model UpgradeRequest {
+  id               Int       @id @default(autoincrement())
+  tenantId         Int       @default(dbgenerated("(current_setting('app.tenant_id'::text))::integer"))
+  tenant           Tenant    @relation(fields: [tenantId], references: [id])
+  requestedPlanId  Int
+  message          String?
+  status           String    @default("PENDING") // PENDING | HANDLED
+  requestedByName  String?
+  requestedByEmail String?
+  createdAt        DateTime  @default(now())
+  handledAt        DateTime?
+  handledByName    String?
+
+  @@index([tenantId])
+  @@index([status])
 }
