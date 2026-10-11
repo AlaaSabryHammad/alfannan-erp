@@ -44,6 +44,7 @@ const ACTION_LABELS: Record<string, string> = {
   SUB_CANCEL: 'إلغاء اشتراك',
   SUB_OVERRIDES: 'حدود/مزايا مخصصة',
   UPGRADE_REQUEST_HANDLED: 'معالجة طلب ترقية',
+  PLATFORM_PASSWORD_CHANGE: 'تغيير كلمة مرور مالك المنصة',
   SUB_AUTO_EXPIRE: 'انتهاء تلقائي للاشتراك',
   PAYMENT_ONLINE: 'دفع إلكتروني ناجح',
   PAYMENT_ORDER_SETTLE: 'إعادة فحص طلب دفع',
@@ -577,6 +578,70 @@ function TenantPanel({ tenantId, onClose }: { tenantId: number; onClose: () => v
 
 // ── page ──────────────────────────────────────────────────────────────────────
 
+function ChangePasswordDialog({ onClose }: { onClose: () => void }) {
+  const [current, setCurrent] = useState('');
+  const [next, setNext] = useState('');
+  const [confirm, setConfirm] = useState('');
+  const [error, setError] = useState<string | null>(null);
+  const [done, setDone] = useState(false);
+
+  const change = useMutation({
+    mutationFn: async () =>
+      (await platformApi.post<{ token: string }>('/me/password', { currentPassword: current, newPassword: next })).data,
+    onSuccess: (r) => {
+      localStorage.setItem(PLATFORM_TOKEN_KEY, r.token); // the other sessions were ended; keep this one
+      setDone(true);
+    },
+    onError: (e) => setError(errorOf(e)),
+  });
+
+  const mismatch = confirm.length > 0 && next !== confirm;
+  const valid = current && next.length >= 12 && next === confirm;
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40" dir="rtl">
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm p-6 flex flex-col gap-4">
+        <div className="flex items-center justify-between">
+          <h2 className="text-lg font-bold text-slate-900">تغيير كلمة المرور</h2>
+          <button onClick={onClose} className="text-slate-500 hover:text-slate-900"><X size={20} /></button>
+        </div>
+        {done ? (
+          <>
+            <p className="text-sm text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-lg px-4 py-3">
+              تم تغيير كلمة المرور. أُنهيت جلساتك الأخرى على أي جهاز.
+            </p>
+            <button onClick={onClose} className="bg-teal-700 hover:bg-teal-800 text-white text-sm font-semibold py-2 rounded-lg">تم</button>
+          </>
+        ) : (
+          <>
+            <label className="text-sm font-medium text-slate-700 flex flex-col gap-1">
+              كلمة المرور الحالية
+              <input type="password" dir="ltr" autoComplete="current-password" value={current} onChange={(e) => setCurrent(e.target.value)} className={input} />
+            </label>
+            <label className="text-sm font-medium text-slate-700 flex flex-col gap-1">
+              كلمة المرور الجديدة (12 حرفًا على الأقل، حروف وأرقام)
+              <input type="password" dir="ltr" autoComplete="new-password" value={next} onChange={(e) => setNext(e.target.value)} className={input} />
+            </label>
+            <label className="text-sm font-medium text-slate-700 flex flex-col gap-1">
+              تأكيد كلمة المرور الجديدة
+              <input type="password" dir="ltr" autoComplete="new-password" value={confirm} onChange={(e) => setConfirm(e.target.value)} className={input} />
+              {mismatch && <span className="text-xs text-red-600">غير متطابقتين</span>}
+            </label>
+            {error && <div className="bg-red-50 border border-red-200 text-red-700 text-sm rounded-lg px-4 py-3">{error}</div>}
+            <button
+              disabled={!valid || change.isPending}
+              onClick={() => { setError(null); change.mutate(); }}
+              className="bg-teal-700 hover:bg-teal-800 text-white text-sm font-semibold py-2 rounded-lg disabled:opacity-60 flex items-center justify-center gap-2"
+            >
+              {change.isPending && <Loader2 size={14} className="animate-spin" />} حفظ
+            </button>
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
+
 type Tab = 'tenants' | 'requests' | 'plans' | 'payments' | 'audit';
 
 export function PlatformDashboardPage() {
@@ -585,6 +650,7 @@ export function PlatformDashboardPage() {
   const [selected, setSelected] = useState<number | null>(null);
   const [tab, setTab] = useState<Tab>('tenants');
   const [editingPlan, setEditingPlan] = useState<PlatformPlan | 'new' | null>(null);
+  const [changingPassword, setChangingPassword] = useState(false);
   const hasToken = !!localStorage.getItem(PLATFORM_TOKEN_KEY);
   const admin = (() => {
     try { return JSON.parse(localStorage.getItem(PLATFORM_ADMIN_KEY) ?? 'null') as { name: string } | null; } catch { return null; }
@@ -677,6 +743,9 @@ export function PlatformDashboardPage() {
           <Building2 size={20} className="text-teal-400" />
           <h1 className="font-bold">لوحة إدارة المنصة</h1>
           <span className="mr-auto text-sm text-slate-300">{admin?.name}</span>
+          <button onClick={() => setChangingPassword(true)} className="flex items-center gap-1.5 text-sm text-slate-300 hover:text-white">
+            <KeyRound size={16} /> كلمة المرور
+          </button>
           <button onClick={logout} className="flex items-center gap-1.5 text-sm text-slate-300 hover:text-white">
             <LogOut size={16} /> خروج
           </button>
@@ -943,6 +1012,7 @@ export function PlatformDashboardPage() {
         </section>
       </main>
 
+      {changingPassword && <ChangePasswordDialog onClose={() => setChangingPassword(false)} />}
       {selected !== null && <TenantPanel tenantId={selected} onClose={() => setSelected(null)} />}
       {editingPlan !== null && (
         <PlanForm plan={editingPlan === 'new' ? null : editingPlan} onClose={() => setEditingPlan(null)} />
