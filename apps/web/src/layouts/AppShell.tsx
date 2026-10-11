@@ -3,6 +3,7 @@ import { Sidebar } from './Sidebar';
 import { Topbar } from './Topbar';
 import { SubscriptionBanner } from '../components/SubscriptionBanner';
 import { LegalBanner } from '../components/LegalBanner';
+import { EmailVerificationBanner } from '../components/EmailVerificationBanner';
 
 export function AppShell() {
   return (
@@ -17,6 +18,7 @@ export function AppShell() {
 
         {/* Trial ending / expired / grace — only visible when it needs attention */}
         <SubscriptionBanner />
+        <EmailVerificationBanner />
         <LegalBanner />
 
         {/* Page content */}

@@ -56,6 +56,8 @@ model User {
   createdAt    DateTime @default(now())
   // sessions (JWTs) issued before this instant are rejected — set when the password is changed/reset
   sessionsValidAfter DateTime?
+  // set when the owner of the mailbox opened the confirmation link
+  emailVerifiedAt    DateTime?
 
   branchId     Int?
 
