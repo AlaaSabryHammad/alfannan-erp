@@ -11,12 +11,17 @@ datasource db {
 
 model Role {
   id          Int            @id @default(autoincrement())
-  code        String         @unique
+  tenantId     Int @default(dbgenerated("(current_setting('app.tenant_id'::text))::integer"))
+  tenant       Tenant @relation(fields: [tenantId], references: [id])
+  code        String
   nameAr      String
   description String?
   users       User[]
   permissions RolePermission[]
   createdAt   DateTime       @default(now())
+
+  @@unique([tenantId, code])
+  @@index([tenantId])
 }
 
 model Permission {
@@ -40,6 +45,8 @@ model RolePermission {
 
 model User {
   id           Int      @id @default(autoincrement())
+  tenantId     Int @default(dbgenerated("(current_setting('app.tenant_id'::text))::integer"))
+  tenant       Tenant @relation(fields: [tenantId], references: [id])
   name         String
   email        String   @unique
   passwordHash String
@@ -71,12 +78,16 @@ model User {
   salesOrdersCreated      SalesOrder[]
   purchaseOrdersCreated   PurchaseOrder[]
   reconciliationsCreated  BankReconciliation[]
+
+  @@index([tenantId])
 }
 
 // ── BRANCHES ──────────────────────────────────────────────────────────────────
 
 model Branch {
   id            Int       @id @default(autoincrement())
+  tenantId     Int @default(dbgenerated("(current_setting('app.tenant_id'::text))::integer"))
+  tenant       Tenant @relation(fields: [tenantId], references: [id])
   nameAr        String
   code          String?   // رمز الفرع — يُستخدم في تقرير مزامنة الفروع
   address       String?
@@ -94,12 +105,16 @@ model Branch {
   quotations       Quotation[]
   salesOrders      SalesOrder[]
   purchaseOrders   PurchaseOrder[]
+
+  @@index([tenantId])
 }
 
 // ── DEPARTMENTS ───────────────────────────────────────────────────────────────
 
 model Department {
   id            Int          @id @default(autoincrement())
+  tenantId     Int @default(dbgenerated("(current_setting('app.tenant_id'::text))::integer"))
+  tenant       Tenant @relation(fields: [tenantId], references: [id])
   nameAr        String
   descriptionAr String?
   parentId      Int?
@@ -107,33 +122,46 @@ model Department {
   parent        Department?  @relation("DepartmentTree", fields: [parentId], references: [id])
   children      Department[] @relation("DepartmentTree")
   products      Product[]
+
+  @@index([tenantId])
 }
 
 // ── BRANDS ────────────────────────────────────────────────────────────────────
 
 model Brand {
   id        Int       @id @default(autoincrement())
+  tenantId     Int @default(dbgenerated("(current_setting('app.tenant_id'::text))::integer"))
+  tenant       Tenant @relation(fields: [tenantId], references: [id])
   nameAr    String
   logoUrl   String?
   sortOrder Int       @default(0)
   products  Product[]
+
+  @@index([tenantId])
 }
 
 // ── UNITS ─────────────────────────────────────────────────────────────────────
 
 model Unit {
   id       Int       @id @default(autoincrement())
+  tenantId     Int @default(dbgenerated("(current_setting('app.tenant_id'::text))::integer"))
+  tenant       Tenant @relation(fields: [tenantId], references: [id])
   nameAr   String
-  code     String    @unique
+  code     String
   products Product[]
+
+  @@unique([tenantId, code])
+  @@index([tenantId])
 }
 
 // ── PRODUCTS ──────────────────────────────────────────────────────────────────
 
 model Product {
   id           Int            @id @default(autoincrement())
+  tenantId     Int @default(dbgenerated("(current_setting('app.tenant_id'::text))::integer"))
+  tenant       Tenant @relation(fields: [tenantId], references: [id])
   nameAr       String
-  sku          String         @unique
+  sku          String
   barcode      String?
   departmentId Int?
   brandId      Int?
@@ -168,12 +196,17 @@ model Product {
   quotationItems       QuotationItem[]
   salesOrderItems      SalesOrderItem[]
   purchaseOrderItems   PurchaseOrderItem[]
+
+  @@unique([tenantId, sku])
+  @@index([tenantId])
 }
 
 // ── WAREHOUSES ────────────────────────────────────────────────────────────────
 
 model Warehouse {
   id         Int            @id @default(autoincrement())
+  tenantId     Int @default(dbgenerated("(current_setting('app.tenant_id'::text))::integer"))
+  tenant       Tenant @relation(fields: [tenantId], references: [id])
   nameAr     String
   location   String?
   managerId  Int?
@@ -195,12 +228,16 @@ model Warehouse {
   purchaseReturns PurchaseReturn[]
   salesOrders    SalesOrder[]
   purchaseOrders PurchaseOrder[]
+
+  @@index([tenantId])
 }
 
 // ── STOCK ─────────────────────────────────────────────────────────────────────
 
 model StockBalance {
   id          Int       @id @default(autoincrement())
+  tenantId     Int @default(dbgenerated("(current_setting('app.tenant_id'::text))::integer"))
+  tenant       Tenant @relation(fields: [tenantId], references: [id])
   productId   Int
   warehouseId Int
   quantity    Decimal   @db.Decimal(12, 2) @default(0)
@@ -209,6 +246,8 @@ model StockBalance {
   warehouse Warehouse @relation(fields: [warehouseId], references: [id])
 
   @@unique([productId, warehouseId])
+
+  @@index([tenantId])
 }
 
 enum MovementType {
@@ -220,6 +259,8 @@ enum MovementType {
 
 model StockMovement {
   id           Int          @id @default(autoincrement())
+  tenantId     Int @default(dbgenerated("(current_setting('app.tenant_id'::text))::integer"))
+  tenant       Tenant @relation(fields: [tenantId], references: [id])
   productId    Int
   warehouseId  Int
   type         MovementType
@@ -238,6 +279,8 @@ model StockMovement {
   @@index([productId, warehouseId])
   @@index([refType, refId])
   @@index([createdAt])
+
+  @@index([tenantId])
 }
 
 // ── STOCK COUNT (الجرد المخزني) ─────────────────────────────────────────────────
@@ -249,7 +292,9 @@ enum StockCountStatus {
 
 model StockCount {
   id          Int              @id @default(autoincrement())
-  countNo     String           @unique
+  tenantId     Int @default(dbgenerated("(current_setting('app.tenant_id'::text))::integer"))
+  tenant       Tenant @relation(fields: [tenantId], references: [id])
+  countNo     String
   warehouseId Int
   date        DateTime         @default(now())
   status      StockCountStatus @default(DRAFT)
@@ -264,10 +309,15 @@ model StockCount {
 
   @@index([warehouseId])
   @@index([status])
+
+  @@unique([tenantId, countNo])
+  @@index([tenantId])
 }
 
 model StockCountLine {
   id           Int     @id @default(autoincrement())
+  tenantId     Int @default(dbgenerated("(current_setting('app.tenant_id'::text))::integer"))
+  tenant       Tenant @relation(fields: [tenantId], references: [id])
   stockCountId Int
   productId    Int
   systemQty    Decimal @db.Decimal(12, 2)
@@ -277,12 +327,16 @@ model StockCountLine {
   product    Product    @relation(fields: [productId], references: [id])
 
   @@unique([stockCountId, productId])
+
+  @@index([tenantId])
 }
 
 // ── MANUFACTURING (أوامر التصنيع وقوائم المكونات) ────────────────────────────────
 
 model BillOfMaterial {
   id        Int       @id @default(autoincrement())
+  tenantId     Int @default(dbgenerated("(current_setting('app.tenant_id'::text))::integer"))
+  tenant       Tenant @relation(fields: [tenantId], references: [id])
   productId Int       @unique // المنتج النهائي — قائمة مكونات واحدة نشطة لكل منتج
   notes     String?
   createdAt DateTime  @default(now())
@@ -290,10 +344,14 @@ model BillOfMaterial {
   product    Product     @relation("BOMFinishedProduct", fields: [productId], references: [id])
   lines      BOMLine[]
   workOrders WorkOrder[]
+
+  @@index([tenantId])
 }
 
 model BOMLine {
   id          Int     @id @default(autoincrement())
+  tenantId     Int @default(dbgenerated("(current_setting('app.tenant_id'::text))::integer"))
+  tenant       Tenant @relation(fields: [tenantId], references: [id])
   bomId       Int
   componentId Int
   qtyPerUnit  Decimal @db.Decimal(12, 4) // كمية المكون اللازمة لإنتاج وحدة واحدة من المنتج النهائي
@@ -302,6 +360,8 @@ model BOMLine {
   component Product        @relation("BOMLineComponent", fields: [componentId], references: [id])
 
   @@unique([bomId, componentId])
+
+  @@index([tenantId])
 }
 
 enum WorkOrderStatus {
@@ -312,7 +372,9 @@ enum WorkOrderStatus {
 
 model WorkOrder {
   id          Int             @id @default(autoincrement())
-  orderNo     String          @unique
+  tenantId     Int @default(dbgenerated("(current_setting('app.tenant_id'::text))::integer"))
+  tenant       Tenant @relation(fields: [tenantId], references: [id])
+  orderNo     String
   bomId       Int
   productId   Int             // المنتج النهائي — نُسخة من bom.productId وقت الإنشاء
   warehouseId Int
@@ -332,10 +394,15 @@ model WorkOrder {
 
   @@index([status])
   @@index([warehouseId])
+
+  @@unique([tenantId, orderNo])
+  @@index([tenantId])
 }
 
 model WorkOrderLine {
   id          Int     @id @default(autoincrement())
+  tenantId     Int @default(dbgenerated("(current_setting('app.tenant_id'::text))::integer"))
+  tenant       Tenant @relation(fields: [tenantId], references: [id])
   workOrderId Int
   componentId Int
   qtyPerUnit  Decimal @db.Decimal(12, 4) // نسخة من BOMLine وقت إنشاء الأمر
@@ -343,6 +410,8 @@ model WorkOrderLine {
 
   workOrder WorkOrder @relation(fields: [workOrderId], references: [id], onDelete: Cascade)
   component Product   @relation("WorkOrderLineComponent", fields: [componentId], references: [id])
+
+  @@index([tenantId])
 }
 
 // ── CUSTOMERS ─────────────────────────────────────────────────────────────────
@@ -354,6 +423,8 @@ enum CustomerStatus {
 
 model Customer {
   id             Int            @id @default(autoincrement())
+  tenantId     Int @default(dbgenerated("(current_setting('app.tenant_id'::text))::integer"))
+  tenant       Tenant @relation(fields: [tenantId], references: [id])
   nameAr         String
   company        String?
   phone          String?
@@ -370,6 +441,8 @@ model Customer {
   salesReturns        SalesReturn[]
   quotations          Quotation[]
   salesOrders         SalesOrder[]
+
+  @@index([tenantId])
 }
 
 // ── SALES INVOICES ────────────────────────────────────────────────────────────
@@ -396,7 +469,9 @@ enum ZatcaStatus {
 
 model SalesInvoice {
   id             Int           @id @default(autoincrement())
-  refNo          String        @unique
+  tenantId     Int @default(dbgenerated("(current_setting('app.tenant_id'::text))::integer"))
+  tenant       Tenant @relation(fields: [tenantId], references: [id])
+  refNo          String
   customerId     Int
   warehouseId    Int
   cashierId      Int
@@ -438,6 +513,9 @@ model SalesInvoice {
   @@index([warehouseId])
   @@index([branchId])
   @@index([date])
+
+  @@unique([tenantId, refNo])
+  @@index([tenantId])
 }
 
 // ── LOYALTY POINTS & DISCOUNT COUPONS (نقاط الولاء وكوبونات الخصم) ────────────────
@@ -449,7 +527,9 @@ enum CouponType {
 
 model Coupon {
   id                Int        @id @default(autoincrement())
-  code              String     @unique
+  tenantId     Int @default(dbgenerated("(current_setting('app.tenant_id'::text))::integer"))
+  tenant       Tenant @relation(fields: [tenantId], references: [id])
+  code              String
   type              CouponType
   value             Decimal    @db.Decimal(12, 2) // نسبة % أو مبلغ ثابت حسب النوع
   minPurchaseAmount Decimal    @db.Decimal(12, 2) @default(0)
@@ -462,6 +542,9 @@ model Coupon {
   createdAt         DateTime   @default(now())
 
   invoices SalesInvoice[]
+
+  @@unique([tenantId, code])
+  @@index([tenantId])
 }
 
 enum LoyaltyTxType {
@@ -472,6 +555,8 @@ enum LoyaltyTxType {
 
 model LoyaltyTransaction {
   id             Int           @id @default(autoincrement())
+  tenantId     Int @default(dbgenerated("(current_setting('app.tenant_id'::text))::integer"))
+  tenant       Tenant @relation(fields: [tenantId], references: [id])
   customerId     Int
   type           LoyaltyTxType
   points         Decimal       @db.Decimal(12, 2)
@@ -481,10 +566,14 @@ model LoyaltyTransaction {
 
   customer     Customer      @relation(fields: [customerId], references: [id])
   salesInvoice SalesInvoice? @relation(fields: [salesInvoiceId], references: [id])
+
+  @@index([tenantId])
 }
 
 model SalesInvoiceItem {
   id        Int     @id @default(autoincrement())
+  tenantId     Int @default(dbgenerated("(current_setting('app.tenant_id'::text))::integer"))
+  tenant       Tenant @relation(fields: [tenantId], references: [id])
   invoiceId Int
   productId Int
   qty       Decimal @db.Decimal(12, 2)
@@ -497,6 +586,8 @@ model SalesInvoiceItem {
 
   @@index([invoiceId])
   @@index([productId])
+
+  @@index([tenantId])
 }
 
 // ── QUOTATIONS & ORDERS (عروض الأسعار وأوامر البيع/الشراء) ─────────────────────
@@ -513,7 +604,9 @@ enum QuotationStatus {
 
 model Quotation {
   id          Int             @id @default(autoincrement())
-  refNo       String          @unique
+  tenantId     Int @default(dbgenerated("(current_setting('app.tenant_id'::text))::integer"))
+  tenant       Tenant @relation(fields: [tenantId], references: [id])
+  refNo       String
   customerId  Int
   branchId    Int?
   date        DateTime        @default(now())
@@ -536,10 +629,15 @@ model Quotation {
   @@index([customerId])
   @@index([status])
   @@index([date])
+
+  @@unique([tenantId, refNo])
+  @@index([tenantId])
 }
 
 model QuotationItem {
   id          Int     @id @default(autoincrement())
+  tenantId     Int @default(dbgenerated("(current_setting('app.tenant_id'::text))::integer"))
+  tenant       Tenant @relation(fields: [tenantId], references: [id])
   quotationId Int
   productId   Int
   qty         Decimal @db.Decimal(12, 2)
@@ -550,6 +648,8 @@ model QuotationItem {
   product   Product   @relation(fields: [productId], references: [id])
 
   @@index([quotationId])
+
+  @@index([tenantId])
 }
 
 enum SalesOrderStatus {
@@ -560,7 +660,9 @@ enum SalesOrderStatus {
 
 model SalesOrder {
   id           Int              @id @default(autoincrement())
-  orderNo      String           @unique
+  tenantId     Int @default(dbgenerated("(current_setting('app.tenant_id'::text))::integer"))
+  tenant       Tenant @relation(fields: [tenantId], references: [id])
+  orderNo      String
   customerId   Int
   warehouseId  Int
   branchId     Int?
@@ -588,10 +690,15 @@ model SalesOrder {
   @@index([customerId])
   @@index([status])
   @@index([date])
+
+  @@unique([tenantId, orderNo])
+  @@index([tenantId])
 }
 
 model SalesOrderItem {
   id           Int     @id @default(autoincrement())
+  tenantId     Int @default(dbgenerated("(current_setting('app.tenant_id'::text))::integer"))
+  tenant       Tenant @relation(fields: [tenantId], references: [id])
   salesOrderId Int
   productId    Int
   qty          Decimal @db.Decimal(12, 2)
@@ -602,6 +709,8 @@ model SalesOrderItem {
   product    Product    @relation(fields: [productId], references: [id])
 
   @@index([salesOrderId])
+
+  @@index([tenantId])
 }
 
 enum PurchaseOrderStatus {
@@ -612,7 +721,9 @@ enum PurchaseOrderStatus {
 
 model PurchaseOrder {
   id           Int                 @id @default(autoincrement())
-  orderNo      String              @unique
+  tenantId     Int @default(dbgenerated("(current_setting('app.tenant_id'::text))::integer"))
+  tenant       Tenant @relation(fields: [tenantId], references: [id])
+  orderNo      String
   supplierId   Int
   warehouseId  Int
   branchId     Int?
@@ -638,10 +749,15 @@ model PurchaseOrder {
   @@index([supplierId])
   @@index([status])
   @@index([date])
+
+  @@unique([tenantId, orderNo])
+  @@index([tenantId])
 }
 
 model PurchaseOrderItem {
   id              Int     @id @default(autoincrement())
+  tenantId     Int @default(dbgenerated("(current_setting('app.tenant_id'::text))::integer"))
+  tenant       Tenant @relation(fields: [tenantId], references: [id])
   purchaseOrderId Int
   productId       Int
   qty             Decimal @db.Decimal(12, 2)
@@ -652,6 +768,8 @@ model PurchaseOrderItem {
   product       Product       @relation(fields: [productId], references: [id])
 
   @@index([purchaseOrderId])
+
+  @@index([tenantId])
 }
 
 // ── RETURNS (المرتجعات — إشعارات دائن/مدين) ────────────────────────────────────
@@ -666,7 +784,9 @@ enum RefundMethod {
 
 model SalesReturn {
   id             Int          @id @default(autoincrement())
-  refNo          String       @unique
+  tenantId     Int @default(dbgenerated("(current_setting('app.tenant_id'::text))::integer"))
+  tenant       Tenant @relation(fields: [tenantId], references: [id])
+  refNo          String
   salesInvoiceId Int
   customerId     Int
   warehouseId    Int
@@ -692,10 +812,15 @@ model SalesReturn {
   @@index([customerId])
   @@index([branchId])
   @@index([date])
+
+  @@unique([tenantId, refNo])
+  @@index([tenantId])
 }
 
 model SalesReturnItem {
   id        Int     @id @default(autoincrement())
+  tenantId     Int @default(dbgenerated("(current_setting('app.tenant_id'::text))::integer"))
+  tenant       Tenant @relation(fields: [tenantId], references: [id])
   returnId  Int
   productId Int
   qty       Decimal @db.Decimal(12, 2)
@@ -707,11 +832,15 @@ model SalesReturnItem {
 
   @@index([returnId])
   @@index([productId])
+
+  @@index([tenantId])
 }
 
 model PurchaseReturn {
   id                Int          @id @default(autoincrement())
-  refNo             String       @unique
+  tenantId     Int @default(dbgenerated("(current_setting('app.tenant_id'::text))::integer"))
+  tenant       Tenant @relation(fields: [tenantId], references: [id])
+  refNo             String
   purchaseInvoiceId Int
   supplierId        Int
   warehouseId       Int
@@ -737,10 +866,15 @@ model PurchaseReturn {
   @@index([supplierId])
   @@index([branchId])
   @@index([date])
+
+  @@unique([tenantId, refNo])
+  @@index([tenantId])
 }
 
 model PurchaseReturnItem {
   id        Int     @id @default(autoincrement())
+  tenantId     Int @default(dbgenerated("(current_setting('app.tenant_id'::text))::integer"))
+  tenant       Tenant @relation(fields: [tenantId], references: [id])
   returnId  Int
   productId Int
   qty       Decimal @db.Decimal(12, 2)
@@ -752,6 +886,8 @@ model PurchaseReturnItem {
 
   @@index([returnId])
   @@index([productId])
+
+  @@index([tenantId])
 }
 
 // ── SUPPLIERS ─────────────────────────────────────────────────────────────────
@@ -763,6 +899,8 @@ enum SupplierStatus {
 
 model Supplier {
   id             Int            @id @default(autoincrement())
+  tenantId     Int @default(dbgenerated("(current_setting('app.tenant_id'::text))::integer"))
+  tenant       Tenant @relation(fields: [tenantId], references: [id])
   nameAr         String
   company        String?
   phone          String?
@@ -774,6 +912,8 @@ model Supplier {
   purchaseInvoices PurchaseInvoice[]
   purchaseReturns  PurchaseReturn[]
   purchaseOrders   PurchaseOrder[]
+
+  @@index([tenantId])
 }
 
 // ── PURCHASE INVOICES ─────────────────────────────────────────────────────────
@@ -785,7 +925,9 @@ enum ReceiveStatus {
 
 model PurchaseInvoice {
   id            Int           @id @default(autoincrement())
-  refNo         String        @unique
+  tenantId     Int @default(dbgenerated("(current_setting('app.tenant_id'::text))::integer"))
+  tenant       Tenant @relation(fields: [tenantId], references: [id])
+  refNo         String
   supplierId    Int
   warehouseId   Int
   branchId      Int?          // فرع المستند — يُشتق من فرع المستودع عند الإنشاء
@@ -811,10 +953,15 @@ model PurchaseInvoice {
   @@index([warehouseId])
   @@index([branchId])
   @@index([date])
+
+  @@unique([tenantId, refNo])
+  @@index([tenantId])
 }
 
 model PurchaseInvoiceItem {
   id        Int     @id @default(autoincrement())
+  tenantId     Int @default(dbgenerated("(current_setting('app.tenant_id'::text))::integer"))
+  tenant       Tenant @relation(fields: [tenantId], references: [id])
   invoiceId Int
   productId Int
   qty       Decimal @db.Decimal(12, 2)
@@ -826,6 +973,8 @@ model PurchaseInvoiceItem {
 
   @@index([invoiceId])
   @@index([productId])
+
+  @@index([tenantId])
 }
 
 // ── ACCOUNTS ──────────────────────────────────────────────────────────────────
@@ -840,7 +989,9 @@ enum AccountType {
 
 model Account {
   id             Int         @id @default(autoincrement())
-  code           String      @unique
+  tenantId     Int @default(dbgenerated("(current_setting('app.tenant_id'::text))::integer"))
+  tenant       Tenant @relation(fields: [tenantId], references: [id])
+  code           String
   nameAr         String
   type           AccountType
   parentId       Int?
@@ -862,6 +1013,9 @@ model Account {
 
   @@index([type])
   @@index([parentId])
+
+  @@unique([tenantId, code])
+  @@index([tenantId])
 }
 
 // ── FISCAL PERIODS (إقفال الفترات المحاسبية) ──────────────────────────────────
@@ -876,6 +1030,8 @@ enum PeriodStatus {
 
 model FiscalPeriod {
   id         Int          @id @default(autoincrement())
+  tenantId     Int @default(dbgenerated("(current_setting('app.tenant_id'::text))::integer"))
+  tenant       Tenant @relation(fields: [tenantId], references: [id])
   year       Int
   month      Int // 1-12
   status     PeriodStatus @default(OPEN)
@@ -884,7 +1040,9 @@ model FiscalPeriod {
 
   lockedBy User? @relation(fields: [lockedById], references: [id], onDelete: SetNull)
 
-  @@unique([year, month])
+  @@unique([tenantId, year, month])
+
+  @@index([tenantId])
 }
 
 // ── JOURNAL ───────────────────────────────────────────────────────────────────
@@ -906,7 +1064,9 @@ enum JournalSource {
 
 model JournalEntry {
   id          Int           @id @default(autoincrement())
-  entryNo     String        @unique
+  tenantId     Int @default(dbgenerated("(current_setting('app.tenant_id'::text))::integer"))
+  tenant       Tenant @relation(fields: [tenantId], references: [id])
+  entryNo     String
   date        DateTime
   description String
   sourceType  JournalSource
@@ -924,10 +1084,15 @@ model JournalEntry {
 
   @@index([sourceType, sourceId])
   @@index([date])
+
+  @@unique([tenantId, entryNo])
+  @@index([tenantId])
 }
 
 model JournalLine {
   id          Int     @id @default(autoincrement())
+  tenantId     Int @default(dbgenerated("(current_setting('app.tenant_id'::text))::integer"))
+  tenant       Tenant @relation(fields: [tenantId], references: [id])
   entryId     Int
   accountId   Int
   costCenterId Int?
@@ -943,13 +1108,17 @@ model JournalLine {
   @@index([accountId])
   @@index([entryId])
   @@index([costCenterId])
+
+  @@index([tenantId])
 }
 
 // ── COST CENTERS (مراكز التكلفة) ──────────────────────────────────────────────
 
 model CostCenter {
   id        Int      @id @default(autoincrement())
-  code      String   @unique
+  tenantId     Int @default(dbgenerated("(current_setting('app.tenant_id'::text))::integer"))
+  tenant       Tenant @relation(fields: [tenantId], references: [id])
+  code      String
   nameAr    String
   isActive  Boolean  @default(true)
   createdAt DateTime @default(now())
@@ -958,12 +1127,17 @@ model CostCenter {
   budgets      Budget[]
   recurringEntryLines RecurringEntryLine[]
   approvalLines JournalEntryApprovalLine[]
+
+  @@unique([tenantId, code])
+  @@index([tenantId])
 }
 
 // ── BUDGETS (الموازنات التقديرية) ──────────────────────────────────────────────
 
 model Budget {
   id           Int      @id @default(autoincrement())
+  tenantId     Int @default(dbgenerated("(current_setting('app.tenant_id'::text))::integer"))
+  tenant       Tenant @relation(fields: [tenantId], references: [id])
   accountId    Int
   costCenterId Int?
   year         Int
@@ -976,12 +1150,16 @@ model Budget {
 
   @@unique([accountId, costCenterId, year, month])
   @@index([year, month])
+
+  @@index([tenantId])
 }
 
 // ── RECURRING JOURNAL ENTRIES (القيود المتكررة) ────────────────────────────────
 
 model RecurringEntry {
   id          Int       @id @default(autoincrement())
+  tenantId     Int @default(dbgenerated("(current_setting('app.tenant_id'::text))::integer"))
+  tenant       Tenant @relation(fields: [tenantId], references: [id])
   description String
   dayOfMonth  Int       @default(1) // 1-28, day of month to post on
   startDate   DateTime  @default(now())
@@ -993,10 +1171,14 @@ model RecurringEntry {
 
   createdBy User? @relation(fields: [createdById], references: [id], onDelete: SetNull)
   lines RecurringEntryLine[]
+
+  @@index([tenantId])
 }
 
 model RecurringEntryLine {
   id               Int     @id @default(autoincrement())
+  tenantId     Int @default(dbgenerated("(current_setting('app.tenant_id'::text))::integer"))
+  tenant       Tenant @relation(fields: [tenantId], references: [id])
   recurringEntryId Int
   accountId        Int
   costCenterId     Int?
@@ -1010,6 +1192,8 @@ model RecurringEntryLine {
 
   @@index([recurringEntryId])
   @@index([accountId])
+
+  @@index([tenantId])
 }
 
 // ── JOURNAL ENTRY APPROVALS (سير الاعتماد — Maker-Checker) ─────────────────────
@@ -1024,6 +1208,8 @@ enum ApprovalStatus {
 
 model JournalEntryApproval {
   id             Int            @id @default(autoincrement())
+  tenantId     Int @default(dbgenerated("(current_setting('app.tenant_id'::text))::integer"))
+  tenant       Tenant @relation(fields: [tenantId], references: [id])
   description    String
   date           DateTime
   status         ApprovalStatus @default(PENDING)
@@ -1040,10 +1226,14 @@ model JournalEntryApproval {
   reviewedBy   User?                      @relation("ApprovalChecker", fields: [reviewedById], references: [id], onDelete: SetNull)
 
   @@index([status])
+
+  @@index([tenantId])
 }
 
 model JournalEntryApprovalLine {
   id           Int     @id @default(autoincrement())
+  tenantId     Int @default(dbgenerated("(current_setting('app.tenant_id'::text))::integer"))
+  tenant       Tenant @relation(fields: [tenantId], references: [id])
   requestId    Int
   accountId    Int
   costCenterId Int?
@@ -1057,6 +1247,8 @@ model JournalEntryApprovalLine {
 
   @@index([requestId])
   @@index([accountId])
+
+  @@index([tenantId])
 }
 
 // ── BANK RECONCILIATION (التسوية البنكية) ─────────────────────────────────────
@@ -1070,7 +1262,9 @@ enum ReconciliationStatus {
 
 model BankReconciliation {
   id               Int                  @id @default(autoincrement())
-  reconNo          String               @unique
+  tenantId     Int @default(dbgenerated("(current_setting('app.tenant_id'::text))::integer"))
+  tenant       Tenant @relation(fields: [tenantId], references: [id])
+  reconNo          String
   accountId        Int                  // حساب البنك/الخزينة موضوع التسوية
   statementDate    DateTime             // تاريخ كشف البنك
   statementBalance Decimal              @db.Decimal(12, 2) // الرصيد حسب كشف البنك
@@ -1088,10 +1282,15 @@ model BankReconciliation {
 
   @@index([accountId])
   @@index([status])
+
+  @@unique([tenantId, reconNo])
+  @@index([tenantId])
 }
 
 model BankReconciliationLine {
   id               Int @id @default(autoincrement())
+  tenantId     Int @default(dbgenerated("(current_setting('app.tenant_id'::text))::integer"))
+  tenant       Tenant @relation(fields: [tenantId], references: [id])
   reconciliationId Int
   journalLineId    Int @unique // السطر يُسوّى مرة واحدة فقط عبر كل الجلسات
 
@@ -1099,6 +1298,8 @@ model BankReconciliationLine {
   journalLine    JournalLine        @relation(fields: [journalLineId], references: [id])
 
   @@index([reconciliationId])
+
+  @@index([tenantId])
 }
 
 // ── PARTNERS ──────────────────────────────────────────────────────────────────
@@ -1110,6 +1311,8 @@ enum PartnerStatus {
 
 model Partner {
   id              Int           @id @default(autoincrement())
+  tenantId     Int @default(dbgenerated("(current_setting('app.tenant_id'::text))::integer"))
+  tenant       Tenant @relation(fields: [tenantId], references: [id])
   nameAr          String
   email           String?
   phone           String?
@@ -1119,6 +1322,8 @@ model Partner {
   currentBalance  Decimal       @db.Decimal(12, 2) @default(0)
   status          PartnerStatus @default(ACTIVE)
   createdAt       DateTime      @default(now())
+
+  @@index([tenantId])
 }
 
 // ── STOCK TRANSFERS ───────────────────────────────────────────────────────────
@@ -1130,7 +1335,9 @@ enum TransferStatus {
 
 model StockTransfer {
   id                Int            @id @default(autoincrement())
-  transferNo        String         @unique
+  tenantId     Int @default(dbgenerated("(current_setting('app.tenant_id'::text))::integer"))
+  tenant       Tenant @relation(fields: [tenantId], references: [id])
+  transferNo        String
   fromWarehouseId   Int
   toWarehouseId     Int
   date              DateTime       @default(now())
@@ -1144,10 +1351,15 @@ model StockTransfer {
 
   @@index([fromWarehouseId])
   @@index([toWarehouseId])
+
+  @@unique([tenantId, transferNo])
+  @@index([tenantId])
 }
 
 model StockTransferItem {
   id         Int     @id @default(autoincrement())
+  tenantId     Int @default(dbgenerated("(current_setting('app.tenant_id'::text))::integer"))
+  tenant       Tenant @relation(fields: [tenantId], references: [id])
   transferId Int
   productId  Int
   qty        Decimal @db.Decimal(12, 2)
@@ -1157,20 +1369,29 @@ model StockTransferItem {
 
   @@index([transferId])
   @@index([productId])
+
+  @@index([tenantId])
 }
 
 // ── SETTINGS ─────────────────────────────────────────────────────────────────
 
 model Setting {
-  key       String   @id
+  tenantId     Int @default(dbgenerated("(current_setting('app.tenant_id'::text))::integer"))
+  tenant       Tenant @relation(fields: [tenantId], references: [id])
+  key       String
   value     String
   updatedAt DateTime @updatedAt
+
+  @@id([tenantId, key])
+  @@index([tenantId])
 }
 
 // ── AUDIT LOG ─────────────────────────────────────────────────────────────────
 
 model AuditLog {
   id         Int      @id @default(autoincrement())
+  tenantId     Int @default(dbgenerated("(current_setting('app.tenant_id'::text))::integer"))
+  tenant       Tenant @relation(fields: [tenantId], references: [id])
   userId     Int?
   userName   String?
   method     String
@@ -1182,12 +1403,16 @@ model AuditLog {
   createdAt  DateTime @default(now())
 
   @@index([createdAt])
+
+  @@index([tenantId])
 }
 
 // ── EXPENSES ──────────────────────────────────────────────────────────────────
 
 model Expense {
   id          Int      @id @default(autoincrement())
+  tenantId     Int @default(dbgenerated("(current_setting('app.tenant_id'::text))::integer"))
+  tenant       Tenant @relation(fields: [tenantId], references: [id])
   accountId   Int?
   amount      Decimal  @db.Decimal(12, 2)
   date        DateTime @default(now())
@@ -1198,6 +1423,8 @@ model Expense {
 
   @@index([date])
   @@index([accountId])
+
+  @@index([tenantId])
 }
 
 // ── VOUCHERS / TREASURY ───────────────────────────────────────────────────────
@@ -1217,7 +1444,9 @@ enum PartyType {
 
 model Voucher {
   id                Int         @id @default(autoincrement())
-  voucherNo         String      @unique
+  tenantId     Int @default(dbgenerated("(current_setting('app.tenant_id'::text))::integer"))
+  tenant       Tenant @relation(fields: [tenantId], references: [id])
+  voucherNo         String
   type              VoucherType
   date              DateTime    @default(now())
   treasuryAccountId Int
@@ -1248,10 +1477,15 @@ model Voucher {
   @@index([salesInvoiceId])
   @@index([purchaseInvoiceId])
   @@index([branchId])
+
+  @@unique([tenantId, voucherNo])
+  @@index([tenantId])
 }
 
 model VoucherLine {
   id          Int            @id @default(autoincrement())
+  tenantId     Int @default(dbgenerated("(current_setting('app.tenant_id'::text))::integer"))
+  tenant       Tenant @relation(fields: [tenantId], references: [id])
   voucherId   Int
   accountId   Int
   amount      Decimal        @db.Decimal(12, 2) @default(0)
@@ -1262,6 +1496,8 @@ model VoucherLine {
 
   @@index([voucherId])
   @@index([accountId])
+
+  @@index([tenantId])
 }
 
 // ── PROMISSORY NOTES (الكمبيالات) ─────────────────────────────────────────────
@@ -1285,7 +1521,9 @@ enum NoteInstrumentType {
 
 model PromissoryNote {
   id                Int       @id @default(autoincrement())
-  noteNo            String    @unique
+  tenantId     Int @default(dbgenerated("(current_setting('app.tenant_id'::text))::integer"))
+  tenant       Tenant @relation(fields: [tenantId], references: [id])
+  noteNo            String
   type              NoteType
   instrumentType    NoteInstrumentType @default(PROMISSORY_NOTE)
   bankName          String?   // اسم البنك — للشيكات فقط
@@ -1306,6 +1544,9 @@ model PromissoryNote {
   @@index([status])
   @@index([dueDate])
   @@index([partyType, partyId])
+
+  @@unique([tenantId, noteNo])
+  @@index([tenantId])
 }
 
 // ── FIXED ASSETS (الأصول الثابتة) ─────────────────────────────────────────────
@@ -1329,7 +1570,9 @@ enum AssetStatus {
 
 model FixedAsset {
   id                       Int                 @id @default(autoincrement())
-  assetCode                String              @unique
+  tenantId     Int @default(dbgenerated("(current_setting('app.tenant_id'::text))::integer"))
+  tenant       Tenant @relation(fields: [tenantId], references: [id])
+  assetCode                String
   nameAr                   String
   category                 AssetCategory       @default(OTHER)
   purchaseDate             DateTime            @default(now())
@@ -1348,6 +1591,9 @@ model FixedAsset {
 
   @@index([category])
   @@index([status])
+
+  @@unique([tenantId, assetCode])
+  @@index([tenantId])
 }
 
 // ── HUMAN RESOURCES / PAYROLL (الموارد البشرية والرواتب) ──────────────────────
@@ -1364,6 +1610,8 @@ enum PayrollStatus {
 
 model Employee {
   id           Int             @id @default(autoincrement())
+  tenantId     Int @default(dbgenerated("(current_setting('app.tenant_id'::text))::integer"))
+  tenant       Tenant @relation(fields: [tenantId], references: [id])
   nameAr       String
   nationalId   String?
   phone        String?
@@ -1383,11 +1631,15 @@ model Employee {
   payrollItems  PayrollItem[]
 
   @@index([status])
+
+  @@index([tenantId])
 }
 
 model PayrollRun {
   id          Int           @id @default(autoincrement())
-  runNo       String        @unique
+  tenantId     Int @default(dbgenerated("(current_setting('app.tenant_id'::text))::integer"))
+  tenant       Tenant @relation(fields: [tenantId], references: [id])
+  runNo       String
   month       Int
   year        Int
   totalGross  Decimal       @db.Decimal(12, 2) @default(0)
@@ -1403,10 +1655,15 @@ model PayrollRun {
   items PayrollItem[]
 
   @@index([month, year])
+
+  @@unique([tenantId, runNo])
+  @@index([tenantId])
 }
 
 model PayrollItem {
   id           Int       @id @default(autoincrement())
+  tenantId     Int @default(dbgenerated("(current_setting('app.tenant_id'::text))::integer"))
+  tenant       Tenant @relation(fields: [tenantId], references: [id])
   payrollRunId Int
   employeeId   Int
   basic        Decimal   @db.Decimal(12, 2) @default(0)
@@ -1419,4 +1676,77 @@ model PayrollItem {
 
   @@index([payrollRunId])
   @@index([employeeId])
+
+  @@index([tenantId])
+}
+
+
+// ── TENANTS (SaaS) ────────────────────────────────────────────────────────────
+
+model Tenant {
+  id        Int      @id @default(autoincrement())
+  name      String
+  slug      String   @unique
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+
+  roleRows Role[]
+  userRows User[]
+  branchRows Branch[]
+  departmentRows Department[]
+  brandRows Brand[]
+  unitRows Unit[]
+  productRows Product[]
+  warehouseRows Warehouse[]
+  stockBalanceRows StockBalance[]
+  stockMovementRows StockMovement[]
+  stockCountRows StockCount[]
+  stockCountLineRows StockCountLine[]
+  billOfMaterialRows BillOfMaterial[]
+  bOMLineRows BOMLine[]
+  workOrderRows WorkOrder[]
+  workOrderLineRows WorkOrderLine[]
+  customerRows Customer[]
+  salesInvoiceRows SalesInvoice[]
+  couponRows Coupon[]
+  loyaltyTransactionRows LoyaltyTransaction[]
+  salesInvoiceItemRows SalesInvoiceItem[]
+  quotationRows Quotation[]
+  quotationItemRows QuotationItem[]
+  salesOrderRows SalesOrder[]
+  salesOrderItemRows SalesOrderItem[]
+  purchaseOrderRows PurchaseOrder[]
+  purchaseOrderItemRows PurchaseOrderItem[]
+  salesReturnRows SalesReturn[]
+  salesReturnItemRows SalesReturnItem[]
+  purchaseReturnRows PurchaseReturn[]
+  purchaseReturnItemRows PurchaseReturnItem[]
+  supplierRows Supplier[]
+  purchaseInvoiceRows PurchaseInvoice[]
+  purchaseInvoiceItemRows PurchaseInvoiceItem[]
+  accountRows Account[]
+  fiscalPeriodRows FiscalPeriod[]
+  journalEntryRows JournalEntry[]
+  journalLineRows JournalLine[]
+  costCenterRows CostCenter[]
+  budgetRows Budget[]
+  recurringEntryRows RecurringEntry[]
+  recurringEntryLineRows RecurringEntryLine[]
+  journalEntryApprovalRows JournalEntryApproval[]
+  journalEntryApprovalLineRows JournalEntryApprovalLine[]
+  bankReconciliationRows BankReconciliation[]
+  bankReconciliationLineRows BankReconciliationLine[]
+  partnerRows Partner[]
+  stockTransferRows StockTransfer[]
+  stockTransferItemRows StockTransferItem[]
+  settingRows Setting[]
+  auditLogRows AuditLog[]
+  expenseRows Expense[]
+  voucherRows Voucher[]
+  voucherLineRows VoucherLine[]
+  promissoryNoteRows PromissoryNote[]
+  fixedAssetRows FixedAsset[]
+  employeeRows Employee[]
+  payrollRunRows PayrollRun[]
+  payrollItemRows PayrollItem[]
 }
