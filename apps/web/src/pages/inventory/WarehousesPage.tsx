@@ -217,6 +217,11 @@ export function WarehousesPage() {
       render: (row) => row.manager?.name ?? <span className="text-app-muted text-xs">—</span>,
     },
     {
+      key: 'items',
+      header: 'الأصناف المخزنة',
+      render: (row) => <span className="font-mono">{row._count?.stockBalances ?? 0}</span>,
+    },
+    {
       key: 'isActive',
       header: 'الحالة',
       render: (row) => (

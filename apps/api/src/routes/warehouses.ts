@@ -15,6 +15,15 @@ const warehouseSchema = z.object({
   isActive: z.boolean().optional(),
 });
 
+// Shared by list + detail. `_count.stockBalances` is the number of products
+// actually in stock here (quantity > 0), which the warehouses page sums for
+// its «إجمالي الأصناف المخزنة» card and shows per warehouse.
+const warehouseInclude = {
+  manager: { select: { id: true, name: true, email: true } },
+  branch: { select: { id: true, nameAr: true } },
+  _count: { select: { stockBalances: { where: { quantity: { gt: 0 } } } } },
+} as const;
+
 router.get('/', requirePermission('warehouses.view'), async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { page, pageSize, search, skip } = getPagination(req);
@@ -25,7 +34,7 @@ router.get('/', requirePermission('warehouses.view'), async (req: Request, res: 
         skip,
         take: pageSize,
         orderBy: { id: 'asc' },
-        include: { manager: { select: { id: true, name: true, email: true } }, branch: { select: { id: true, nameAr: true } } },
+        include: { ...warehouseInclude },
       }),
       prisma.warehouse.count({ where }),
     ]);
@@ -39,7 +48,7 @@ router.get('/:id', requirePermission('warehouses.view'), async (req: Request, re
   try {
     const wh = await prisma.warehouse.findUniqueOrThrow({
       where: { id: parseInt(req.params.id) },
-      include: { manager: { select: { id: true, name: true, email: true } }, branch: { select: { id: true, nameAr: true } } },
+      include: { ...warehouseInclude },
     });
     res.json(wh);
   } catch (err) {
