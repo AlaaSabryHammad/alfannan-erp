@@ -8,6 +8,8 @@ export interface RegisterCompanyPayload {
   adminName: string;
   email: string;
   password: string;
+  /** the company accepts the Terms of Service and Privacy Policy (required by the server) */
+  acceptTerms: true;
 }
 
 interface AuthContextValue {

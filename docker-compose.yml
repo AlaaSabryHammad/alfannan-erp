@@ -55,6 +55,11 @@ services:
     build:
       context: .
       dockerfile: deploy/web.Dockerfile
+      args:
+        # shown on the Terms / Privacy pages (leave empty to use the defaults)
+        VITE_LEGAL_ENTITY: ${VITE_LEGAL_ENTITY:-}
+        VITE_SUPPORT_EMAIL: ${VITE_SUPPORT_EMAIL:-}
+        VITE_SUPPORT_PHONE: ${VITE_SUPPORT_PHONE:-}
     restart: unless-stopped
     ports:
       - "${WEB_PORT:-8080}:80"

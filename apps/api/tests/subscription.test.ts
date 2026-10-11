@@ -32,7 +32,7 @@ beforeAll(async () => {
   process.env.ALLOW_SIGNUP = 'true';
   process.env.SUBSCRIPTION_ENFORCEMENT = 'enforce';
   const reg = await request(app).post('/api/auth/register-tenant').send({
-    companyName: `شركة الاشتراك ${stamp}`, adminName: 'مدير', email, password,
+    companyName: `شركة الاشتراك ${stamp}`, adminName: 'مدير', acceptTerms: true, email, password,
   });
   expect(reg.status).toBe(201);
   token = reg.body.token;

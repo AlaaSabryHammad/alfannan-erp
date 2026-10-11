@@ -36,7 +36,7 @@ beforeAll(async () => {
   platformToken = (await request(app).post('/api/platform/auth/login').send({ email: ownerEmail, password: ownerPassword })).body.token;
 
   const reg = await request(app).post('/api/auth/register-tenant').send({
-    companyName: `شركة الترقية ${stamp}`, adminName: 'مدير', email: ceoEmail, password: ceoPassword,
+    companyName: `شركة الترقية ${stamp}`, adminName: 'مدير', acceptTerms: true, email: ceoEmail, password: ceoPassword,
   });
   expect(reg.status).toBe(201);
   token = reg.body.token;

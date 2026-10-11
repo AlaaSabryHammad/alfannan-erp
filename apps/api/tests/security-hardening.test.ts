@@ -24,7 +24,7 @@ interface Company { token: string; tenantId: number; adminId: number; roles: Rec
 
 async function register(name: string, email: string): Promise<Company> {
   const reg = await request(app).post('/api/auth/register-tenant').send({
-    companyName: `${name} ${stamp}`, adminName: 'مدير', email, password,
+    companyName: `${name} ${stamp}`, adminName: 'مدير', acceptTerms: true, email, password,
   });
   expect(reg.status).toBe(201);
   const token = reg.body.token as string;

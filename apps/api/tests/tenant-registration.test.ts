@@ -14,7 +14,7 @@ let token: string;
 let tenantId: number;
 
 const post = (body: object) => request(app).post('/api/auth/register-tenant').send(body);
-const valid = { companyName: 'شركة النور للتجارة', adminName: 'أحمد المالك', email, password };
+const valid = { companyName: 'شركة النور للتجارة', adminName: 'أحمد المالك', acceptTerms: true, email, password };
 
 beforeAll(() => {
   process.env.ALLOW_SIGNUP = 'true';

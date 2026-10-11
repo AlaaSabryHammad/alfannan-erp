@@ -9,6 +9,7 @@ import bcrypt from 'bcrypt';
 import prisma, { basePrisma } from './prisma';
 import { runWithTenant, runUnscoped } from './tenantContext';
 import { PERMISSION_DEFS, ROLE_DEFS, ACCOUNT_CHART, UNIT_DEFS } from './tenantDefaults';
+import { LEGAL_VERSION } from './legal';
 
 export class EmailTakenError extends Error {
   constructor() {
@@ -17,6 +18,8 @@ export class EmailTakenError extends Error {
 }
 
 export interface ProvisionInput {
+  /** where the acceptance came from (kept as evidence) */
+  acceptedFromIp?: string | null;
   companyName: string;
   adminName: string;
   email: string;
@@ -54,7 +57,16 @@ export async function provisionTenant(input: ProvisionInput): Promise<{ tenantId
 
   return prisma.$transaction(
     async (tx) => {
-      const tenant = await tx.tenant.create({ data: { name: input.companyName.trim(), slug } });
+      const tenant = await tx.tenant.create({
+        data: {
+          name: input.companyName.trim(),
+          slug,
+          termsVersion: LEGAL_VERSION,
+          termsAcceptedAt: new Date(),
+          termsAcceptedBy: email,
+          termsAcceptedIp: input.acceptedFromIp ?? null,
+        },
+      });
       // This transaction started without a tenant (nobody is logged in yet): point it at the new one
       // so Row-Level Security accepts the rows created below.
       await tx.$executeRaw`SELECT set_config('app.tenant_id', ${String(tenant.id)}, true)`;

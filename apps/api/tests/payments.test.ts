@@ -30,7 +30,7 @@ const auth = (c: Company) => ({ Authorization: `Bearer ${c.token}` });
 
 async function register(name: string): Promise<Company> {
   const reg = await request(app).post('/api/auth/register-tenant').send({
-    companyName: `${name} ${stamp}`, adminName: 'مدير', email: `${name}-${stamp}@pay.test`, password: 'Payments-pass-1',
+    companyName: `${name} ${stamp}`, adminName: 'مدير', acceptTerms: true, email: `${name}-${stamp}@pay.test`, password: 'Payments-pass-1',
   });
   expect(reg.status).toBe(201);
   const token = reg.body.token as string;

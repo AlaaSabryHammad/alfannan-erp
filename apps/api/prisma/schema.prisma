@@ -1693,6 +1693,12 @@ model Tenant {
   isActive  Boolean  @default(true)
   createdAt DateTime @default(now())
 
+  // acceptance of the Terms of Service / Privacy Policy (who, when, which version, from where)
+  termsVersion    String?
+  termsAcceptedAt DateTime?
+  termsAcceptedBy String?
+  termsAcceptedIp String?
+
   roleRows Role[]
   userRows User[]
   branchRows Branch[]

@@ -36,7 +36,7 @@ beforeAll(async () => {
   platformToken = login.body.token;
 
   const reg = await request(app).post('/api/auth/register-tenant').send({
-    companyName: `شركة الفوترة ${stamp}`, adminName: 'مدير', email: companyEmail, password: 'Billing-co-pass-1',
+    companyName: `شركة الفوترة ${stamp}`, adminName: 'مدير', acceptTerms: true, email: companyEmail, password: 'Billing-co-pass-1',
   });
   expect(reg.status).toBe(201);
   tenantToken = reg.body.token;
