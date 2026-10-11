@@ -21,6 +21,8 @@ import { platformPrisma as db } from '../lib/platformPrisma';
 import { requirePlatformAdmin, signPlatformToken } from '../middleware/platformAuth';
 import { invalidateTenantActive } from '../middleware/auth';
 import { lockRemainingSeconds, recordFailure, recordSuccess } from '../lib/loginThrottle';
+import { computeEntitlements } from '../lib/entitlements';
+import billingRouter from './platformBilling';
 
 const router = Router();
 
@@ -65,6 +67,8 @@ router.post('/auth/login', async (req: Request, res: Response, next: NextFunctio
 });
 
 router.use(requirePlatformAdmin);
+
+router.use(billingRouter);
 
 router.get('/me', (req: Request, res: Response) => {
   const a = req.platformAdmin!;
@@ -115,6 +119,31 @@ async function usageByTenant() {
   });
 }
 
+type SubRow = Awaited<ReturnType<typeof loadSubscriptions>> extends Map<number, infer V> ? V : never;
+
+async function loadSubscriptions() {
+  const subs = await db.subscription.findMany({ include: { plan: true } });
+  return new Map(subs.map((s) => [s.tenantId, { ...s, ent: computeEntitlements(s) }]));
+}
+
+function subscriptionSummary(s: SubRow | undefined) {
+  if (!s) return null;
+  return {
+    planId: s.planId,
+    planCode: s.plan.code,
+    planName: s.plan.nameAr,
+    priceMonthly: Number(s.plan.priceMonthly),
+    status: s.ent.status,
+    storedStatus: s.status,
+    trialEndsAt: s.trialEndsAt,
+    currentPeriodEnd: s.currentPeriodEnd,
+    daysLeft: s.ent.daysLeft,
+    limitOverrides: s.limitOverrides,
+    featureOverrides: s.featureOverrides,
+    notes: s.notes,
+  };
+}
+
 router.get('/stats', async (_req: Request, res: Response, next: NextFunction) => {
   try {
     const now = Date.now();
@@ -136,7 +165,49 @@ router.get('/stats', async (_req: Request, res: Response, next: NextFunction) =>
       return { date: d, count: byDay.get(d) ?? 0 };
     });
 
+    const [subs, paid30, tenantNames] = await Promise.all([
+      loadSubscriptions(),
+      db.subscriptionPayment.aggregate({ where: { createdAt: { gte: daysAgo(30) } }, _sum: { amount: true } }),
+      db.tenant.findMany({ select: { id: true, name: true } }),
+    ]);
+    const nameOf = new Map(tenantNames.map((t) => [t.id, t.name]));
+    let mrr = 0;
+    let trialing = 0;
+    let paying = 0;
+    const expiringSoon: Array<{ tenantId: number; name: string; planName: string; status: string; endsAt: Date | null; daysLeft: number | null }> = [];
+    for (const [tenantId, s] of subs) {
+      const st = s.ent.status;
+      // "paying" = an open paid subscription on a priced plan (free/custom-priced plans add no revenue)
+      if ((st === 'ACTIVE' || st === 'PAST_DUE') && Number(s.plan.priceMonthly) > 0) {
+        paying += 1;
+        mrr += Number(s.plan.priceMonthly);
+      }
+      if (st === 'TRIALING') trialing += 1;
+      const open = st === 'TRIALING' || st === 'ACTIVE' || st === 'PAST_DUE';
+      if (open && s.ent.daysLeft !== null && s.ent.daysLeft <= 7) {
+        expiringSoon.push({
+          tenantId,
+          name: nameOf.get(tenantId) ?? '',
+          planName: s.plan.nameAr,
+          status: st,
+          endsAt: st === 'TRIALING' ? s.trialEndsAt : s.currentPeriodEnd,
+          daysLeft: s.ent.daysLeft,
+        });
+      }
+      if (st === 'EXPIRED') {
+        expiringSoon.push({ tenantId, name: nameOf.get(tenantId) ?? '', planName: s.plan.nameAr, status: st, endsAt: s.currentPeriodEnd ?? s.trialEndsAt, daysLeft: s.ent.daysLeft });
+      }
+    }
+    expiringSoon.sort((a, b) => (a.daysLeft ?? 0) - (b.daysLeft ?? 0));
+
     res.json({
+      revenue: {
+        mrr,
+        payingTenants: paying,
+        trialingTenants: trialing,
+        paidLast30Days: Number(paid30._sum.amount ?? 0),
+        attention: expiringSoon,
+      },
       tenants: {
         total: tenants.length,
         active: tenants.filter((t) => t.isActive).length,
@@ -166,8 +237,8 @@ router.get('/tenants', async (req: Request, res: Response, next: NextFunction) =
         : undefined,
       orderBy: { id: 'asc' },
     });
-    const usage = await usageByTenant();
-    res.json(tenants.map((t) => ({ ...t, usage: usage(t.id) })));
+    const [usage, subs] = await Promise.all([usageByTenant(), loadSubscriptions()]);
+    res.json(tenants.map((t) => ({ ...t, usage: usage(t.id), subscription: subscriptionSummary(subs.get(t.id)) })));
   } catch (err) {
     next(err);
   }
@@ -181,7 +252,7 @@ router.get('/tenants/:id', async (req: Request, res: Response, next: NextFunctio
       res.status(404).json({ error: 'الشركة غير موجودة' });
       return;
     }
-    const [users, usage] = await Promise.all([
+    const [users, usage, subs, payments] = await Promise.all([
       db.user.findMany({
         where: { tenantId: id },
         select: {
@@ -195,8 +266,16 @@ router.get('/tenants/:id', async (req: Request, res: Response, next: NextFunctio
         orderBy: { id: 'asc' },
       }),
       usageByTenant(),
+      loadSubscriptions(),
+      db.subscriptionPayment.findMany({ where: { tenantId: id }, orderBy: { id: 'desc' }, take: 50 }),
     ]);
-    res.json({ ...tenant, usage: usage(id), users });
+    res.json({
+      ...tenant,
+      usage: usage(id),
+      users,
+      subscription: subscriptionSummary(subs.get(id)),
+      payments: payments.map((p) => ({ ...p, amount: Number(p.amount) })),
+    });
   } catch (err) {
     next(err);
   }

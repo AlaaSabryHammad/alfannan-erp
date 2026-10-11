@@ -1,19 +1,32 @@
 import { useState } from 'react';
 import { Navigate, useNavigate } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Building2, KeyRound, Loader2, LogOut, PauseCircle, PlayCircle, Search, Users, X } from 'lucide-react';
+import {
+  AlertTriangle, Building2, KeyRound, Loader2, LogOut, PauseCircle, PlayCircle, Plus, Search, Users, X,
+} from 'lucide-react';
+import type { AxiosError } from 'axios';
 import {
   platformApi,
   PLATFORM_ADMIN_KEY,
   PLATFORM_TOKEN_KEY,
+  FEATURE_LABELS,
+  LIMIT_LABELS,
+  STATUS_LABELS,
+  type FeatureKey,
+  type LimitKey,
   type PlatformAuditRow,
+  type PlatformPayment,
+  type PlatformPlan,
   type PlatformStats,
   type PlatformTenant,
   type PlatformTenantDetail,
+  type SubscriptionStatus,
 } from '../../lib/platformApi';
 
-const fmtDate = (v: string | null) => (v ? new Date(v).toLocaleDateString('ar-SA', { year: 'numeric', month: 'short', day: 'numeric' }) : '—');
-const fmtMoney = (n: number) => new Intl.NumberFormat('ar-SA', { maximumFractionDigits: 0 }).format(n);
+const fmtDate = (v: string | null) =>
+  v ? new Date(v).toLocaleDateString('ar-SA', { year: 'numeric', month: 'short', day: 'numeric' }) : '—';
+const fmtMoney = (n: number | string) =>
+  new Intl.NumberFormat('ar-SA', { maximumFractionDigits: 0 }).format(Number(n));
 
 const ACTION_LABELS: Record<string, string> = {
   LOGIN: 'دخول مدير المنصة',
@@ -21,7 +34,44 @@ const ACTION_LABELS: Record<string, string> = {
   TENANT_ACTIVATE: 'تفعيل شركة',
   TENANT_RENAME: 'تغيير اسم شركة',
   USER_PASSWORD_RESET: 'إعادة تعيين كلمة مرور',
+  PLAN_CREATE: 'إنشاء باقة',
+  PLAN_UPDATE: 'تعديل باقة',
+  SUB_CHANGE_PLAN: 'تغيير باقة شركة',
+  SUB_EXTEND_TRIAL: 'تمديد تجربة',
+  SUB_ACTIVATE: 'تفعيل/تجديد اشتراك',
+  SUB_CANCEL: 'إلغاء اشتراك',
+  SUB_OVERRIDES: 'حدود/مزايا مخصصة',
 };
+
+const METHOD_LABELS: Record<string, string> = {
+  CASH: 'نقدًا',
+  BANK_TRANSFER: 'تحويل بنكي',
+  CARD: 'بطاقة',
+  OTHER: 'أخرى',
+};
+
+const STATUS_STYLE: Record<SubscriptionStatus, string> = {
+  TRIALING: 'bg-sky-50 text-sky-700',
+  ACTIVE: 'bg-emerald-50 text-emerald-700',
+  PAST_DUE: 'bg-amber-50 text-amber-700',
+  EXPIRED: 'bg-red-50 text-red-700',
+  CANCELED: 'bg-slate-100 text-slate-600',
+};
+
+const input =
+  'w-full border border-slate-300 rounded-lg px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-teal-600/30 focus:border-teal-600';
+
+const errorOf = (err: unknown) =>
+  (err as AxiosError<{ error?: string }>).response?.data?.error ?? 'تعذّر تنفيذ العملية';
+
+function StatusBadge({ status }: { status: SubscriptionStatus | undefined }) {
+  if (!status) return <span className="text-xs text-slate-400">—</span>;
+  return (
+    <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${STATUS_STYLE[status]}`}>
+      {STATUS_LABELS[status]}
+    </span>
+  );
+}
 
 function StatCard({ label, value, hint }: { label: string; value: number | string; hint?: string }) {
   return (
@@ -52,6 +102,347 @@ function SignupsChart({ data }: { data: PlatformStats['signupsByDay'] }) {
   );
 }
 
+// ── plan editor ───────────────────────────────────────────────────────────────
+
+function PlanForm({ plan, onClose }: { plan: PlatformPlan | null; onClose: () => void }) {
+  const qc = useQueryClient();
+  const limitKeys = Object.keys(LIMIT_LABELS) as LimitKey[];
+  const featureKeys = Object.keys(FEATURE_LABELS) as FeatureKey[];
+
+  const [code, setCode] = useState(plan?.code ?? '');
+  const [nameAr, setNameAr] = useState(plan?.nameAr ?? '');
+  const [priceMonthly, setPriceMonthly] = useState(String(plan ? Number(plan.priceMonthly) : 0));
+  const [priceYearly, setPriceYearly] = useState(String(plan ? Number(plan.priceYearly) : 0));
+  const [trialDays, setTrialDays] = useState(String(plan?.trialDays ?? 0));
+  const [sortOrder, setSortOrder] = useState(String(plan?.sortOrder ?? 10));
+  const [isActive, setIsActive] = useState(plan?.isActive ?? true);
+  const [limits, setLimits] = useState<Record<LimitKey, string>>(
+    () => Object.fromEntries(limitKeys.map((k) => [k, plan?.limits[k] == null ? '' : String(plan.limits[k])])) as Record<LimitKey, string>,
+  );
+  const [features, setFeatures] = useState<Record<FeatureKey, boolean>>(
+    () => Object.fromEntries(featureKeys.map((k) => [k, plan?.features[k] ?? false])) as Record<FeatureKey, boolean>,
+  );
+  const [error, setError] = useState<string | null>(null);
+
+  const save = useMutation({
+    mutationFn: async () => {
+      const body = {
+        nameAr,
+        priceMonthly: Number(priceMonthly),
+        priceYearly: Number(priceYearly),
+        trialDays: Number(trialDays),
+        sortOrder: Number(sortOrder),
+        isActive,
+        limits: Object.fromEntries(limitKeys.map((k) => [k, limits[k].trim() === '' ? null : Number(limits[k])])),
+        features,
+      };
+      return plan
+        ? platformApi.put(`/plans/${plan.id}`, body)
+        : platformApi.post('/plans', { ...body, code });
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['platform'] });
+      onClose();
+    },
+    onError: (e) => setError(errorOf(e)),
+  });
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40" dir="rtl">
+      <form
+        onSubmit={(e) => { e.preventDefault(); setError(null); save.mutate(); }}
+        className="bg-white rounded-2xl shadow-2xl w-full max-w-xl max-h-[90vh] overflow-y-auto p-6 flex flex-col gap-4"
+      >
+        <div className="flex items-center justify-between">
+          <h2 className="text-lg font-bold text-slate-900">{plan ? `تعديل باقة «${plan.nameAr}»` : 'باقة جديدة'}</h2>
+          <button type="button" onClick={onClose} className="text-slate-500 hover:text-slate-900"><X size={20} /></button>
+        </div>
+
+        <div className="grid grid-cols-2 gap-3">
+          <label className="text-sm font-medium text-slate-700 flex flex-col gap-1">
+            الكود
+            <input value={code} onChange={(e) => setCode(e.target.value)} disabled={!!plan} dir="ltr" className={`${input} disabled:bg-slate-100`} placeholder="pro-plus" />
+          </label>
+          <label className="text-sm font-medium text-slate-700 flex flex-col gap-1">
+            الاسم
+            <input value={nameAr} onChange={(e) => setNameAr(e.target.value)} required className={input} />
+          </label>
+          <label className="text-sm font-medium text-slate-700 flex flex-col gap-1">
+            السعر الشهري (ر.س)
+            <input type="number" min={0} value={priceMonthly} onChange={(e) => setPriceMonthly(e.target.value)} className={input} />
+          </label>
+          <label className="text-sm font-medium text-slate-700 flex flex-col gap-1">
+            السعر السنوي (ر.س)
+            <input type="number" min={0} value={priceYearly} onChange={(e) => setPriceYearly(e.target.value)} className={input} />
+          </label>
+          <label className="text-sm font-medium text-slate-700 flex flex-col gap-1">
+            أيام التجربة
+            <input type="number" min={0} max={90} value={trialDays} onChange={(e) => setTrialDays(e.target.value)} className={input} />
+          </label>
+          <label className="text-sm font-medium text-slate-700 flex flex-col gap-1">
+            الترتيب
+            <input type="number" min={0} value={sortOrder} onChange={(e) => setSortOrder(e.target.value)} className={input} />
+          </label>
+        </div>
+
+        <fieldset className="border border-slate-200 rounded-lg p-3">
+          <legend className="text-sm font-semibold text-slate-700 px-1">الحدود (اتركه فارغًا = بلا حد)</legend>
+          <div className="grid grid-cols-2 gap-3">
+            {limitKeys.map((k) => (
+              <label key={k} className="text-sm text-slate-700 flex flex-col gap-1">
+                {LIMIT_LABELS[k]}
+                <input type="number" min={0} value={limits[k]} onChange={(e) => setLimits({ ...limits, [k]: e.target.value })} placeholder="بلا حد" className={input} />
+              </label>
+            ))}
+          </div>
+        </fieldset>
+
+        <fieldset className="border border-slate-200 rounded-lg p-3">
+          <legend className="text-sm font-semibold text-slate-700 px-1">المزايا</legend>
+          <div className="flex flex-col gap-2">
+            {featureKeys.map((k) => (
+              <label key={k} className="flex items-center gap-2 text-sm text-slate-700">
+                <input type="checkbox" checked={features[k]} onChange={(e) => setFeatures({ ...features, [k]: e.target.checked })} />
+                {FEATURE_LABELS[k]}
+              </label>
+            ))}
+          </div>
+        </fieldset>
+
+        <label className="flex items-center gap-2 text-sm text-slate-700">
+          <input type="checkbox" checked={isActive} onChange={(e) => setIsActive(e.target.checked)} />
+          الباقة متاحة للاشتراك
+        </label>
+
+        {error && <div className="bg-red-50 border border-red-200 text-red-700 text-sm rounded-lg px-4 py-3">{error}</div>}
+
+        <div className="flex gap-2 justify-end">
+          <button type="button" onClick={onClose} className="px-4 py-2 text-sm text-slate-600 hover:bg-slate-100 rounded-lg">إلغاء</button>
+          <button type="submit" disabled={save.isPending} className="px-4 py-2 text-sm font-semibold bg-teal-700 hover:bg-teal-800 text-white rounded-lg disabled:opacity-60 flex items-center gap-2">
+            {save.isPending && <Loader2 size={14} className="animate-spin" />} حفظ
+          </button>
+        </div>
+      </form>
+    </div>
+  );
+}
+
+// ── company panel ─────────────────────────────────────────────────────────────
+
+function SubscriptionCard({ tenant, plans }: { tenant: PlatformTenantDetail; plans: PlatformPlan[] }) {
+  const qc = useQueryClient();
+  const sub = tenant.subscription;
+  const [mode, setMode] = useState<null | 'activate' | 'trial' | 'plan' | 'overrides'>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  const activePlans = plans.filter((p) => p.isActive);
+  const [planId, setPlanId] = useState<number>(sub?.planId ?? activePlans[0]?.id ?? 0);
+  const [months, setMonths] = useState('1');
+  const [amount, setAmount] = useState('');
+  const [method, setMethod] = useState('BANK_TRANSFER');
+  const [reference, setReference] = useState('');
+  const [days, setDays] = useState('7');
+
+  const limitKeys = Object.keys(LIMIT_LABELS) as LimitKey[];
+  const featureKeys = Object.keys(FEATURE_LABELS) as FeatureKey[];
+  const [limitDraft, setLimitDraft] = useState<Record<LimitKey, string>>(
+    () => Object.fromEntries(limitKeys.map((k) => {
+      const o = sub?.limitOverrides;
+      return [k, o && k in o ? (o[k] === null ? 'inf' : String(o[k])) : ''];
+    })) as Record<LimitKey, string>,
+  );
+  const [featureDraft, setFeatureDraft] = useState<Record<FeatureKey, '' | 'on' | 'off'>>(
+    () => Object.fromEntries(featureKeys.map((k) => {
+      const o = sub?.featureOverrides;
+      return [k, o && k in o ? (o[k] ? 'on' : 'off') : ''];
+    })) as Record<FeatureKey, '' | 'on' | 'off'>,
+  );
+
+  const done = () => {
+    setMode(null);
+    setError(null);
+    qc.invalidateQueries({ queryKey: ['platform'] });
+  };
+  const run = useMutation({
+    mutationFn: async (fn: () => Promise<unknown>) => fn(),
+    onSuccess: done,
+    onError: (e) => setError(errorOf(e)),
+  });
+  const base = `/tenants/${tenant.id}/subscription`;
+
+  const selectedPlan = plans.find((p) => p.id === planId);
+  const expected = selectedPlan ? Number(selectedPlan.priceMonthly) * Number(months || 0) : 0;
+
+  const saveOverrides = () => {
+    const limitOverrides: Record<string, number | null> = {};
+    for (const k of limitKeys) {
+      const v = limitDraft[k].trim();
+      if (v === '') continue;
+      limitOverrides[k] = v === 'inf' ? null : Number(v);
+    }
+    const featureOverrides: Record<string, boolean> = {};
+    for (const k of featureKeys) if (featureDraft[k]) featureOverrides[k] = featureDraft[k] === 'on';
+    run.mutate(() =>
+      platformApi.put(`${base}/overrides`, {
+        limitOverrides: Object.keys(limitOverrides).length ? limitOverrides : null,
+        featureOverrides: Object.keys(featureOverrides).length ? featureOverrides : null,
+      }),
+    );
+  };
+
+  if (!sub) {
+    return <div className="border border-red-200 bg-red-50 text-red-700 text-sm rounded-lg p-3 mb-6">لا يوجد اشتراك لهذه الشركة.</div>;
+  }
+
+  const btn = 'text-xs font-semibold px-3 py-1.5 rounded-lg border border-slate-300 hover:bg-slate-50 text-slate-700';
+
+  return (
+    <div className="border border-slate-200 rounded-xl p-4 mb-6">
+      <div className="flex items-center gap-2 flex-wrap">
+        <h3 className="text-sm font-semibold text-slate-700">الاشتراك</h3>
+        <StatusBadge status={sub.status} />
+        <span className="text-sm font-medium text-slate-900">{sub.planName}</span>
+        <span className="mr-auto text-xs text-slate-500">
+          {sub.status === 'TRIALING'
+            ? `تنتهي التجربة ${fmtDate(sub.trialEndsAt)}`
+            : sub.currentPeriodEnd
+              ? `الفترة حتى ${fmtDate(sub.currentPeriodEnd)}`
+              : 'بلا تاريخ انتهاء'}
+          {sub.daysLeft !== null && ` (${sub.daysLeft} يوم)`}
+        </span>
+      </div>
+      {sub.notes && <p className="text-xs text-slate-500 mt-2">ملاحظات: {sub.notes}</p>}
+
+      <div className="flex flex-wrap gap-2 mt-3">
+        <button className={btn} onClick={() => setMode(mode === 'activate' ? null : 'activate')}>تفعيل / تجديد</button>
+        <button className={btn} onClick={() => setMode(mode === 'trial' ? null : 'trial')}>تمديد التجربة</button>
+        <button className={btn} onClick={() => setMode(mode === 'plan' ? null : 'plan')}>تغيير الباقة</button>
+        <button className={btn} onClick={() => setMode(mode === 'overrides' ? null : 'overrides')}>حدود ومزايا مخصصة</button>
+        {sub.status !== 'CANCELED' && (
+          <button
+            className={`${btn} text-red-700 border-red-200 hover:bg-red-50`}
+            onClick={() => window.confirm('إلغاء الاشتراك؟ ستتحول الشركة لوضع القراءة فقط.') && run.mutate(() => platformApi.post(`${base}/cancel`))}
+          >
+            إلغاء الاشتراك
+          </button>
+        )}
+      </div>
+
+      {mode === 'activate' && (
+        <div className="mt-3 bg-slate-50 rounded-lg p-3 grid grid-cols-2 gap-3">
+          <label className="text-xs text-slate-600 flex flex-col gap-1">الباقة
+            <select value={planId} onChange={(e) => setPlanId(Number(e.target.value))} className={input}>
+              {activePlans.map((p) => <option key={p.id} value={p.id}>{p.nameAr} — {fmtMoney(p.priceMonthly)} ر.س/شهر</option>)}
+            </select>
+          </label>
+          <label className="text-xs text-slate-600 flex flex-col gap-1">عدد الأشهر
+            <input type="number" min={1} max={36} value={months} onChange={(e) => setMonths(e.target.value)} className={input} />
+          </label>
+          <label className="text-xs text-slate-600 flex flex-col gap-1">المبلغ المحصَّل (ر.س)
+            <input type="number" min={0} value={amount} onChange={(e) => setAmount(e.target.value)} placeholder={String(expected)} className={input} />
+          </label>
+          <label className="text-xs text-slate-600 flex flex-col gap-1">طريقة الدفع
+            <select value={method} onChange={(e) => setMethod(e.target.value)} className={input}>
+              {Object.entries(METHOD_LABELS).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
+            </select>
+          </label>
+          <label className="text-xs text-slate-600 flex flex-col gap-1 col-span-2">مرجع العملية (اختياري)
+            <input value={reference} onChange={(e) => setReference(e.target.value)} className={input} />
+          </label>
+          <button
+            disabled={run.isPending}
+            onClick={() => run.mutate(() => platformApi.post(`${base}/activate`, {
+              planId, months: Number(months), method,
+              ...(amount.trim() !== '' ? { amount: Number(amount) } : {}),
+              ...(reference.trim() ? { reference: reference.trim() } : {}),
+            }))}
+            className="col-span-2 bg-teal-700 hover:bg-teal-800 text-white text-sm font-semibold py-2 rounded-lg disabled:opacity-60"
+          >
+            تأكيد التفعيل وتسجيل الدفعة
+          </button>
+        </div>
+      )}
+
+      {mode === 'trial' && (
+        <div className="mt-3 bg-slate-50 rounded-lg p-3 flex items-end gap-3">
+          <label className="text-xs text-slate-600 flex flex-col gap-1 flex-1">عدد الأيام المضافة
+            <input type="number" min={1} max={365} value={days} onChange={(e) => setDays(e.target.value)} className={input} />
+          </label>
+          <button
+            disabled={run.isPending}
+            onClick={() => run.mutate(() => platformApi.post(`${base}/extend-trial`, { days: Number(days) }))}
+            className="bg-teal-700 hover:bg-teal-800 text-white text-sm font-semibold px-4 py-2 rounded-lg disabled:opacity-60"
+          >
+            تمديد
+          </button>
+        </div>
+      )}
+
+      {mode === 'plan' && (
+        <div className="mt-3 bg-slate-50 rounded-lg p-3 flex items-end gap-3">
+          <label className="text-xs text-slate-600 flex flex-col gap-1 flex-1">الباقة الجديدة (دون تغيير الفترة)
+            <select value={planId} onChange={(e) => setPlanId(Number(e.target.value))} className={input}>
+              {activePlans.map((p) => <option key={p.id} value={p.id}>{p.nameAr}</option>)}
+            </select>
+          </label>
+          <button
+            disabled={run.isPending}
+            onClick={() => run.mutate(() => platformApi.post(`${base}/change-plan`, { planId }))}
+            className="bg-teal-700 hover:bg-teal-800 text-white text-sm font-semibold px-4 py-2 rounded-lg disabled:opacity-60"
+          >
+            تغيير
+          </button>
+        </div>
+      )}
+
+      {mode === 'overrides' && (
+        <div className="mt-3 bg-slate-50 rounded-lg p-3 flex flex-col gap-3">
+          <p className="text-xs text-slate-500">القيمة الفارغة = حسب الباقة. اكتب <b>inf</b> لإلغاء الحد لهذه الشركة.</p>
+          <div className="grid grid-cols-2 gap-3">
+            {limitKeys.map((k) => (
+              <label key={k} className="text-xs text-slate-600 flex flex-col gap-1">{LIMIT_LABELS[k]}
+                <input value={limitDraft[k]} onChange={(e) => setLimitDraft({ ...limitDraft, [k]: e.target.value })} placeholder="حسب الباقة" className={input} />
+              </label>
+            ))}
+          </div>
+          <div className="grid grid-cols-1 gap-2">
+            {featureKeys.map((k) => (
+              <label key={k} className="text-xs text-slate-600 flex items-center gap-2">
+                <span className="flex-1">{FEATURE_LABELS[k]}</span>
+                <select value={featureDraft[k]} onChange={(e) => setFeatureDraft({ ...featureDraft, [k]: e.target.value as '' | 'on' | 'off' })} className="border border-slate-300 rounded-lg px-2 py-1 text-sm">
+                  <option value="">حسب الباقة</option>
+                  <option value="on">مفعّلة</option>
+                  <option value="off">معطّلة</option>
+                </select>
+              </label>
+            ))}
+          </div>
+          <button onClick={saveOverrides} disabled={run.isPending} className="bg-teal-700 hover:bg-teal-800 text-white text-sm font-semibold py-2 rounded-lg disabled:opacity-60">
+            حفظ
+          </button>
+        </div>
+      )}
+
+      {error && <div className="mt-3 bg-red-50 border border-red-200 text-red-700 text-sm rounded-lg px-3 py-2">{error}</div>}
+
+      {tenant.payments.length > 0 && (
+        <div className="mt-4">
+          <p className="text-xs font-semibold text-slate-600 mb-1">آخر الدفعات</p>
+          <ul className="divide-y divide-slate-100 border border-slate-200 rounded-lg">
+            {tenant.payments.slice(0, 5).map((p: PlatformPayment) => (
+              <li key={p.id} className="px-3 py-2 text-xs flex items-center gap-2">
+                <span className="font-semibold text-slate-900">{fmtMoney(p.amount)} {p.currency}</span>
+                <span className="text-slate-500">{p.months} شهر · {METHOD_LABELS[p.method] ?? p.method}</span>
+                <span className="mr-auto text-slate-400">{fmtDate(p.createdAt)}</span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+    </div>
+  );
+}
+
 function TenantPanel({ tenantId, onClose }: { tenantId: number; onClose: () => void }) {
   const qc = useQueryClient();
   const [temp, setTemp] = useState<{ email: string; password: string } | null>(null);
@@ -60,12 +451,14 @@ function TenantPanel({ tenantId, onClose }: { tenantId: number; onClose: () => v
     queryKey: ['platform', 'tenant', tenantId],
     queryFn: async () => (await platformApi.get<PlatformTenantDetail>(`/tenants/${tenantId}`)).data,
   });
+  const plans = useQuery({
+    queryKey: ['platform', 'plans'],
+    queryFn: async () => (await platformApi.get<PlatformPlan[]>('/plans')).data,
+  });
 
   const toggle = useMutation({
     mutationFn: async (isActive: boolean) => (await platformApi.patch(`/tenants/${tenantId}`, { isActive })).data,
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['platform'] });
-    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['platform'] }),
   });
 
   const reset = useMutation({
@@ -118,6 +511,8 @@ function TenantPanel({ tenantId, onClose }: { tenantId: number; onClose: () => v
               </button>
             </div>
 
+            <SubscriptionCard key={`${data.id}-${data.subscription?.planId}-${data.subscription?.status}`} tenant={data} plans={plans.data ?? []} />
+
             <div className="grid grid-cols-2 gap-3 mb-6">
               <StatCard label="المستخدمون" value={data.usage.users} />
               <StatCard label="الأصناف" value={data.usage.products} />
@@ -165,11 +560,16 @@ function TenantPanel({ tenantId, onClose }: { tenantId: number; onClose: () => v
   );
 }
 
+// ── page ──────────────────────────────────────────────────────────────────────
+
+type Tab = 'tenants' | 'plans' | 'payments' | 'audit';
+
 export function PlatformDashboardPage() {
   const navigate = useNavigate();
   const [search, setSearch] = useState('');
   const [selected, setSelected] = useState<number | null>(null);
-  const [tab, setTab] = useState<'tenants' | 'audit'>('tenants');
+  const [tab, setTab] = useState<Tab>('tenants');
+  const [editingPlan, setEditingPlan] = useState<PlatformPlan | 'new' | null>(null);
   const hasToken = !!localStorage.getItem(PLATFORM_TOKEN_KEY);
   const admin = (() => {
     try { return JSON.parse(localStorage.getItem(PLATFORM_ADMIN_KEY) ?? 'null') as { name: string } | null; } catch { return null; }
@@ -184,6 +584,16 @@ export function PlatformDashboardPage() {
     queryKey: ['platform', 'tenants', search],
     enabled: hasToken,
     queryFn: async () => (await platformApi.get<PlatformTenant[]>('/tenants', { params: { search } })).data,
+  });
+  const plans = useQuery({
+    queryKey: ['platform', 'plans'],
+    enabled: hasToken && tab === 'plans',
+    queryFn: async () => (await platformApi.get<PlatformPlan[]>('/plans')).data,
+  });
+  const payments = useQuery({
+    queryKey: ['platform', 'payments'],
+    enabled: hasToken && tab === 'payments',
+    queryFn: async () => (await platformApi.get<PlatformPayment[]>('/payments')).data,
   });
   const audit = useQuery({
     queryKey: ['platform', 'audit'],
@@ -200,6 +610,17 @@ export function PlatformDashboardPage() {
   };
 
   const s = stats.data;
+  const tabs: Array<[Tab, string]> = [
+    ['tenants', 'الشركات'],
+    ['plans', 'الباقات'],
+    ['payments', 'المدفوعات'],
+    ['audit', 'سجل العمليات'],
+  ];
+  const Loading = ({ cols }: { cols: number }) => (
+    <tr><td colSpan={cols} className="py-10 text-center text-slate-400"><Loader2 className="inline animate-spin" /></td></tr>
+  );
+  const th = (h: string) => <th key={h} className="text-right font-medium px-4 py-2.5">{h}</th>;
+
   return (
     <div className="min-h-screen bg-slate-50" dir="rtl">
       <header className="bg-slate-900 text-white">
@@ -214,25 +635,46 @@ export function PlatformDashboardPage() {
       </header>
 
       <main className="max-w-6xl mx-auto px-4 py-6 flex flex-col gap-6">
-        <section className="grid grid-cols-2 md:grid-cols-5 gap-3">
-          <StatCard label="إجمالي الشركات" value={s?.tenants.total ?? '—'} />
-          <StatCard label="نشطة" value={s?.tenants.active ?? '—'} />
-          <StatCard label="موقوفة" value={s?.tenants.suspended ?? '—'} />
-          <StatCard label="جديدة (7 أيام)" value={s?.tenants.newLast7Days ?? '—'} hint={`${s?.tenants.newLast30Days ?? 0} في 30 يومًا`} />
-          <StatCard label="المستخدمون" value={s?.users ?? '—'} />
+        <section className="grid grid-cols-2 md:grid-cols-4 gap-3">
+          <StatCard label="الإيراد الشهري المتكرر (ر.س)" value={s ? fmtMoney(s.revenue.mrr) : '—'} hint={`${s?.revenue.payingTenants ?? 0} مشترك مدفوع`} />
+          <StatCard label="المحصَّل — آخر 30 يومًا (ر.س)" value={s ? fmtMoney(s.revenue.paidLast30Days) : '—'} />
+          <StatCard label="شركات في التجربة" value={s?.revenue.trialingTenants ?? '—'} />
+          <StatCard label="إجمالي الشركات" value={s?.tenants.total ?? '—'} hint={`${s?.tenants.suspended ?? 0} موقوفة · ${s?.tenants.newLast7Days ?? 0} جديدة (7 أيام)`} />
         </section>
+
+        {s && s.revenue.attention.length > 0 && (
+          <section className="bg-amber-50 border border-amber-200 rounded-xl p-4">
+            <p className="text-sm font-semibold text-amber-900 flex items-center gap-2 mb-2">
+              <AlertTriangle size={16} /> تحتاج متابعة ({s.revenue.attention.length})
+            </p>
+            <ul className="flex flex-col gap-1">
+              {s.revenue.attention.slice(0, 6).map((a) => (
+                <li key={a.tenantId}>
+                  <button onClick={() => setSelected(a.tenantId)} className="w-full text-right text-sm flex items-center gap-2 hover:bg-amber-100 rounded px-2 py-1">
+                    <span className="font-medium text-slate-900">{a.name}</span>
+                    <StatusBadge status={a.status} />
+                    <span className="text-slate-500">{a.planName}</span>
+                    <span className="mr-auto text-xs text-slate-500">
+                      {a.daysLeft !== null && a.daysLeft < 0 ? `منتهٍ منذ ${-a.daysLeft} يوم` : a.daysLeft !== null ? `باقي ${a.daysLeft} يوم` : ''}
+                    </span>
+                  </button>
+                </li>
+              ))}
+            </ul>
+          </section>
+        )}
 
         {s && <SignupsChart data={s.signupsByDay} />}
 
         <section className="bg-white rounded-xl border border-slate-200">
-          <div className="flex items-center gap-2 p-3 border-b border-slate-200">
-            {(['tenants', 'audit'] as const).map((t) => (
+          <div className="flex items-center gap-2 p-3 border-b border-slate-200 flex-wrap">
+            {tabs.map(([t, label]) => (
               <button
                 key={t}
                 onClick={() => setTab(t)}
                 className={`text-sm font-semibold px-3 py-1.5 rounded-lg ${tab === t ? 'bg-teal-700 text-white' : 'text-slate-600 hover:bg-slate-100'}`}
               >
-                {t === 'tenants' ? 'الشركات' : 'سجل العمليات'}
+                {label}
               </button>
             ))}
             {tab === 'tenants' && (
@@ -246,36 +688,35 @@ export function PlatformDashboardPage() {
                 />
               </div>
             )}
+            {tab === 'plans' && (
+              <button onClick={() => setEditingPlan('new')} className="mr-auto flex items-center gap-1.5 text-sm font-semibold bg-teal-700 hover:bg-teal-800 text-white px-3 py-1.5 rounded-lg">
+                <Plus size={16} /> باقة جديدة
+              </button>
+            )}
           </div>
 
-          {tab === 'tenants' ? (
+          {tab === 'tenants' && (
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
                 <thead className="bg-slate-50 text-slate-500 text-xs">
-                  <tr>
-                    {['الشركة', 'الحالة', 'المستخدمون', 'الأصناف', 'فواتير 30 يومًا', 'مبيعات 30 يومًا', 'آخر نشاط', 'الإنشاء'].map((h) => (
-                      <th key={h} className="text-right font-medium px-4 py-2.5">{h}</th>
-                    ))}
-                  </tr>
+                  <tr>{['الشركة', 'الباقة', 'الاشتراك', 'المستخدمون', 'الأصناف', 'مبيعات 30 يومًا', 'آخر نشاط', 'الحساب'].map(th)}</tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">
-                  {tenants.isLoading && (
-                    <tr><td colSpan={8} className="py-10 text-center text-slate-400"><Loader2 className="inline animate-spin" /></td></tr>
-                  )}
+                  {tenants.isLoading && <Loading cols={8} />}
                   {tenants.data?.map((t) => (
                     <tr key={t.id} onClick={() => setSelected(t.id)} className="hover:bg-slate-50 cursor-pointer">
                       <td className="px-4 py-3 font-medium text-slate-900">{t.name}</td>
+                      <td className="px-4 py-3 text-slate-600">{t.subscription?.planName ?? '—'}</td>
+                      <td className="px-4 py-3"><StatusBadge status={t.subscription?.status} /></td>
+                      <td className="px-4 py-3">{t.usage.users}</td>
+                      <td className="px-4 py-3">{t.usage.products}</td>
+                      <td className="px-4 py-3">{fmtMoney(t.usage.salesLast30Days)}</td>
+                      <td className="px-4 py-3 text-slate-500">{fmtDate(t.usage.lastActivityAt)}</td>
                       <td className="px-4 py-3">
                         <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${t.isActive ? 'bg-emerald-50 text-emerald-700' : 'bg-red-50 text-red-700'}`}>
                           {t.isActive ? 'نشطة' : 'موقوفة'}
                         </span>
                       </td>
-                      <td className="px-4 py-3">{t.usage.users}</td>
-                      <td className="px-4 py-3">{t.usage.products}</td>
-                      <td className="px-4 py-3">{t.usage.invoicesLast30Days}</td>
-                      <td className="px-4 py-3">{fmtMoney(t.usage.salesLast30Days)}</td>
-                      <td className="px-4 py-3 text-slate-500">{fmtDate(t.usage.lastActivityAt)}</td>
-                      <td className="px-4 py-3 text-slate-500">{fmtDate(t.createdAt)}</td>
                     </tr>
                   ))}
                   {tenants.data?.length === 0 && (
@@ -284,7 +725,62 @@ export function PlatformDashboardPage() {
                 </tbody>
               </table>
             </div>
-          ) : (
+          )}
+
+          {tab === 'plans' && (
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead className="bg-slate-50 text-slate-500 text-xs">
+                  <tr>{['الباقة', 'شهري', 'سنوي', 'تجربة', 'المستخدمون', 'الأصناف', 'فواتير/شهر', 'ZATCA', 'تصنيع', 'مشتركون', ''].map((h, i) => (h ? th(h) : <th key={i} />))}</tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {plans.isLoading && <Loading cols={11} />}
+                  {plans.data?.map((p) => (
+                    <tr key={p.id} className={p.isActive ? '' : 'opacity-50'}>
+                      <td className="px-4 py-3 font-medium text-slate-900">{p.nameAr} <span className="text-xs text-slate-400" dir="ltr">{p.code}</span></td>
+                      <td className="px-4 py-3">{fmtMoney(p.priceMonthly)}</td>
+                      <td className="px-4 py-3">{fmtMoney(p.priceYearly)}</td>
+                      <td className="px-4 py-3">{p.trialDays ? `${p.trialDays} يوم` : '—'}</td>
+                      <td className="px-4 py-3">{p.limits.users ?? '∞'}</td>
+                      <td className="px-4 py-3">{p.limits.products ?? '∞'}</td>
+                      <td className="px-4 py-3">{p.limits.salesInvoicesPerMonth ?? '∞'}</td>
+                      <td className="px-4 py-3">{p.features.zatca ? '✓' : '—'}</td>
+                      <td className="px-4 py-3">{p.features.manufacturing ? '✓' : '—'}</td>
+                      <td className="px-4 py-3">{p.subscribers}</td>
+                      <td className="px-4 py-3"><button onClick={() => setEditingPlan(p)} className="text-xs font-semibold text-teal-700 hover:underline">تعديل</button></td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+
+          {tab === 'payments' && (
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead className="bg-slate-50 text-slate-500 text-xs">
+                  <tr>{['التاريخ', 'الشركة', 'المبلغ', 'المدة', 'الطريقة', 'المرجع', 'سجّلها'].map(th)}</tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {payments.isLoading && <Loading cols={7} />}
+                  {payments.data?.map((p) => (
+                    <tr key={p.id}>
+                      <td className="px-4 py-3 text-slate-500">{fmtDate(p.createdAt)}</td>
+                      <td className="px-4 py-3 font-medium text-slate-900">{p.tenantName}</td>
+                      <td className="px-4 py-3">{fmtMoney(p.amount)} {p.currency}</td>
+                      <td className="px-4 py-3">{p.months} شهر</td>
+                      <td className="px-4 py-3">{METHOD_LABELS[p.method] ?? p.method}</td>
+                      <td className="px-4 py-3 text-slate-500" dir="ltr">{p.reference ?? '—'}</td>
+                      <td className="px-4 py-3 text-slate-500">{p.recordedByName ?? '—'}</td>
+                    </tr>
+                  ))}
+                  {payments.data?.length === 0 && <tr><td colSpan={7} className="py-10 text-center text-slate-400">لا توجد دفعات بعد</td></tr>}
+                </tbody>
+              </table>
+            </div>
+          )}
+
+          {tab === 'audit' && (
             <ul className="divide-y divide-slate-100">
               {audit.isLoading && <li className="py-10 text-center text-slate-400"><Loader2 className="inline animate-spin" /></li>}
               {audit.data?.map((r) => (
@@ -303,6 +799,9 @@ export function PlatformDashboardPage() {
       </main>
 
       {selected !== null && <TenantPanel tenantId={selected} onClose={() => setSelected(null)} />}
+      {editingPlan !== null && (
+        <PlanForm plan={editingPlan === 'new' ? null : editingPlan} onClose={() => setEditingPlan(null)} />
+      )}
     </div>
   );
 }
