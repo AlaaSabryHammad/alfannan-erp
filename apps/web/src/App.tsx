@@ -8,6 +8,7 @@ import { AppShell } from './layouts/AppShell';
 import { LoginPage } from './pages/auth/LoginPage';
 import { RegisterPage } from './pages/auth/RegisterPage';
 import { PrivacyPage, TermsPage } from './pages/legal/LegalPages';
+import { VerifyEmailPage } from './pages/auth/VerifyEmailPage';
 import { PlatformLoginPage } from './pages/platform/PlatformLoginPage';
 import { PlatformDashboardPage } from './pages/platform/PlatformDashboardPage';
 import { DashboardPage } from './pages/DashboardPage';
@@ -77,6 +78,7 @@ export function App() {
             {/* Public routes */}
             <Route path="/login" element={<LoginPage />} />
             <Route path="/register" element={<RegisterPage />} />
+            <Route path="/verify-email" element={<VerifyEmailPage />} />
             <Route path="/terms" element={<TermsPage />} />
             <Route path="/privacy" element={<PrivacyPage />} />
             <Route path="/platform/login" element={<PlatformLoginPage />} />

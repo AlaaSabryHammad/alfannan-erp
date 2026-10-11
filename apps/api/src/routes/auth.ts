@@ -10,6 +10,8 @@ import { provisionTenant, EmailTakenError } from '../lib/tenantProvisioning';
 import { rateLimit } from '../middleware/rateLimit';
 import { LEGAL_VERSION } from '../lib/legal';
 import { invalidateUserSessions } from '../lib/userSession';
+import { confirmEmailToken, sendVerificationEmail } from '../lib/emailVerification';
+import { mailEnabled } from '../lib/mail/mailer';
 
 const router = Router();
 
@@ -79,6 +81,7 @@ async function buildToken(userId: number): Promise<{ token: string; user: object
       name: user.name,
       email: user.email,
       isActive: user.isActive,
+      emailVerified: user.emailVerifiedAt !== null,
       role: {
         id: user.role.id,
         code: user.role.code,
@@ -152,12 +155,72 @@ router.post('/register-tenant', rateLimit({ name: 'register', windowMs: 60 * 60 
     const { acceptTerms: _accepted, ...company } = input;
     const { tenantId, userId } = await provisionTenant({ ...company, acceptedFromIp: req.ip ?? null });
     const result = await runWithTenant(tenantId, () => buildToken(userId));
+    // the confirmation e-mail goes out in the background; a mail outage must not fail the registration
+    void sendVerificationEmail(
+      { id: userId, tenantId, email: input.email.trim().toLowerCase(), name: company.adminName },
+      company.companyName,
+    ).catch(() => undefined);
     res.status(201).json(result);
   } catch (err) {
     if (err instanceof EmailTakenError) {
       res.status(409).json({ error: err.message });
       return;
     }
+    next(err);
+  }
+});
+
+// POST /api/auth/verify-email — the link in the confirmation e-mail (public: the token is the proof)
+router.post('/verify-email', rateLimit({ name: 'verify-email', windowMs: 10 * 60 * 1000, max: 30 }), async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { token } = z.object({ token: z.string().min(10).max(2000) }).parse(req.body);
+    const result = await confirmEmailToken(token);
+    if (!result.ok) {
+      res.status(400).json({
+        error: result.reason === 'expired'
+          ? 'انتهت صلاحية رابط التأكيد. اطلب رابطًا جديدًا من داخل النظام.'
+          : 'رابط التأكيد غير صالح',
+        reason: result.reason,
+      });
+      return;
+    }
+    res.json({ verified: true, email: result.email, alreadyVerified: result.alreadyVerified });
+  } catch (err) {
+    next(err);
+  }
+});
+
+// POST /api/auth/resend-verification — send the confirmation link again (one a minute per user)
+const resendAt = new Map<number, number>();
+const RESEND_COOLDOWN_MS = 60 * 1000;
+
+router.post('/resend-verification', requireAuth, rateLimit({ name: 'resend-verification', windowMs: 60 * 60 * 1000, max: 20 }), async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const me = req.user!;
+    const user = await prisma.user.findUniqueOrThrow({ where: { id: me.userId }, include: { tenant: true } });
+    if (user.emailVerifiedAt) {
+      res.json({ sent: false, alreadyVerified: true });
+      return;
+    }
+    if (!mailEnabled()) {
+      res.status(503).json({ error: 'خدمة البريد غير مفعّلة على هذا الخادم — تواصل مع الدعم' });
+      return;
+    }
+    const last = resendAt.get(user.id) ?? 0;
+    const wait = Math.ceil((last + RESEND_COOLDOWN_MS - Date.now()) / 1000);
+    if (wait > 0) {
+      res.status(429).json({ error: `انتظر ${wait} ثانية قبل إعادة الإرسال` });
+      return;
+    }
+    resendAt.set(user.id, Date.now());
+    const sent = await sendVerificationEmail(user, user.tenant.name);
+    if (!sent) {
+      resendAt.delete(user.id);
+      res.status(502).json({ error: 'تعذّر إرسال الرسالة الآن — حاول لاحقًا' });
+      return;
+    }
+    res.json({ sent: true, alreadyVerified: false });
+  } catch (err) {
     next(err);
   }
 });

@@ -9,6 +9,8 @@ export interface User {
   email: string;
   role: Role;
   permissions: string[];
+  /** the address was confirmed through the link in the confirmation e-mail */
+  emailVerified?: boolean;
 }
 
 export interface AuthResponse {

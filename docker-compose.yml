@@ -45,6 +45,12 @@ services:
       MOYASAR_SECRET_KEY: ${MOYASAR_SECRET_KEY:-}
       MOYASAR_WEBHOOK_SECRET: ${MOYASAR_WEBHOOK_SECRET:-}
       PUBLIC_BASE_URL: ${PUBLIC_BASE_URL:-}
+      # Outgoing e-mail (address confirmation) — see docs/EMAIL.md. Empty SMTP_HOST = nothing is sent.
+      SMTP_HOST: ${SMTP_HOST:-}
+      SMTP_PORT: ${SMTP_PORT:-465}
+      SMTP_USER: ${SMTP_USER:-}
+      SMTP_PASS: ${SMTP_PASS:-}
+      MAIL_FROM: ${MAIL_FROM:-}
     volumes:
       - uploads:/app/apps/api/uploads
     depends_on:
