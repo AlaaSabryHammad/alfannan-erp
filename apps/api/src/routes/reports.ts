@@ -955,8 +955,30 @@ router.get('/ar-aging', async (req: Request, res: Response, next: NextFunction) 
       byCustomer.set(inv.customerId, entry);
     }
 
-    const rows = [...byCustomer.values()]
-      .map((r) => ({ ...r, total: r.current + r.b31_60 + r.b61_90 + r.over90 }))
+    // Invoice aging alone misses balances that no invoice carries: opening
+    // balances (+) and receipts taken on account rather than against an
+    // invoice (−). Surface them per customer as `unallocated` so the report
+    // total reconciles with the customers' balances / the AR control account.
+    // (Meaningful for the current balance, i.e. when asOf is not in the past.)
+    const customers = await prisma.customer.findMany({
+      where: { OR: [{ currentBalance: { not: 0 } }, { id: { in: [...byCustomer.keys()] } }] },
+      select: { id: true, nameAr: true, currentBalance: true },
+    });
+    const agedByCustomer = new Map(
+      [...byCustomer.values()].map((r) => [r.id, r.current + r.b31_60 + r.b61_90 + r.over90]),
+    );
+
+    const rows = customers
+      .map((c) => {
+        const aged = byCustomer.get(c.id) ?? { id: c.id, nameAr: c.nameAr, ...emptyAgingRow() };
+        const unallocated = Math.round((Number(c.currentBalance) - (agedByCustomer.get(c.id) ?? 0)) * 100) / 100;
+        return {
+          ...aged,
+          unallocated: Math.abs(unallocated) < 0.01 ? 0 : unallocated,
+        };
+      })
+      .map((r) => ({ ...r, total: r.current + r.b31_60 + r.b61_90 + r.over90 + r.unallocated }))
+      .filter((r) => Math.abs(r.total) >= 0.01)
       .sort((a, b) => b.total - a.total);
 
     const totals = rows.reduce(
@@ -965,9 +987,10 @@ router.get('/ar-aging', async (req: Request, res: Response, next: NextFunction) 
         b31_60: acc.b31_60 + r.b31_60,
         b61_90: acc.b61_90 + r.b61_90,
         over90: acc.over90 + r.over90,
+        unallocated: acc.unallocated + r.unallocated,
         total: acc.total + r.total,
       }),
-      { current: 0, b31_60: 0, b61_90: 0, over90: 0, total: 0 },
+      { current: 0, b31_60: 0, b61_90: 0, over90: 0, unallocated: 0, total: 0 },
     );
 
     res.json({ asOfDate: asOf, rows, totals });
