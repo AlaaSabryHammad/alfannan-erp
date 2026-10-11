@@ -3,6 +3,9 @@ import { z } from 'zod';
 import prisma from '../lib/prisma';
 import { requireAuth, requirePermission } from '../middleware/auth';
 import { getPagination, paginatedResponse } from '../lib/paginate';
+import { parseDateRange } from '../lib/dateRange';
+
+const MOVEMENT_TYPES = ['IN', 'OUT', 'TRANSFER', 'ADJUST'] as const;
 
 const router = Router();
 router.use(requireAuth);
@@ -47,9 +50,16 @@ router.get('/movements', requirePermission('stock.view'), async (req: Request, r
     const productId = req.query.productId ? parseInt(req.query.productId as string) : undefined;
     const warehouseId = req.query.warehouseId ? parseInt(req.query.warehouseId as string) : undefined;
 
+    const type = req.query.type as string | undefined;
+    const refType = req.query.refType as string | undefined;
+    const dateRange = parseDateRange(req.query.from as string | undefined, req.query.to as string | undefined);
+
     const where: Record<string, unknown> = {};
     if (productId) where.productId = productId;
     if (warehouseId) where.warehouseId = warehouseId;
+    if (type && (MOVEMENT_TYPES as readonly string[]).includes(type)) where.type = type;
+    if (refType) where.refType = refType;
+    if (dateRange) where.createdAt = dateRange;
 
     const [data, total] = await Promise.all([
       prisma.stockMovement.findMany({
