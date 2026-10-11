@@ -13,3 +13,6 @@ apps/api/uploads/*
 
 # local pre-migration dumps
 backups-local/
+
+# Claude Code per-machine settings (can contain connection strings/credentials)
+.claude/settings.local.json
