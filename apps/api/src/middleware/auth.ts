@@ -3,6 +3,7 @@ import jwt from 'jsonwebtoken';
 import { enterTenant } from '../lib/tenantContext';
 import { basePrisma } from '../lib/prisma';
 import { enforcementMode, getEntitlements } from '../lib/entitlements';
+import { getSessionState } from '../lib/userSession';
 
 export interface AuthPayload {
   userId: number;
@@ -10,6 +11,8 @@ export interface AuthPayload {
   email: string;
   roleCode: string;
   permissions: string[];
+  /** issued-at (seconds) — added by jsonwebtoken */
+  iat?: number;
 }
 
 declare global {
@@ -23,6 +26,8 @@ declare global {
 const SAFE_METHODS = new Set(['GET', 'HEAD', 'OPTIONS']);
 // Self-service account endpoints that must keep working on an expired company.
 const READ_ONLY_EXEMPT = /^\/api\/(auth\/change-password|subscription\/upgrade-request)/;
+
+const UNAUTHORIZED = 'الجلسة منتهية — الرجاء تسجيل الدخول مجدداً';
 
 // Tenant "is active" lookups are cached briefly so the check costs ~nothing per request.
 const TENANT_ACTIVE_TTL_MS = 15_000;
@@ -51,10 +56,10 @@ export async function requireAuth(req: Request, res: Response, next: NextFunctio
 
   const token = authHeader.split(' ')[1];
   try {
-    const decoded = jwt.verify(token, process.env.JWT_SECRET!) as AuthPayload;
+    const decoded = jwt.verify(token, process.env.JWT_SECRET!, { algorithms: ['HS256'] }) as AuthPayload;
     // Tokens issued before multi-tenancy carry no tenant — force a fresh login.
-    if (typeof decoded.tenantId !== 'number') {
-      res.status(401).json({ error: 'الجلسة منتهية — الرجاء تسجيل الدخول مجدداً' });
+    if (typeof decoded.tenantId !== 'number' || typeof decoded.userId !== 'number') {
+      res.status(401).json({ error: UNAUTHORIZED });
       return;
     }
     // A suspended company is locked out immediately, not when its 24h token expires.
@@ -62,7 +67,18 @@ export async function requireAuth(req: Request, res: Response, next: NextFunctio
       res.status(403).json({ error: 'تم إيقاف حساب الشركة — تواصل مع الدعم' });
       return;
     }
-    req.user = decoded;
+
+    // Live user state: deactivated users, password changes and role changes apply immediately.
+    const state = await getSessionState(decoded.tenantId, decoded.userId);
+    if (!state || !state.isActive) {
+      res.status(401).json({ error: UNAUTHORIZED });
+      return;
+    }
+    if (state.sessionsValidAfter !== null && (decoded.iat ?? 0) < Math.floor(state.sessionsValidAfter / 1000)) {
+      res.status(401).json({ error: UNAUTHORIZED });
+      return;
+    }
+    req.user = { ...decoded, roleCode: state.roleCode, permissions: state.permissions };
 
     // Expired / canceled companies keep read access (and can export) but cannot write.
     if (!SAFE_METHODS.has(req.method) && enforcementMode() !== 'off' && !READ_ONLY_EXEMPT.test(req.originalUrl)) {
@@ -81,7 +97,7 @@ export async function requireAuth(req: Request, res: Response, next: NextFunctio
     // Everything downstream (routes, services, transactions) runs scoped to this tenant.
     enterTenant(decoded.tenantId, next);
   } catch {
-    res.status(401).json({ error: 'الجلسة منتهية — الرجاء تسجيل الدخول مجدداً' });
+    res.status(401).json({ error: UNAUTHORIZED });
   }
 }
 

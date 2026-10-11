@@ -1,6 +1,7 @@
 import { Router, Request, Response, NextFunction } from 'express';
 import { z } from 'zod';
 import prisma from '../lib/prisma';
+import { invalidateUserSessions } from '../lib/userSession';
 import { requireAuth, requirePermission } from '../middleware/auth';
 
 const router = Router();
@@ -111,6 +112,7 @@ router.delete('/:id', requirePermission('roles.edit'), async (req: Request, res:
       await tx.rolePermission.deleteMany({ where: { roleId } });
       await tx.role.delete({ where: { id: roleId } });
     });
+    invalidateUserSessions();
 
     res.json({ success: true });
   } catch (err) {
@@ -126,6 +128,9 @@ router.put('/:id/permissions', requirePermission('roles.edit'), async (req: Requ
 
     const roleId = parseInt(req.params.id);
 
+    // The role must belong to this company (RolePermission itself carries no tenant column).
+    await prisma.role.findUniqueOrThrow({ where: { id: roleId }, select: { id: true } });
+
     const permissions = await prisma.permission.findMany({
       where: { code: { in: permissionCodes } },
     });
@@ -138,6 +143,7 @@ router.put('/:id/permissions', requirePermission('roles.edit'), async (req: Requ
         });
       }
     });
+    invalidateUserSessions(); // permission changes apply on the very next request
 
     const updated = await prisma.role.findUniqueOrThrow({
       where: { id: roleId },

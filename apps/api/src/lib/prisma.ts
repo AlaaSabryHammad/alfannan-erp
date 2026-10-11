@@ -60,6 +60,9 @@ function walkNested(model: string, data: Json, tenantId: number): void {
   }
 }
 
+/** Tables without a tenantId column whose RLS policy depends on the tenant setting. */
+const RLS_ONLY = new Set(['RolePermission']);
+
 const READ_FILTER_OPS = new Set([
   'findUnique', 'findUniqueOrThrow', 'findFirst', 'findFirstOrThrow', 'findMany',
   'count', 'aggregate', 'groupBy', 'update', 'updateMany', 'delete', 'deleteMany', 'upsert',
@@ -86,7 +89,9 @@ const tenantExtension = Prisma.defineExtension((client) =>
     query: {
       $allModels: {
         async $allOperations({ model, operation, args, query }) {
-          if (!SCOPED.has(model)) return query(args);
+          // RolePermission has no tenantId column but its RLS policy follows its Role, so it needs the
+          // tenant setting too (no filter/stamping — the policy does the work).
+          if (!SCOPED.has(model) && !RLS_ONLY.has(model)) return query(args);
 
           const unscoped = isUnscoped();
           const tenantId = tryTenantId();
@@ -95,7 +100,7 @@ const tenantExtension = Prisma.defineExtension((client) =>
           }
 
           const a = (args ?? {}) as Json;
-          if (!unscoped && tenantId != null) {
+          if (SCOPED.has(model) && !unscoped && tenantId != null) {
             if (READ_FILTER_OPS.has(operation)) {
               a.where = { ...(isObj(a.where) ? a.where : {}), tenantId };
             }

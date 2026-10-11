@@ -31,7 +31,7 @@ export async function requirePlatformAdmin(req: Request, res: Response, next: Ne
     return;
   }
   try {
-    const decoded = jwt.verify(header.split(' ')[1], platformSecret()) as PlatformPayload;
+    const decoded = jwt.verify(header.split(' ')[1], platformSecret(), { algorithms: ['HS256'] }) as PlatformPayload;
     if (decoded.scope !== 'platform') throw new Error('wrong scope');
     // still an active platform admin? (revoking an admin takes effect immediately)
     const admin = await platformPrisma.platformAdmin.findUnique({

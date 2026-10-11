@@ -52,6 +52,27 @@ export const SETTING_DEFAULTS: Record<string, string> = {
   zatcaSignerPrivateKey: '', // المفتاح الخاص (PEM, secp256k1) للختم الرقمي — يُستخرج مع شهادة CSID من بوابة فاتورة
 };
 
+// Credentials stored as settings. Everyone logged in can read /api/settings (company name, currency,
+// …), so these are never returned in clear: a set value comes back as MASK, and a PUT that sends MASK
+// back unchanged leaves the stored value alone.
+export const SECRET_SETTING_KEYS = new Set([
+  'whatsappApiToken',
+  'smsApiKey',
+  'zatcaBinarySecurityToken',
+  'zatcaSecret',
+  'zatcaSignerPrivateKey',
+]);
+export const SECRET_MASK = '********';
+
+function redact(settings: Record<string, string>): Record<string, string> {
+  const out = { ...settings };
+  for (const k of SECRET_SETTING_KEYS) if (out[k]) out[k] = SECRET_MASK;
+  return out;
+}
+
+const KEY_PATTERN = /^[A-Za-z][A-Za-z0-9_]{0,63}$/;
+const MAX_VALUE_LENGTH = 8000; // a PEM private key fits comfortably
+
 async function mergedSettings(): Promise<Record<string, string>> {
   const rows = await prisma.setting.findMany();
   const fromDb: Record<string, string> = {};
@@ -64,7 +85,7 @@ async function mergedSettings(): Promise<Record<string, string>> {
 // GET /api/settings
 router.get('/', async (_req: Request, res: Response, next: NextFunction) => {
   try {
-    res.json(await mergedSettings());
+    res.json(redact(await mergedSettings()));
   } catch (err) {
     next(err);
   }
@@ -82,6 +103,8 @@ router.put('/', requirePermission('settings.edit'), async (req: Request, res: Re
     // Upsert each provided key
     for (const [key, val] of Object.entries(body)) {
       if (typeof val !== 'string') continue; // skip non-string values
+      if (!KEY_PATTERN.test(key) || val.length > MAX_VALUE_LENGTH) continue;
+      if (SECRET_SETTING_KEYS.has(key) && val === SECRET_MASK) continue; // unchanged secret
       await prisma.setting.upsert({
         where:  { tenantId_key: { tenantId: currentTenantId(), key } },
         update: { value: val },
@@ -89,7 +112,7 @@ router.put('/', requirePermission('settings.edit'), async (req: Request, res: Re
       });
     }
 
-    res.json(await mergedSettings());
+    res.json(redact(await mergedSettings()));
   } catch (err) {
     next(err);
   }

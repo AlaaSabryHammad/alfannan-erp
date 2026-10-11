@@ -58,8 +58,23 @@ import subscriptionRouter from './routes/subscription';
 import { startScheduler } from './lib/scheduler';
 import { auditMiddleware } from './middleware/audit';
 import { errorHandler } from './middleware/errorHandler';
+import helmet from 'helmet';
+import { assertSafeEnvironment } from './lib/env';
+
+assertSafeEnvironment();
 
 const app = express();
+
+// Behind nginx / Tailscale Funnel: trust the private hops so req.ip is the real client
+// (rate limits, audit log). Override with TRUST_PROXY (a hop count or a subnet list).
+const trustProxy = process.env.TRUST_PROXY;
+app.set(
+  'trust proxy',
+  trustProxy === undefined || trustProxy === ''
+    ? 'loopback, linklocal, uniquelocal, 100.64.0.0/10'
+    : /^[0-9]+$/.test(trustProxy) ? Number(trustProxy) : trustProxy,
+);
+app.use(helmet({ crossOriginResourcePolicy: { policy: 'same-site' } }));
 const PORT = parseInt(process.env.PORT ?? '4000', 10);
 
 // ── Uploads directory ─────────────────────────────────────────────────────────
@@ -69,25 +84,36 @@ if (!fs.existsSync(uploadsDir)) {
 }
 
 // ── Middleware ────────────────────────────────────────────────────────────────
+const corsOrigins = (process.env.CORS_ORIGIN ?? '').split(',').map((o) => o.trim()).filter(Boolean);
 app.use(cors({
-  // Allow any localhost/127.0.0.1 port in dev (Vite may fall back to 5174+ if 5173 is taken),
-  // plus an optional explicit origin from CORS_ORIGIN for production.
+  // Production: only the configured origin(s). Development/test: also any localhost port
+  // (Vite may fall back to 5174+ if 5173 is taken).
   origin: (origin, cb) => {
     if (!origin) return cb(null, true); // non-browser clients (curl, server-to-server)
-    const allowed =
-      /^http:\/\/(localhost|127\.0\.0\.1):\d+$/.test(origin) ||
-      origin === process.env.CORS_ORIGIN;
-    cb(null, allowed);
+    const localDev =
+      process.env.NODE_ENV !== 'production' && /^http:\/\/(localhost|127\.0\.0\.1):\d+$/.test(origin);
+    cb(null, localDev || corsOrigins.includes(origin));
   },
   credentials: true,
 }));
-app.use(express.json());
+app.use(express.json({ limit: '1mb' }));
 
 // ── Audit middleware (registers res.on('finish') handler; reads req.user set by per-router requireAuth) ──
 app.use(auditMiddleware);
 
 // ── Static uploads ────────────────────────────────────────────────────────────
-app.use('/uploads', express.static(uploadsDir));
+// Uploaded files are images only, but never trust what a file claims to be: no sniffing, and a
+// sandboxed CSP so even a mislabelled HTML/SVG file cannot run script in the app's origin.
+app.use(
+  '/uploads',
+  (_req, res, next) => {
+    res.setHeader('X-Content-Type-Options', 'nosniff');
+    res.setHeader('Content-Security-Policy', "default-src 'none'; img-src 'self'; sandbox");
+    res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin');
+    next();
+  },
+  express.static(uploadsDir, { index: false, dotfiles: 'deny' }),
+);
 
 // ── Health check ──────────────────────────────────────────────────────────────
 app.get('/health', (_req, res) => {
