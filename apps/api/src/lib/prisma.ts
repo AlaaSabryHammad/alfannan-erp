@@ -1,5 +1,5 @@
 import { PrismaClient, Prisma } from '@prisma/client';
-import { isUnscoped, tryTenantId } from './tenantContext';
+import { isInTransaction, isUnscoped, runInTransaction, tryTenantId } from './tenantContext';
 
 // Serialize Prisma Decimal values as JSON numbers (not strings) everywhere.
 // Money fields (prices, totals, balances) are Decimal in the schema; without this
@@ -65,52 +65,103 @@ const READ_FILTER_OPS = new Set([
   'count', 'aggregate', 'groupBy', 'update', 'updateMany', 'delete', 'deleteMany', 'upsert',
 ]);
 
-const tenantExtension = Prisma.defineExtension({
-  name: 'tenant-scope',
-  query: {
-    $allModels: {
-      async $allOperations({ model, operation, args, query }) {
-        if (!SCOPED.has(model) || isUnscoped()) return query(args);
+// ── Row-Level Security ────────────────────────────────────────────────────────
+// The database enforces the tenant too: every tenant table has an RLS policy comparing "tenantId"
+// with the transaction-local setting app.tenant_id, and the application connects as a role that
+// cannot bypass it (see migration 20261011200000_enable_row_level_security). The settings are
+// applied in the same transaction as the statement(s):
+//   - single operations: a batch transaction [set_config, operation]
+//   - prisma.$transaction(fn): set once at the start of the interactive transaction
+function rlsSettings(): { tenant: string; unscoped: string } {
+  return { tenant: String(tryTenantId() ?? ''), unscoped: isUnscoped() ? 'on' : '' };
+}
 
-        const tenantId = tryTenantId();
-        if (tenantId == null) {
-          throw new Error(`رفض الوصول: لا يوجد سياق شركة لعملية ${model}.${operation}`);
-        }
-
-        const a = (args ?? {}) as Json;
-        if (READ_FILTER_OPS.has(operation)) {
-          a.where = { ...(isObj(a.where) ? a.where : {}), tenantId };
-        }
-        switch (operation) {
-          case 'create':
-            if (isObj(a.data)) stampCreate(model, a.data, tenantId);
-            break;
-          case 'createMany':
-          case 'createManyAndReturn':
-            for (const row of asArray(a.data)) if (isObj(row) && row.tenantId === undefined) row.tenantId = tenantId;
-            break;
-          case 'update':
-          case 'updateMany':
-            if (isObj(a.data)) walkNested(model, a.data, tenantId);
-            break;
-          case 'upsert':
-            if (isObj(a.create)) stampCreate(model, a.create, tenantId);
-            if (isObj(a.update)) walkNested(model, a.update, tenantId);
-            break;
-        }
-        return query(a);
-      },
-    },
-  },
-});
-
-export const basePrisma = new PrismaClient({
+const base = new PrismaClient({
   log: process.env.NODE_ENV === 'development' ? ['warn', 'error'] : ['error'],
 });
 
-const prisma = basePrisma.$extends(tenantExtension);
+const tenantExtension = Prisma.defineExtension((client) =>
+  client.$extends({
+    name: 'tenant-scope',
+    query: {
+      $allModels: {
+        async $allOperations({ model, operation, args, query }) {
+          if (!SCOPED.has(model)) return query(args);
 
-export type TenantPrismaClient = typeof prisma;
+          const unscoped = isUnscoped();
+          const tenantId = tryTenantId();
+          if (!unscoped && tenantId == null) {
+            throw new Error(`رفض الوصول: لا يوجد سياق شركة لعملية ${model}.${operation}`);
+          }
+
+          const a = (args ?? {}) as Json;
+          if (!unscoped && tenantId != null) {
+            if (READ_FILTER_OPS.has(operation)) {
+              a.where = { ...(isObj(a.where) ? a.where : {}), tenantId };
+            }
+            switch (operation) {
+              case 'create':
+                if (isObj(a.data)) stampCreate(model, a.data, tenantId);
+                break;
+              case 'createMany':
+              case 'createManyAndReturn':
+                for (const row of asArray(a.data)) if (isObj(row) && row.tenantId === undefined) row.tenantId = tenantId;
+                break;
+              case 'update':
+              case 'updateMany':
+                if (isObj(a.data)) walkNested(model, a.data, tenantId);
+                break;
+              case 'upsert':
+                if (isObj(a.create)) stampCreate(model, a.create, tenantId);
+                if (isObj(a.update)) walkNested(model, a.update, tenantId);
+                break;
+            }
+          }
+
+          // Inside prisma.$transaction(fn) the RLS settings are already applied to the connection.
+          if (isInTransaction()) return query(a);
+
+          const { tenant, unscoped: flag } = rlsSettings();
+          const [, result] = await client.$transaction([
+            client.$executeRaw`SELECT set_config('app.tenant_id', ${tenant}, true), set_config('app.unscoped', ${flag}, true)`,
+            query(a),
+          ]);
+          return result;
+        },
+      },
+    },
+  }),
+);
+
+export const basePrisma = base;
+
+const extended = base.$extends(tenantExtension);
+
+/**
+ * prisma.$transaction(fn) is wrapped so every interactive transaction starts by telling the
+ * database which tenant it belongs to (RLS). The array form is not used anywhere and is passed
+ * through untouched.
+ */
+const prisma = new Proxy(extended, {
+  get(target, prop, receiver) {
+    if (prop === '$transaction') {
+      return (arg: unknown, options?: unknown) => {
+        if (typeof arg !== 'function') {
+          return (target.$transaction as (a: unknown, o?: unknown) => unknown)(arg, options);
+        }
+        const { tenant, unscoped } = rlsSettings();
+        return target.$transaction(async (tx) => {
+          await tx.$executeRaw`SELECT set_config('app.tenant_id', ${tenant}, true), set_config('app.unscoped', ${unscoped}, true)`;
+          return runInTransaction(() => (arg as (t: unknown) => unknown)(tx));
+        }, options as never);
+      };
+    }
+    const value = Reflect.get(target, prop, receiver);
+    return typeof value === 'function' ? value.bind(target) : value;
+  },
+}) as typeof extended;
+
+export type TenantPrismaClient = typeof extended;
 export default prisma;
 
 /** Transaction (or plain) client type accepted by services — replaces Prisma.TransactionClient. */

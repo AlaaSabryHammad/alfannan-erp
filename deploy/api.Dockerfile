@@ -15,5 +15,5 @@ RUN npm ci --workspace=apps/api \
 WORKDIR /app/apps/api
 EXPOSE 4000
 
-# apply pending migrations on boot, then start
-CMD ["sh", "-c", "npx prisma migrate deploy && node dist/index.js"]
+# apply pending migrations (as the owner), set the app role's password, then start
+CMD ["sh", "-c", "npx prisma migrate deploy && node dist/ensureAppRole.js && node dist/index.js"]

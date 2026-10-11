@@ -164,10 +164,53 @@ describe('tenant isolation', () => {
     delete process.env.TENANT_FALLBACK_ID;
     try {
       await expect(prisma.product.findMany()).rejects.toThrow(/سياق شركة/);
-      // explicit unscoped access still works (used for login / tenant bootstrap)
-      await expect(runUnscoped(() => prisma.product.count())).resolves.toBeGreaterThan(0);
+      // explicit unscoped access is allowed only where the database policy permits it (login lookup)
+      await expect(runUnscoped(() => prisma.user.count())).resolves.toBeGreaterThan(1);
     } finally {
       process.env.TENANT_FALLBACK_ID = saved;
     }
+  });
+
+  it('Row-Level Security: the database itself hides other tenants, even for hand-written queries', async () => {
+    // Raw SQL without any tenant filter — only the RLS policy can scope it.
+    const asB = await runWithTenant(tenantB, () =>
+      prisma.$transaction((tx) => tx.$queryRaw<Array<{ n: bigint }>>`SELECT count(*)::bigint AS n FROM "Product"`),
+    );
+    expect(Number(asB[0].n)).toBeLessThanOrEqual(2); // only tenant B's own products
+
+    const asA = await runWithTenant(1, () =>
+      prisma.$transaction((tx) => tx.$queryRaw<Array<{ n: bigint }>>`SELECT count(*)::bigint AS n FROM "Product"`),
+    );
+    expect(Number(asA[0].n)).toBeGreaterThan(Number(asB[0].n));
+
+    // Without any tenant setting the same query sees nothing (fails closed).
+    const none = await runUnscoped(() =>
+      prisma.$transaction((tx) => tx.$queryRaw<Array<{ n: bigint }>>`SELECT count(*)::bigint AS n FROM "Product"`),
+    );
+    expect(Number(none[0].n)).toBe(0);
+  });
+
+  it('Row-Level Security: a tenant cannot write a row for another tenant', async () => {
+    await expect(
+      runWithTenant(tenantB, () =>
+        prisma.$transaction((tx) =>
+          tx.$executeRaw`INSERT INTO "Brand" ("nameAr", "tenantId") VALUES ('تسلل', 1)`,
+        ),
+      ),
+    ).rejects.toThrow();
+  });
+
+  it('every tenant table has RLS enabled and forced with an isolation policy', async () => {
+    const rows = await basePrisma.$queryRaw<Array<{ table_name: string; rls: boolean; forced: boolean; policies: bigint }>>`
+      SELECT c.table_name,
+             cl.relrowsecurity AS rls,
+             cl.relforcerowsecurity AS forced,
+             (SELECT count(*) FROM pg_policies p WHERE p.tablename = c.table_name AND p.policyname = 'tenant_isolation') AS policies
+      FROM information_schema.columns c
+      JOIN pg_class cl ON cl.relname = c.table_name AND cl.relkind = 'r'
+      WHERE c.table_schema = 'public' AND c.column_name = 'tenantId'`;
+    expect(rows.length).toBeGreaterThan(50);
+    const broken = rows.filter((r) => !r.rls || !r.forced || Number(r.policies) !== 1).map((r) => r.table_name);
+    expect(broken).toEqual([]);
   });
 });
