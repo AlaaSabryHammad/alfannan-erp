@@ -1041,8 +1041,24 @@ router.get('/ap-aging', async (req: Request, res: Response, next: NextFunction) 
       bySupplier.set(inv.supplierId, entry);
     }
 
-    const rows = [...bySupplier.values()]
-      .map((r) => ({ ...r, total: r.current + r.b31_60 + r.b61_90 + r.over90 }))
+    // Same reconciliation as the AR report: opening balances (+) and payments
+    // made on account rather than against an invoice (−) are not on any
+    // invoice, so surface them as `unallocated` to tie out to supplier
+    // balances / the AP control account.
+    const suppliers = await prisma.supplier.findMany({
+      where: { OR: [{ currentBalance: { not: 0 } }, { id: { in: [...bySupplier.keys()] } }] },
+      select: { id: true, nameAr: true, currentBalance: true },
+    });
+
+    const rows = suppliers
+      .map((s) => {
+        const aged = bySupplier.get(s.id) ?? { id: s.id, nameAr: s.nameAr, ...emptyAgingRow() };
+        const agedTotal = aged.current + aged.b31_60 + aged.b61_90 + aged.over90;
+        const unallocated = Math.round((Number(s.currentBalance) - agedTotal) * 100) / 100;
+        return { ...aged, unallocated: Math.abs(unallocated) < 0.01 ? 0 : unallocated };
+      })
+      .map((r) => ({ ...r, total: r.current + r.b31_60 + r.b61_90 + r.over90 + r.unallocated }))
+      .filter((r) => Math.abs(r.total) >= 0.01)
       .sort((a, b) => b.total - a.total);
 
     const totals = rows.reduce(
@@ -1051,9 +1067,10 @@ router.get('/ap-aging', async (req: Request, res: Response, next: NextFunction) 
         b31_60: acc.b31_60 + r.b31_60,
         b61_90: acc.b61_90 + r.b61_90,
         over90: acc.over90 + r.over90,
+        unallocated: acc.unallocated + r.unallocated,
         total: acc.total + r.total,
       }),
-      { current: 0, b31_60: 0, b61_90: 0, over90: 0, total: 0 },
+      { current: 0, b31_60: 0, b61_90: 0, over90: 0, unallocated: 0, total: 0 },
     );
 
     res.json({ asOfDate: asOf, rows, totals });
