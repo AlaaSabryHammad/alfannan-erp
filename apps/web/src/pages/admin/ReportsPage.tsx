@@ -248,8 +248,18 @@ interface BudgetVsActualData {
   year: number;
   month: number | null;
   rows: BudgetVsActualRow[];
-  totalBudget: number;
-  totalActual: number;
+  totals: {
+    revenue: BudgetVsActualSide;
+    expense: BudgetVsActualSide;
+    net: { budget: number; actual: number; variance: number };
+  };
+}
+
+interface BudgetVsActualSide {
+  budget: number;
+  actual: number;
+  variance: number;
+  variancePct: number;
 }
 
 interface AgingRow {
@@ -1752,12 +1762,33 @@ export function ReportsPage() {
                           </tr>
                         );
                       })}
+                      {([
+                        { key: 'revenue', label: 'إجمالي الإيرادات', side: budgetVsActual.totals.revenue, unfavorable: budgetVsActual.totals.revenue.variance < 0 },
+                        { key: 'expense', label: 'إجمالي المصروفات', side: budgetVsActual.totals.expense, unfavorable: budgetVsActual.totals.expense.variance > 0 },
+                      ] as const)
+                        .filter((t) => budgetVsActual.rows.some((r) => r.type === (t.key === 'revenue' ? 'REVENUE' : 'EXPENSE')))
+                        .map((t) => (
+                          <tr key={t.key} className="bg-gray-100 border-t border-app-border font-bold">
+                            <td className="px-4 py-2.5 text-app-muted">{t.label}</td>
+                            <td className="px-4 py-2.5 font-mono">{formatMoney(t.side.budget)}</td>
+                            <td className="px-4 py-2.5 font-mono">{formatMoney(t.side.actual)}</td>
+                            <td className={`px-4 py-2.5 font-mono ${t.unfavorable ? 'text-danger' : 'text-success'}`}>
+                              {formatMoney(t.side.variance)}
+                            </td>
+                            <td className={`px-4 py-2.5 font-mono ${t.unfavorable ? 'text-danger' : 'text-success'}`}>
+                              {t.side.variancePct.toFixed(1)}٪
+                            </td>
+                          </tr>
+                        ))}
                       <tr className="bg-gray-100 border-t-2 border-app-border font-bold">
-                        <td className="px-4 py-2.5 text-app-muted">الإجمالي</td>
-                        <td className="px-4 py-2.5 font-mono">{formatMoney(budgetVsActual.totalBudget)}</td>
-                        <td className="px-4 py-2.5 font-mono">{formatMoney(budgetVsActual.totalActual)}</td>
-                        <td className="px-4 py-2.5 font-mono" colSpan={2}>
-                          {formatMoney(budgetVsActual.totalActual - budgetVsActual.totalBudget)}
+                        <td className="px-4 py-2.5 text-app-muted">صافي (الإيرادات − المصروفات)</td>
+                        <td className="px-4 py-2.5 font-mono">{formatMoney(budgetVsActual.totals.net.budget)}</td>
+                        <td className="px-4 py-2.5 font-mono">{formatMoney(budgetVsActual.totals.net.actual)}</td>
+                        <td
+                          className={`px-4 py-2.5 font-mono ${budgetVsActual.totals.net.variance < 0 ? 'text-danger' : 'text-success'}`}
+                          colSpan={2}
+                        >
+                          {formatMoney(budgetVsActual.totals.net.variance)}
                         </td>
                       </tr>
                     </tbody>
