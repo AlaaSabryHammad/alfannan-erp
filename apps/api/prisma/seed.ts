@@ -166,7 +166,8 @@ async function main() {
   console.log('✅ Roles created');
 
   // ── USERS ──────────────────────────────────────────────────────────────────
-  const passwordHash = await bcrypt.hash('123456', 10);
+  // Demo accounts share one password. Override with SEED_PASSWORD for anything reachable from a network.
+  const passwordHash = await bcrypt.hash(process.env.SEED_PASSWORD ?? '123456', 10);
   const userDefs = [
     { name: 'المدير العام', email: 'admin@store.com', roleCode: 'ADMIN' },
     { name: 'مدير النظام', email: 'manager@store.com', roleCode: 'MANAGER' },
@@ -1336,6 +1337,17 @@ async function run() {
     update: {},
     create: { name: 'الفنان للتوريدات العمومية', slug: DEFAULT_TENANT_SLUG },
   });
+
+  // The seed is demo data: it recreates sample documents and resets account balances to their
+  // "opening" values. Running it against a database that already holds a company's data would
+  // corrupt it, so it refuses unless explicitly forced.
+  const existingUsers = await runWithTenant(tenant.id, () => prisma.user.count());
+  if (existingUsers > 0 && process.env.SEED_FORCE !== 'true') {
+    throw new Error(
+      'قاعدة البيانات تحتوي بيانات بالفعل — رفض تشغيل الـ seed حمايةً للبيانات. ' +
+      'للتشغيل المتعمّد (بيئة تجريبية فقط) اضبط SEED_FORCE=true',
+    );
+  }
   await runWithTenant(tenant.id, main);
 }
 
