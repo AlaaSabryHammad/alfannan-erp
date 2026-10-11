@@ -51,6 +51,7 @@ import { ReportsPage } from './pages/admin/ReportsPage';
 import { UsersPage } from './pages/admin/UsersPage';
 import { RolesPage } from './pages/admin/RolesPage';
 import { SettingsPage } from './pages/admin/SettingsPage';
+import { SubscriptionPage } from './pages/admin/SubscriptionPage';
 import { AlertsPage } from './pages/admin/AlertsPage';
 import { BranchesPage } from './pages/admin/BranchesPage';
 import { AuditLogPage } from './pages/admin/AuditLogPage';
@@ -150,6 +151,7 @@ export function App() {
               <Route path="alerts" element={<AlertsPage />} />
               <Route path="branches" element={<BranchesPage />} />
               <Route path="settings" element={<SettingsPage />} />
+              <Route path="subscription" element={<SubscriptionPage />} />
               <Route path="users" element={<UsersPage />} />
               <Route path="roles" element={<RolesPage />} />
               <Route path="audit" element={<AuditLogPage />} />

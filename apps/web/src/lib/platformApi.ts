@@ -64,6 +64,7 @@ export interface PlatformTenantDetail extends PlatformTenant {
 }
 
 export interface PlatformStats {
+  pendingUpgradeRequests: number;
   revenue: PlatformRevenue;
   tenants: { total: number; active: number; suspended: number; newLast7Days: number; newLast30Days: number };
   users: number;
@@ -167,4 +168,18 @@ export interface PlatformRevenue {
     endsAt: string | null;
     daysLeft: number | null;
   }>;
+}
+
+export interface PlatformUpgradeRequest {
+  id: number;
+  tenantId: number;
+  tenantName: string;
+  planName: string;
+  message: string | null;
+  status: 'PENDING' | 'HANDLED';
+  requestedByName: string | null;
+  requestedByEmail: string | null;
+  createdAt: string;
+  handledAt: string | null;
+  handledByName: string | null;
 }

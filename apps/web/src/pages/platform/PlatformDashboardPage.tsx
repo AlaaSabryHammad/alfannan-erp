@@ -20,6 +20,7 @@ import {
   type PlatformStats,
   type PlatformTenant,
   type PlatformTenantDetail,
+  type PlatformUpgradeRequest,
   type SubscriptionStatus,
 } from '../../lib/platformApi';
 
@@ -41,6 +42,7 @@ const ACTION_LABELS: Record<string, string> = {
   SUB_ACTIVATE: 'تفعيل/تجديد اشتراك',
   SUB_CANCEL: 'إلغاء اشتراك',
   SUB_OVERRIDES: 'حدود/مزايا مخصصة',
+  UPGRADE_REQUEST_HANDLED: 'معالجة طلب ترقية',
 };
 
 const METHOD_LABELS: Record<string, string> = {
@@ -562,7 +564,7 @@ function TenantPanel({ tenantId, onClose }: { tenantId: number; onClose: () => v
 
 // ── page ──────────────────────────────────────────────────────────────────────
 
-type Tab = 'tenants' | 'plans' | 'payments' | 'audit';
+type Tab = 'tenants' | 'requests' | 'plans' | 'payments' | 'audit';
 
 export function PlatformDashboardPage() {
   const navigate = useNavigate();
@@ -590,6 +592,16 @@ export function PlatformDashboardPage() {
     enabled: hasToken && tab === 'plans',
     queryFn: async () => (await platformApi.get<PlatformPlan[]>('/plans')).data,
   });
+  const requests = useQuery({
+    queryKey: ['platform', 'requests'],
+    enabled: hasToken && tab === 'requests',
+    queryFn: async () => (await platformApi.get<PlatformUpgradeRequest[]>('/upgrade-requests')).data,
+  });
+  const qc = useQueryClient();
+  const handle = useMutation({
+    mutationFn: async (id: number) => platformApi.post(`/upgrade-requests/${id}/handle`),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['platform'] }),
+  });
   const payments = useQuery({
     queryKey: ['platform', 'payments'],
     enabled: hasToken && tab === 'payments',
@@ -612,6 +624,7 @@ export function PlatformDashboardPage() {
   const s = stats.data;
   const tabs: Array<[Tab, string]> = [
     ['tenants', 'الشركات'],
+    ['requests', `طلبات الترقية${s?.pendingUpgradeRequests ? ` (${s.pendingUpgradeRequests})` : ''}`],
     ['plans', 'الباقات'],
     ['payments', 'المدفوعات'],
     ['audit', 'سجل العمليات'],
@@ -722,6 +735,43 @@ export function PlatformDashboardPage() {
                   {tenants.data?.length === 0 && (
                     <tr><td colSpan={8} className="py-10 text-center text-slate-400">لا توجد شركات مطابقة</td></tr>
                   )}
+                </tbody>
+              </table>
+            </div>
+          )}
+
+          {tab === 'requests' && (
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead className="bg-slate-50 text-slate-500 text-xs">
+                  <tr>{['التاريخ', 'الشركة', 'الباقة المطلوبة', 'مقدّم الطلب', 'ملاحظة', 'الحالة', ''].map((h, i) => (h ? th(h) : <th key={i} />))}</tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {requests.isLoading && <Loading cols={7} />}
+                  {requests.data?.map((r) => (
+                    <tr key={r.id}>
+                      <td className="px-4 py-3 text-slate-500">{fmtDate(r.createdAt)}</td>
+                      <td className="px-4 py-3">
+                        <button onClick={() => setSelected(r.tenantId)} className="font-medium text-teal-700 hover:underline">{r.tenantName}</button>
+                      </td>
+                      <td className="px-4 py-3 font-medium text-slate-900">{r.planName}</td>
+                      <td className="px-4 py-3 text-slate-600">{r.requestedByName ?? '—'}<span className="block text-xs text-slate-400" dir="ltr">{r.requestedByEmail}</span></td>
+                      <td className="px-4 py-3 text-slate-600 max-w-xs">{r.message ?? '—'}</td>
+                      <td className="px-4 py-3">
+                        <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${r.status === 'PENDING' ? 'bg-amber-50 text-amber-700' : 'bg-slate-100 text-slate-600'}`}>
+                          {r.status === 'PENDING' ? 'قيد المراجعة' : 'تمت المعالجة'}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3">
+                        {r.status === 'PENDING' && (
+                          <button disabled={handle.isPending} onClick={() => handle.mutate(r.id)} className="text-xs font-semibold text-teal-700 hover:underline disabled:opacity-50">
+                            تمت المعالجة
+                          </button>
+                        )}
+                      </td>
+                    </tr>
+                  ))}
+                  {requests.data?.length === 0 && <tr><td colSpan={7} className="py-10 text-center text-slate-400">لا توجد طلبات ترقية</td></tr>}
                 </tbody>
               </table>
             </div>

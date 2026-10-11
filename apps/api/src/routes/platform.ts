@@ -201,6 +201,7 @@ router.get('/stats', async (_req: Request, res: Response, next: NextFunction) =>
     expiringSoon.sort((a, b) => (a.daysLeft ?? 0) - (b.daysLeft ?? 0));
 
     res.json({
+      pendingUpgradeRequests: await db.upgradeRequest.count({ where: { status: 'PENDING' } }),
       revenue: {
         mrr,
         payingTenants: paying,
