@@ -1,11 +1,12 @@
-import { useState } from 'react';
-import { useNavigate, useLocation } from 'react-router-dom';
+import { useEffect, useState } from 'react';
+import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { Eye, EyeOff, BarChart3, QrCode, GitBranch, Loader2 } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import type { AxiosError } from 'axios';
+import apiClient from '../../lib/api';
 
 const loginSchema = z.object({
   email: z.string().email('البريد الإلكتروني غير صحيح'),
@@ -36,6 +37,14 @@ export function LoginPage() {
   const location = useLocation();
   const [showPassword, setShowPassword] = useState(false);
   const [serverError, setServerError] = useState<string | null>(null);
+  const [signupEnabled, setSignupEnabled] = useState(false);
+
+  useEffect(() => {
+    apiClient
+      .get<{ signupEnabled: boolean }>('/auth/config')
+      .then((r) => setSignupEnabled(r.data.signupEnabled))
+      .catch(() => setSignupEnabled(false));
+  }, []);
 
   const from = (location.state as { from?: { pathname: string } })?.from?.pathname ?? '/';
 
@@ -211,6 +220,15 @@ export function LoginPage() {
                 )}
               </button>
             </form>
+
+            {signupEnabled && (
+              <p className="mt-6 text-center text-sm text-app-muted">
+                ليس لديك حساب؟{' '}
+                <Link to="/register" className="text-primary font-semibold hover:underline">
+                  أنشئ شركتك الآن
+                </Link>
+              </p>
+            )}
 
             {/* Quick login chips — dev/demo only, never shipped in a production build */}
             {import.meta.env.DEV && (

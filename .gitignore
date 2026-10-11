@@ -10,3 +10,6 @@ Thumbs.db
 prisma/migrations/dev.db
 apps/api/uploads/*
 !apps/api/uploads/.gitkeep
+
+# local pre-migration dumps
+backups-local/
