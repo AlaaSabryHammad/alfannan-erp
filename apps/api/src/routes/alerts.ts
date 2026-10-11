@@ -29,8 +29,10 @@ router.get('/summary', async (req: Request, res: Response, next: NextFunction) =
       // my own journal entries that were rejected and are waiting for me to fix/resubmit
       prisma.journalEntryApproval.count({ where: { status: 'REJECTED', createdById: userId } }),
       prisma.product.count({ where: { expiryDate: { not: null, lte: expiryCutoff } } }),
+      // Any customer owing money counts as over limit when the balance exceeds
+      // the limit — a limit of 0 (cash-only) means any balance is over it.
       prisma.customer.findMany({
-        where: { creditLimit: { gt: 0 } },
+        where: { currentBalance: { gt: 0 } },
         select: { currentBalance: true, creditLimit: true },
       }),
     ]);

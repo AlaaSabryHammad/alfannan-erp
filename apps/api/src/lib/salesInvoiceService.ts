@@ -97,18 +97,22 @@ export async function createSalesInvoiceInTx(tx: Prisma.TransactionClient, body:
   }
 
   // Credit limit enforcement — only when this sale would actually raise the
-  // receivable (credit or not fully paid) and the customer has a limit set
-  // (creditLimit === 0 means "no limit configured yet", not "zero credit").
+  // receivable (credit or not fully paid). A creditLimit of 0 means the
+  // customer is cash-only: no credit or part-paid invoices at all. A positive
+  // limit caps balance + this invoice.
   const willRaiseBalance = body.paymentMethod === 'CREDIT' || body.paidStatus !== 'PAID';
   if (willRaiseBalance) {
     const creditLimit = Number(customer.creditLimit);
-    if (creditLimit > 0) {
-      const projectedBalance = Number(customer.currentBalance) + total;
-      if (projectedBalance > creditLimit) {
-        throw new Error(
-          `تجاوز الحد الائتماني للعميل ${customer.nameAr}: الرصيد الحالي ${Number(customer.currentBalance).toFixed(2)} + هذه الفاتورة ${total.toFixed(2)} = ${projectedBalance.toFixed(2)}، ويتجاوز الحد المسموح ${creditLimit.toFixed(2)}`
-        );
-      }
+    if (creditLimit <= 0) {
+      throw new Error(
+        `تجاوز الحد الائتماني: العميل ${customer.nameAr} حدّه الائتماني 0 (بيع نقدي فقط) ولا يُسمح له بفاتورة آجلة أو مسددة جزئيًا — حدّد له حدًا ائتمانيًا أولًا أو ادفع قيمة الفاتورة كاملة`
+      );
+    }
+    const projectedBalance = Number(customer.currentBalance) + total;
+    if (projectedBalance > creditLimit) {
+      throw new Error(
+        `تجاوز الحد الائتماني للعميل ${customer.nameAr}: الرصيد الحالي ${Number(customer.currentBalance).toFixed(2)} + هذه الفاتورة ${total.toFixed(2)} = ${projectedBalance.toFixed(2)}، ويتجاوز الحد المسموح ${creditLimit.toFixed(2)}`
+      );
     }
   }
 

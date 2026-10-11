@@ -233,15 +233,18 @@ export function AlertsPage() {
 
   // Customers over their credit limit
   (customersData?.data ?? [])
-    .filter((c) => Number(c.creditLimit) > 0 && Number(c.currentBalance) > Number(c.creditLimit))
+    .filter((c) => Number(c.currentBalance) > Number(c.creditLimit))
     .forEach((c) => {
       const over = Number(c.currentBalance) - Number(c.creditLimit);
+      const cashOnly = Number(c.creditLimit) <= 0;
       alerts.push({
         id: `over-credit-limit-${c.id}`,
         type: 'over-credit-limit',
         severity: 'danger',
-        title: `تجاوز الحد الائتماني: ${c.nameAr}`,
-        message: `الرصيد الحالي ${formatMoney(Number(c.currentBalance))} يتجاوز الحد المسموح ${formatMoney(Number(c.creditLimit))} بمقدار ${formatMoney(over)}`,
+        title: cashOnly ? `مديونية على عميل نقدي: ${c.nameAr}` : `تجاوز الحد الائتماني: ${c.nameAr}`,
+        message: cashOnly
+          ? `الرصيد الحالي ${formatMoney(Number(c.currentBalance))} على عميل حدّه الائتماني 0 (بيع نقدي فقط)`
+          : `الرصيد الحالي ${formatMoney(Number(c.currentBalance))} يتجاوز الحد المسموح ${formatMoney(Number(c.creditLimit))} بمقدار ${formatMoney(over)}`,
         date: new Date().toISOString(),
       });
     });

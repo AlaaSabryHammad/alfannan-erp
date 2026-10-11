@@ -7,6 +7,8 @@ import { api, prisma, fixtures, expectLedgerInvariants, forceDeleteSalesInvoiceF
 describe('sales cycle', () => {
   it('credit invoice → payment → balance return → guarded deletes, balances exact', async () => {
     const { customer, warehouse, product } = await fixtures();
+    // credit sales need a credit limit (0 = cash-only), so give the fixture one
+    await prisma.customer.update({ where: { id: customer.id }, data: { creditLimit: 1_000_000 } });
     const custBefore = Number(customer.currentBalance);
     const cash = await prisma.account.findUniqueOrThrow({ where: { code: '1000' } });
 

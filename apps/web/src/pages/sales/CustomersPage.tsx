@@ -508,7 +508,7 @@ export function CustomersPage() {
             <option value="INACTIVE">غير نشط</option>
           </Select>
           <Input
-            label="الحد الائتماني (ر.س)"
+            label="الحد الائتماني (ر.س) — 0 = بيع نقدي فقط"
             type="number"
             step="0.01"
             placeholder="0.00"
