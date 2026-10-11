@@ -58,13 +58,22 @@ services:
     depends_on:
       db:
         condition: service_healthy
-    entrypoint: >
-      sh -c 'while true; do
-        pg_dump -h db -U postgres -d alfannan -F c -f "/backups/alfannan-$$(date +%Y%m%d-%H%M%S).dump"
-        && echo "backup OK $$(date)";
-        ls -1t /backups/alfannan-*.dump 2>/dev/null | tail -n +31 | xargs -r rm -f;
-        sleep 86400;
-      done'
+    # A folded `>` scalar joined the lines so a line starting with `&&` became a
+    # shell syntax error and the container restarted forever (no backups taken).
+    # Use a literal block so the script keeps its newlines.
+    entrypoint:
+      - sh
+      - -c
+      - |
+        while true; do
+          if pg_dump -h db -U postgres -d alfannan -F c -f "/backups/alfannan-$$(date +%Y%m%d-%H%M%S).dump"; then
+            echo "backup OK $$(date)"
+          else
+            echo "backup FAILED $$(date)"
+          fi
+          ls -1t /backups/alfannan-*.dump 2>/dev/null | tail -n +31 | xargs -r rm -f
+          sleep 86400
+        done
 
 volumes:
   pgdata:
