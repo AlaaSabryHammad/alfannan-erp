@@ -53,6 +53,7 @@ import zatcaRouter from './routes/zatca';
 import stockCountsRouter from './routes/stockCounts';
 import schedulerRouter from './routes/scheduler';
 import bankReconciliationsRouter from './routes/bankReconciliations';
+import platformRouter from './routes/platform';
 import { startScheduler } from './lib/scheduler';
 import { auditMiddleware } from './middleware/audit';
 import { errorHandler } from './middleware/errorHandler';
@@ -143,6 +144,8 @@ app.use('/api/branches', branchesRouter);
 app.use('/api/zatca', zatcaRouter);
 app.use('/api/scheduler', schedulerRouter);
 app.use('/api/bank-reconciliations', bankReconciliationsRouter);
+// SaaS owner console — separate auth (platform token) and owner DB connection
+app.use('/api/platform', platformRouter);
 
 // ── 404 handler ───────────────────────────────────────────────────────────────
 app.use((_req, res) => {

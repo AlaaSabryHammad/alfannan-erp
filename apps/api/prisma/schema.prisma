@@ -1751,3 +1751,31 @@ model Tenant {
   payrollRunRows PayrollRun[]
   payrollItemRows PayrollItem[]
 }
+
+// ── PLATFORM ADMINS (SaaS owner console — not tenant users, no tenantId, no RLS) ──────────────
+// Read/written only through the owner connection (lib/platformPrisma.ts); the app role has no access.
+
+model PlatformAdmin {
+  id           Int      @id @default(autoincrement())
+  name         String
+  email        String   @unique
+  passwordHash String
+  isActive     Boolean  @default(true)
+  createdAt    DateTime @default(now())
+
+  auditLogs PlatformAuditLog[]
+}
+
+model PlatformAuditLog {
+  id        Int      @id @default(autoincrement())
+  adminId   Int?
+  action    String // TENANT_SUSPEND | TENANT_ACTIVATE | TENANT_RENAME | USER_PASSWORD_RESET | LOGIN
+  tenantId  Int?
+  detail    String?
+  createdAt DateTime @default(now())
+
+  admin PlatformAdmin? @relation(fields: [adminId], references: [id], onDelete: SetNull)
+
+  @@index([tenantId])
+  @@index([createdAt])
+}

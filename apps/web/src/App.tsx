@@ -7,6 +7,8 @@ import { ProtectedRoute } from './components/ProtectedRoute';
 import { AppShell } from './layouts/AppShell';
 import { LoginPage } from './pages/auth/LoginPage';
 import { RegisterPage } from './pages/auth/RegisterPage';
+import { PlatformLoginPage } from './pages/platform/PlatformLoginPage';
+import { PlatformDashboardPage } from './pages/platform/PlatformDashboardPage';
 import { DashboardPage } from './pages/DashboardPage';
 import { UnderConstruction } from './pages/UnderConstruction';
 import { ProductsPage } from './pages/products/ProductsPage';
@@ -73,6 +75,8 @@ export function App() {
             {/* Public routes */}
             <Route path="/login" element={<LoginPage />} />
             <Route path="/register" element={<RegisterPage />} />
+            <Route path="/platform/login" element={<PlatformLoginPage />} />
+            <Route path="/platform" element={<PlatformDashboardPage />} />
 
             {/* Protected routes — all inside the AppShell */}
             <Route

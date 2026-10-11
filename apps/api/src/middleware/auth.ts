@@ -1,6 +1,7 @@
 import { Request, Response, NextFunction } from 'express';
 import jwt from 'jsonwebtoken';
 import { enterTenant } from '../lib/tenantContext';
+import { basePrisma } from '../lib/prisma';
 
 export interface AuthPayload {
   userId: number;
@@ -18,6 +19,24 @@ declare global {
   }
 }
 
+// Tenant "is active" lookups are cached briefly so the check costs ~nothing per request.
+const TENANT_ACTIVE_TTL_MS = 15_000;
+const tenantActiveCache = new Map<number, { active: boolean; at: number }>();
+
+async function isTenantActive(tenantId: number): Promise<boolean> {
+  const hit = tenantActiveCache.get(tenantId);
+  if (hit && Date.now() - hit.at < TENANT_ACTIVE_TTL_MS) return hit.active;
+  const row = await basePrisma.tenant.findUnique({ where: { id: tenantId }, select: { isActive: true } });
+  const active = row?.isActive === true;
+  tenantActiveCache.set(tenantId, { active, at: Date.now() });
+  return active;
+}
+
+/** Called by the platform console right after it suspends/activates a company. */
+export function invalidateTenantActive(tenantId: number): void {
+  tenantActiveCache.delete(tenantId);
+}
+
 export async function requireAuth(req: Request, res: Response, next: NextFunction): Promise<void> {
   const authHeader = req.headers.authorization;
   if (!authHeader?.startsWith('Bearer ')) {
@@ -31,6 +50,11 @@ export async function requireAuth(req: Request, res: Response, next: NextFunctio
     // Tokens issued before multi-tenancy carry no tenant — force a fresh login.
     if (typeof decoded.tenantId !== 'number') {
       res.status(401).json({ error: 'الجلسة منتهية — الرجاء تسجيل الدخول مجدداً' });
+      return;
+    }
+    // A suspended company is locked out immediately, not when its 24h token expires.
+    if (!(await isTenantActive(decoded.tenantId))) {
+      res.status(403).json({ error: 'تم إيقاف حساب الشركة — تواصل مع الدعم' });
       return;
     }
     req.user = decoded;
