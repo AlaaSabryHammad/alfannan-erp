@@ -22,6 +22,7 @@ export const SETTING_DEFAULTS: Record<string, string> = {
   vatNumber:         '', // الرقم الضريبي — 15 رقمًا، يبدأ وينتهي بـ 3 (هيئة الزكاة والضريبة والجمارك)
   crNumber:          '', // رقم السجل التجاري
   logoUrl:           '',
+  enableNotifications: 'true', // false = إخفاء عدّاد التنبيهات (ملخص /api/alerts/summary يرجع أصفارًا)
   lowStockThreshold: '10',
   itemsPerPage:      '10',
   loyaltyEnabled:    'true',
