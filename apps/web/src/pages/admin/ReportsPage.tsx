@@ -269,13 +269,15 @@ interface AgingRow {
   b31_60: number;
   b61_90: number;
   over90: number;
+  /** opening balances (+) / on-account receipts (−) not tied to an invoice — AR report only */
+  unallocated?: number;
   total: number;
 }
 
 interface AgingData {
   asOfDate: string;
   rows: AgingRow[];
-  totals: { current: number; b31_60: number; b61_90: number; over90: number; total: number };
+  totals: { current: number; b31_60: number; b61_90: number; over90: number; unallocated?: number; total: number };
 }
 
 interface VatData {
@@ -480,6 +482,8 @@ function AgingTable({ data, isLoading, nameHeader, emptyText }: {
   if (!data) return <div className="py-8 text-center text-app-muted text-sm">لا توجد بيانات</div>;
   if (data.rows.length === 0) return <div className="py-8 text-center text-app-muted text-sm">{emptyText}</div>;
 
+  const showUnallocated = data.totals.unallocated !== undefined;
+
   return (
     <div dir="rtl">
       <p className="text-xs text-app-muted mb-3">كما في تاريخ: {formatDate(data.asOfDate)}</p>
@@ -492,6 +496,9 @@ function AgingTable({ data, isLoading, nameHeader, emptyText }: {
               <th className="text-right px-3 py-2.5 font-semibold w-28">31-60 يوم</th>
               <th className="text-right px-3 py-2.5 font-semibold w-28">61-90 يوم</th>
               <th className="text-right px-3 py-2.5 font-semibold w-28">أكثر من 90 يوم</th>
+              {showUnallocated && (
+                <th className="text-right px-3 py-2.5 font-semibold w-32" title="أرصدة افتتاحية (+) أو دفعات على الحساب غير مربوطة بفاتورة (−)">رصيد غير موزّع</th>
+              )}
               <th className="text-right px-3 py-2.5 font-semibold w-28">الإجمالي</th>
             </tr>
           </thead>
@@ -503,6 +510,9 @@ function AgingTable({ data, isLoading, nameHeader, emptyText }: {
                 <td className="px-3 py-2 font-mono text-warning">{r.b31_60 > 0 ? formatMoney(r.b31_60) : '—'}</td>
                 <td className="px-3 py-2 font-mono text-warning">{r.b61_90 > 0 ? formatMoney(r.b61_90) : '—'}</td>
                 <td className="px-3 py-2 font-mono font-bold text-danger">{r.over90 > 0 ? formatMoney(r.over90) : '—'}</td>
+                {showUnallocated && (
+                  <td className="px-3 py-2 font-mono">{r.unallocated ? formatMoney(r.unallocated) : '—'}</td>
+                )}
                 <td className="px-3 py-2 font-mono font-bold">{formatMoney(r.total)}</td>
               </tr>
             ))}
@@ -512,6 +522,9 @@ function AgingTable({ data, isLoading, nameHeader, emptyText }: {
               <td className="px-3 py-2.5 font-mono text-warning">{formatMoney(data.totals.b31_60)}</td>
               <td className="px-3 py-2.5 font-mono text-warning">{formatMoney(data.totals.b61_90)}</td>
               <td className="px-3 py-2.5 font-mono text-danger">{formatMoney(data.totals.over90)}</td>
+              {showUnallocated && (
+                <td className="px-3 py-2.5 font-mono">{formatMoney(data.totals.unallocated ?? 0)}</td>
+              )}
               <td className="px-3 py-2.5 font-mono">{formatMoney(data.totals.total)}</td>
             </tr>
           </tbody>
