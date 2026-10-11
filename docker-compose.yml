@@ -63,6 +63,8 @@ services:
       PGPASSWORD: ${DB_PASSWORD}
     volumes:
       - ./backups:/backups
+      # uploaded product images (read-only) — archived next to the database dump
+      - uploads:/uploads:ro
     depends_on:
       db:
         condition: service_healthy
@@ -80,6 +82,13 @@ services:
             echo "backup FAILED $$(date)"
           fi
           ls -1t /backups/alfannan-*.dump 2>/dev/null | tail -n +31 | xargs -r rm -f
+          # the images are not part of pg_dump: archive them with the same cadence and retention
+          if tar czf "/backups/uploads-$$(date +%Y%m%d-%H%M%S).tgz" -C /uploads .; then
+            echo "uploads backup OK $$(date)"
+          else
+            echo "uploads backup FAILED $$(date)"
+          fi
+          ls -1t /backups/uploads-*.tgz 2>/dev/null | tail -n +31 | xargs -r rm -f
           sleep 86400
         done
 
