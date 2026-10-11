@@ -152,17 +152,46 @@ router.get('/', requirePermission('dashboard.view'), async (req: Request, res: R
     const grossProfit = netSales - cogs;
     const netProfit = grossProfit - expenses;
 
+    // ── Ledger-backed figures (general ledger is the source of truth).
+    // Branch-scoped views fall back to document figures since journal lines
+    // are not branch-attributable.
+    const num = (v: unknown) => Number(v ?? 0);
+    const [cashAccts, arAcct, invAcct] = await Promise.all([
+      prisma.account.findMany({ where: { code: { in: ['1000', '1100'] } }, select: { currentBalance: true } }),
+      prisma.account.findUnique({ where: { code: '3000' }, select: { currentBalance: true } }),
+      prisma.account.findUnique({ where: { code: '1200' }, select: { currentBalance: true } }),
+    ]);
+    const ledgerCash = cashAccts.reduce((s, a) => s + num(a.currentBalance), 0);
+    const ledgerReceivables = num(arAcct?.currentBalance);
+    const ledgerInventory = num(invAcct?.currentBalance);
+
+    // Net profit = revenue − expenses (incl. COGS) from journal lines in range,
+    // excluding year-close entries that zero the P&L accounts.
+    let ledgerNetProfit = netProfit;
+    if (!branchId) {
+      const lineWhere = (type: 'REVENUE' | 'EXPENSE') => ({
+        account: { type },
+        entry: { sourceType: { not: 'YEAR_CLOSE' as const }, ...(dateRange ? { date: dateRange } : {}) },
+      });
+      const [rev, exp] = await Promise.all([
+        prisma.journalLine.aggregate({ where: lineWhere('REVENUE'), _sum: { debit: true, credit: true } }),
+        prisma.journalLine.aggregate({ where: lineWhere('EXPENSE'), _sum: { debit: true, credit: true } }),
+      ]);
+      ledgerNetProfit =
+        (num(rev._sum.credit) - num(rev._sum.debit)) - (num(exp._sum.debit) - num(exp._sum.credit));
+    }
+
     res.json({
       kpis: {
         netSales,
         purchases,
         expenses,
-        netProfit,
-        cashLiquidity: netSales - totalReceivables,
-        inventoryValuation,
+        netProfit: branchId ? netProfit : ledgerNetProfit,
+        cashLiquidity: branchId ? netSales - totalReceivables : ledgerCash,
+        inventoryValuation: branchId ? inventoryValuation : ledgerInventory,
         totalItemQty,
         lowStockCount,
-        totalReceivables,
+        totalReceivables: branchId ? totalReceivables : ledgerReceivables,
       },
       chartSeries,
       recentMovements,

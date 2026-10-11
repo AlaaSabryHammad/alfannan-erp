@@ -243,7 +243,7 @@ export function DashboardPage() {
             isMoney
             icon={<DollarSign size={22} className="text-success" />}
             iconBg="bg-success-bg"
-            subLabel="تقدير ٪25 من المبيعات"
+            subLabel="من الأستاذ العام"
             subLabelColor="text-success"
           />
           <KpiCard
