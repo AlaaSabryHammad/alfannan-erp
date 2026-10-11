@@ -4,12 +4,10 @@
 
 | الطبقة | ماذا | أين |
 |---|---|---|
-| 1. على السيرفر | حاوية `backup` تأخذ `pg_dump` مضغوطًا كل 24 ساعة وتُبقي آخر 30 | `/opt/alfannan/backups/alfannan-YYYYMMDD-HHMMSS.dump` |
-| 2. خارج السيرفر | `scripts/pull-backups.ps1` يسحب أي نسخة جديدة، يتحقق منها، ويُبقي آخر 60 | `D:\backups\alfannan` على جهازك |
+| 1. على السيرفر | حاوية `backup` تأخذ كل 24 ساعة: `pg_dump` مضغوطًا **وأرشيفًا للصور المرفوعة**، وتُبقي آخر 30 من كل نوع | `/opt/alfannan/backups/alfannan-YYYYMMDD-HHMMSS.dump` و`uploads-YYYYMMDD-HHMMSS.tgz` |
+| 2. خارج السيرفر | `scripts/pull-backups.ps1` يسحب أي نسخة جديدة من النوعين، يتحقق منها، ويُبقي آخر 60 من كل نوع | `D:\backups\alfannan` على جهازك |
 
 الطبقة 1 وحدها تحميك من خطأ في البيانات، لكنها على نفس جهاز قاعدة البيانات؛ ضياع الجهاز يضيّعها معه. الطبقة 2 هي النسخة «خارج الموقع».
-
-> **لا تشمل النسخة** مجلد الصور المرفوعة (volume `uploads`) — انظر «الصور المرفوعة» أدناه.
 
 ## الإعداد (مرة واحدة)
 
@@ -51,7 +49,7 @@ powershell -ExecutionPolicy Bypass -File D:\projects\Alfannan\scripts\register-b
 * رموز الخروج: `0` سليم · `1` خطأ (نسخة فشل نسخها/تحققها، أو السيرفر لا يردّ) · `2` السيرفر لم ينتج نسخة منذ أكثر من 36 ساعة
 * آخر نتيجة للمهمة: `Get-ScheduledTaskInfo -TaskName Alfannan-Pull-Backups | Select LastRunTime, LastTaskResult`
 
-كل نسخة تُفحص قبل اعتمادها: حجم معقول و`pg_restore --list` يقرأ فهرسها. النسخة التالفة لا تُحفظ ويُسجَّل خطأ.
+كل نسخة تُفحص قبل اعتمادها: قاعدة البيانات بـ`pg_restore --list`، وأرشيف الصور بـ`tar -tzf`. النسخة التالفة لا تُحفظ ويُسجَّل خطأ.
 
 ## الاستعادة
 
@@ -102,15 +100,19 @@ select (select count(*) from "Tenant")       as tenants,
 
 `ledger_diff` يجب أن يساوي `0`، و`rls_tables` عدد جداول الشركات (63 حاليًا). جُرّب هذا الإجراء بنجاح بعد بناء السكربت: نسخة مسحوبة واستُعيدت في قاعدة مؤقتة وطابقت المصدر في كل العدّادات.
 
-## الصور المرفوعة (غير مشمولة بالنسخة)
+## الصور المرفوعة
 
-صور الأصناف تُحفظ في volume `uploads`، وليست جزءًا من `pg_dump`. للنسخ اليدوي على السيرفر:
+صور الأصناف في volume `uploads` وليست جزءًا من `pg_dump`، لذلك تأخذ حاوية `backup` أرشيفًا `uploads-*.tgz` معها كل يوم (الـ volume مركّب للقراءة فقط)، ويسحبه نفس السكربت.
+
+**الاستعادة** (على السيرفر، بعد رفع الأرشيف لمجلد `backups`):
 
 ```bash
-docker run --rm -v alfannan_uploads:/data -v /opt/alfannan/backups:/out alpine tar czf /out/uploads-$(date +%Y%m%d).tgz -C /data .
+docker run --rm -v alfannan_uploads:/data -v /opt/alfannan/backups:/in alpine sh -c "tar xzf /in/uploads-YYYYMMDD-HHMMSS.tgz -C /data"
 ```
 
-والاستعادة: `docker run --rm -v alfannan_uploads:/data -v /opt/alfannan/backups:/in alpine tar xzf /in/uploads-YYYYMMDD.tgz -C /data`.
+**الاطلاع على محتواه محليًا** (بدون استعادة): `tar -tzf uploads-YYYYMMDD-HHMMSS.tgz`.
+
+> بعد تحديث السيرفر بهذا التغيير يظهر أول أرشيف صور عند أول دورة للحاوية (فور إعادة إنشائها). قبل ذلك يكتب السكربت «`[uploads] none at the source yet`» ولا يعتبره خطأ.
 
 ## ملاحظات أمان
 
