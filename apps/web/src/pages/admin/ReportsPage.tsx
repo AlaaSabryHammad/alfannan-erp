@@ -1036,7 +1036,7 @@ export function ReportsPage() {
                     <RefreshCw size={28} className="text-success flex-shrink-0" />
                     <div>
                       <p className="font-bold text-success">لا توجد أصناف بحاجة لإعادة طلب حالياً</p>
-                      <p className="text-sm text-success/80 mt-0.5">جميع الأصناف ذات حد إعادة طلب فوق الرصيد الحالي</p>
+                      <p className="text-sm text-success/80 mt-0.5">رصيد كل الأصناف التي لها حد إعادة طلب أعلى من حدّها</p>
                     </div>
                   </div>
                 ) : (
