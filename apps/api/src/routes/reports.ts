@@ -236,8 +236,6 @@ router.get('/balance-sheet', async (req: Request, res: Response, next: NextFunct
     const allLiabilities = byType('LIABILITY');
     const allEquity      = byType('EQUITY');
 
-    const leafOnly = <T extends { isParent: boolean }>(arr: T[]) => arr.filter(a => !a.isParent);
-
     const assets      = allAssets;       // Assets have no children in this chart
     const liabilities = allLiabilities;
     const equity      = allEquity;
@@ -246,8 +244,10 @@ router.get('/balance-sheet', async (req: Request, res: Response, next: NextFunct
 
     const totalAssets      = assets.reduce((s, a) => s + a.balance, 0);
     const totalLiabilities = liabilities.reduce((s, a) => s + a.balance, 0);
-    // Sum only leaf equity accounts to avoid double-counting parent+children
-    const totalEquity      = leafOnly(equity).reduce((s, a) => s + a.balance, 0);
+    // Every equity account counts, parents included: balances are derived from
+    // each account's own journal lines (children are not rolled up), so a
+    // posting made directly on a parent such as 7000 must not be dropped.
+    const totalEquity      = equity.reduce((s, a) => s + a.balance, 0);
 
     // Net profit folds into equity side
     const totalRevenue  = revenues.reduce((s, a) => s + a.balance, 0);
