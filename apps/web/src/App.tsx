@@ -14,6 +14,7 @@ import { BrandsPage } from './pages/products/BrandsPage';
 import { UnitsPage } from './pages/products/UnitsPage';
 import { WarehousesPage } from './pages/inventory/WarehousesPage';
 import { StockPage } from './pages/inventory/StockPage';
+import { StockMovementsPage } from './pages/inventory/StockMovementsPage';
 import { StockTransfersPage } from './pages/inventory/StockTransfersPage';
 import { StockCountPage } from './pages/inventory/StockCountPage';
 import { BomPage } from './pages/manufacturing/BomPage';
@@ -90,6 +91,7 @@ export function App() {
               <Route path="units" element={<UnitsPage />} />
               <Route path="warehouses" element={<WarehousesPage />} />
               <Route path="stock" element={<StockPage />} />
+              <Route path="stock-movements" element={<StockMovementsPage />} />
               <Route path="stock-transfer" element={<StockTransfersPage />} />
               <Route path="stock-count" element={<StockCountPage />} />
               <Route path="barcode-labels" element={<BarcodeLabelsPage />} />
