@@ -170,6 +170,22 @@ export interface PlatformRevenue {
   }>;
 }
 
+export interface PlatformPaymentOrder {
+  id: number;
+  tenantId: number;
+  tenantName: string;
+  planName: string;
+  months: number;
+  amount: number;
+  currency: string;
+  status: 'PENDING' | 'PAID' | 'FAILED' | 'EXPIRED';
+  provider: string;
+  providerInvoiceId: string | null;
+  failureReason: string | null;
+  createdAt: string;
+  paidAt: string | null;
+}
+
 export interface PlatformUpgradeRequest {
   id: number;
   tenantId: number;

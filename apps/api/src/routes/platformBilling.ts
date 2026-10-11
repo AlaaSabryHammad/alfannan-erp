@@ -15,6 +15,8 @@ import { z } from 'zod';
 import { Prisma } from '@prisma/client';
 import { platformPrisma as db } from '../lib/platformPrisma';
 import { invalidateEntitlements } from '../lib/entitlements';
+import { applyPaidPeriod } from '../lib/subscriptionActions';
+import { settleOrder } from '../lib/paymentService';
 import { getLastLifecycleResult, runSubscriptionLifecycle } from '../lib/subscriptionLifecycle';
 
 const router = Router();
@@ -26,14 +28,6 @@ async function audit(req: Request, action: string, tenantId: number | null, deta
 }
 
 const DAY = 24 * 3600 * 1000;
-
-function addMonths(from: Date, months: number): Date {
-  const d = new Date(from);
-  const day = d.getDate();
-  d.setMonth(d.getMonth() + months);
-  if (d.getDate() < day) d.setDate(0); // 31 Jan + 1 month → 28/29 Feb, not 3 Mar
-  return d;
-}
 
 const count = z.number().int().min(0).max(1_000_000).nullable();
 const limitsSchema = z.object({
@@ -188,40 +182,20 @@ router.post('/tenants/:id/subscription/activate', async (req: Request, res: Resp
     const plan = await activePlan(body.planId, res);
     if (!plan) return;
 
-    const now = new Date();
-    const stillRunning =
-      loaded.sub.status === 'ACTIVE' && loaded.sub.currentPeriodEnd && loaded.sub.currentPeriodEnd > now;
-    const periodStart = stillRunning ? loaded.sub.currentPeriodEnd! : now;
-    const periodEnd = addMonths(periodStart, body.months);
     const amount = body.amount ?? Number(plan.priceMonthly) * body.months;
 
-    const [sub, payment] = await db.$transaction([
-      db.subscription.update({
-        where: { tenantId: loaded.tenantId },
-        data: {
-          planId: plan.id,
-          status: 'ACTIVE',
-          trialEndsAt: null,
-          currentPeriodStart: stillRunning ? loaded.sub.currentPeriodStart ?? now : now,
-          currentPeriodEnd: periodEnd,
-        },
+    const { subscription: sub, payment } = await db.$transaction((tx) =>
+      applyPaidPeriod(tx, {
+        tenantId: loaded.tenantId,
+        plan: { id: plan.id, currency: plan.currency },
+        months: body.months,
+        amount,
+        method: body.method,
+        reference: body.reference,
+        note: body.note,
+        recordedByName: req.platformAdmin?.name ?? null,
       }),
-      db.subscriptionPayment.create({
-        data: {
-          tenantId: loaded.tenantId,
-          planId: plan.id,
-          amount,
-          currency: plan.currency,
-          method: body.method,
-          reference: body.reference ?? null,
-          months: body.months,
-          periodStart,
-          periodEnd,
-          note: body.note ?? null,
-          recordedByName: req.platformAdmin?.name ?? null,
-        },
-      }),
-    ]);
+    );
     invalidateEntitlements(loaded.tenantId);
     await audit(req, 'SUB_ACTIVATE', loaded.tenantId, `${plan.code} × ${body.months} شهر — ${amount} ${plan.currency}`);
     res.json({ subscription: sub, payment });
@@ -325,6 +299,54 @@ router.post('/upgrade-requests/:id/handle', async (req: Request, res: Response, 
     });
     await audit(req, 'UPGRADE_REQUEST_HANDLED', existing.tenantId, String(existing.requestedPlanId));
     res.json(updated);
+  } catch (err) {
+    next(err);
+  }
+});
+
+// ── online payment orders ────────────────────────────────────────────────────
+
+router.get('/payment-orders', async (_req: Request, res: Response, next: NextFunction) => {
+  try {
+    const [rows, plans] = await Promise.all([
+      db.paymentOrder.findMany({
+        orderBy: { id: 'desc' },
+        take: 100,
+        include: { tenant: { select: { name: true } } },
+      }),
+      db.plan.findMany({ select: { id: true, nameAr: true } }),
+    ]);
+    const planName = new Map(plans.map((p) => [p.id, p.nameAr]));
+    res.json(rows.map((r) => ({
+      id: r.id,
+      tenantId: r.tenantId,
+      tenantName: r.tenant.name,
+      planName: planName.get(r.planId) ?? '—',
+      months: r.months,
+      amount: Number(r.amount),
+      currency: r.currency,
+      status: r.status,
+      provider: r.provider,
+      providerInvoiceId: r.providerInvoiceId,
+      failureReason: r.failureReason,
+      createdAt: r.createdAt,
+      paidAt: r.paidAt,
+    })));
+  } catch (err) {
+    next(err);
+  }
+});
+
+// Re-asks the gateway about one order (e.g. after a manual refund/confirmation on their dashboard).
+router.post('/payment-orders/:id/settle', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const result = await settleOrder(Number(req.params.id));
+    if (!result) {
+      res.status(404).json({ error: 'الطلب غير موجود' });
+      return;
+    }
+    await audit(req, 'PAYMENT_ORDER_SETTLE', null, `#${result.orderId} → ${result.status}`);
+    res.json(result);
   } catch (err) {
     next(err);
   }

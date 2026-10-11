@@ -18,6 +18,8 @@ export interface SubscriptionInfo {
   features: Record<FeatureKey, boolean>;
   usage: Record<LimitKey, number>;
   enforcement: 'off' | 'log' | 'enforce';
+  /** online checkout is configured on the server */
+  paymentsEnabled: boolean;
 }
 
 export const LIMIT_LABELS: Record<LimitKey, string> = {

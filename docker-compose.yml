@@ -39,6 +39,12 @@ services:
       ALLOW_SIGNUP: ${ALLOW_SIGNUP:-false}
       # Plans/subscriptions: off | log (record what would be blocked, block nothing) | enforce (HTTP 402)
       SUBSCRIPTION_ENFORCEMENT: ${SUBSCRIPTION_ENFORCEMENT:-log}
+      # Online subscription payments (see docs/PAYMENTS.md) — off unless PAYMENTS_ENABLED=true
+      PAYMENTS_ENABLED: ${PAYMENTS_ENABLED:-false}
+      PAYMENTS_PROVIDER: ${PAYMENTS_PROVIDER:-moyasar}
+      MOYASAR_SECRET_KEY: ${MOYASAR_SECRET_KEY:-}
+      MOYASAR_WEBHOOK_SECRET: ${MOYASAR_WEBHOOK_SECRET:-}
+      PUBLIC_BASE_URL: ${PUBLIC_BASE_URL:-}
     volumes:
       - uploads:/app/apps/api/uploads
     depends_on:

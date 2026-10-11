@@ -1,6 +1,7 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Check, Loader2, Minus, Send, X } from 'lucide-react';
+import { Check, CreditCard, Loader2, Minus, Send, X } from 'lucide-react';
 import apiClient from '../../lib/api';
 import { getApiErrorMessage } from '../../lib/utils';
 import { useAuth } from '../../contexts/AuthContext';
@@ -92,6 +93,45 @@ export function SubscriptionPage() {
     queryFn: async () => (await apiClient.get<UpgradeRow[]>('/subscription/upgrade-requests')).data,
   });
 
+  // online payment: period toggle, checkout, and the page the gateway sends the customer back to
+  const [params, setParams] = useSearchParams();
+  const [period, setPeriod] = useState<1 | 12>(1);
+  const returnOrderId = params.get('payment') === 'return' ? Number(params.get('order')) : null;
+
+  const pay = useMutation({
+    mutationFn: async (planId: number) =>
+      (await apiClient.post<{ orderId: number; checkoutUrl: string }>('/subscription/checkout', { planId, months: period })).data,
+    onSuccess: (r) => { window.location.href = r.checkoutUrl; },
+    onError: (err) => setNotice({ type: 'error', text: getApiErrorMessage(err, 'تعذّر بدء الدفع') }),
+  });
+
+  const orderStatus = useQuery({
+    queryKey: ['subscription', 'order', returnOrderId],
+    enabled: !!returnOrderId,
+    queryFn: async () =>
+      (await apiClient.get<{ status: 'PENDING' | 'PAID' | 'FAILED' | 'EXPIRED' }>('/subscription/checkout/' + returnOrderId)).data,
+    refetchInterval: (query) => (query.state.data?.status === 'PENDING' || !query.state.data ? 3000 : false),
+  });
+
+  useEffect(() => {
+    const status = orderStatus.data?.status;
+    if (!status || status === 'PENDING') return;
+    if (status === 'PAID') {
+      qc.invalidateQueries({ queryKey: ['subscription'] });
+      setNotice({ type: 'ok', text: 'تم الدفع بنجاح وتفعيل اشتراكك. شكرًا لك!' });
+    } else {
+      setNotice({ type: 'error', text: 'لم تكتمل عملية الدفع. لم يُخصم أي مبلغ، ويمكنك المحاولة من جديد.' });
+    }
+    setParams({}, { replace: true });
+  }, [orderStatus.data?.status]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  useEffect(() => {
+    if (params.get('payment') === 'cancelled') {
+      setNotice({ type: 'error', text: 'تم إلغاء عملية الدفع.' });
+      setParams({}, { replace: true });
+    }
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
   const [target, setTarget] = useState<PlanOption | null>(null);
   const [message, setMessage] = useState('');
   const [notice, setNotice] = useState<{ type: 'ok' | 'error'; text: string } | null>(null);
@@ -128,6 +168,12 @@ export function SubscriptionPage() {
         <h1 className="text-xl font-bold text-app-text">الاشتراك والباقة</h1>
         <p className="text-sm text-app-muted mt-1">باقتك الحالية، واستهلاكك مقابل الحدود، وسجل الدفعات.</p>
       </div>
+
+      {returnOrderId && orderStatus.data?.status === 'PENDING' && (
+        <div className="rounded-lg border border-sky-200 bg-sky-50 text-sky-800 px-4 py-3 text-sm flex items-center gap-2">
+          <Loader2 size={16} className="animate-spin" /> نتحقق من عملية الدفع... لحظات ويتم تفعيل اشتراكك.
+        </div>
+      )}
 
       {notice && (
         <div className={`rounded-lg border px-4 py-3 text-sm ${notice.type === 'ok' ? 'bg-emerald-50 border-emerald-200 text-emerald-800' : 'bg-red-50 border-red-200 text-red-700'}`}>
@@ -174,7 +220,22 @@ export function SubscriptionPage() {
 
       {/* plans */}
       <section>
-        <h2 className="text-base font-bold text-app-text mb-3">الباقات المتاحة</h2>
+        <div className="flex items-center gap-3 mb-3 flex-wrap">
+          <h2 className="text-base font-bold text-app-text">الباقات المتاحة</h2>
+          {sub.paymentsEnabled && (
+            <div className="mr-auto inline-flex rounded-lg border border-app-border bg-white p-0.5 text-sm">
+              {([1, 12] as const).map((m) => (
+                <button
+                  key={m}
+                  onClick={() => setPeriod(m)}
+                  className={'px-3 py-1 rounded-md font-medium ' + (period === m ? 'bg-primary text-white' : 'text-app-muted hover:text-app-text')}
+                >
+                  {m === 1 ? 'شهري' : 'سنوي'}
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           {plans.data?.map((p) => {
             const current = p.code === sub.planCode;
@@ -185,10 +246,19 @@ export function SubscriptionPage() {
                   {current && <span className="text-[11px] font-semibold bg-primary/10 text-primary px-2 py-0.5 rounded-full">باقتك</span>}
                 </div>
                 <p className="mt-2 text-2xl font-bold text-app-text">
-                  {p.priceMonthly > 0 ? fmtMoney(p.priceMonthly) : 'حسب الاتفاق'}
-                  {p.priceMonthly > 0 && <span className="text-sm font-normal text-app-muted"> {p.currency} / شهر</span>}
+                  {p.priceMonthly > 0
+                    ? fmtMoney(sub.paymentsEnabled && period === 12 ? (p.priceYearly > 0 ? p.priceYearly : p.priceMonthly * 12) : p.priceMonthly)
+                    : 'حسب الاتفاق'}
+                  {p.priceMonthly > 0 && (
+                    <span className="text-sm font-normal text-app-muted">
+                      {' '}{p.currency} / {sub.paymentsEnabled && period === 12 ? 'سنة' : 'شهر'}
+                    </span>
+                  )}
                 </p>
-                {p.priceYearly > 0 && <p className="text-xs text-app-muted">أو {fmtMoney(p.priceYearly)} {p.currency} سنويًا</p>}
+                {p.priceYearly > 0 && !(sub.paymentsEnabled && period === 12) && (
+                  <p className="text-xs text-app-muted">أو {fmtMoney(p.priceYearly)} {p.currency} سنويًا</p>
+                )}
+                <p className="text-[11px] text-app-muted">الأسعار شاملة ضريبة القيمة المضافة</p>
                 <ul className="mt-4 mb-5 flex flex-col gap-1.5 text-sm text-app-text flex-1">
                   {limitKeys.map((k) => (
                     <li key={k} className="flex justify-between">
@@ -207,6 +277,25 @@ export function SubscriptionPage() {
                   <button disabled className="w-full py-2 rounded-lg text-sm font-semibold bg-slate-100 text-slate-500">باقتك الحالية</button>
                 ) : pending.has(p.id) ? (
                   <button disabled className="w-full py-2 rounded-lg text-sm font-semibold bg-amber-50 text-amber-700">طلبك قيد المراجعة</button>
+                ) : sub.paymentsEnabled && p.priceMonthly > 0 ? (
+                  <div className="flex flex-col gap-2">
+                    <button
+                      disabled={!canRequest || pay.isPending}
+                      onClick={() => { setNotice(null); pay.mutate(p.id); }}
+                      title={canRequest ? undefined : 'ليست لديك صلاحية الدفع'}
+                      className="w-full py-2 rounded-lg text-sm font-semibold bg-primary hover:bg-primary-600 text-white disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                    >
+                      {pay.isPending && pay.variables === p.id ? <Loader2 size={15} className="animate-spin" /> : <CreditCard size={15} />}
+                      ادفع الآن
+                    </button>
+                    <button
+                      disabled={!canRequest}
+                      onClick={() => { setNotice(null); setTarget(p); }}
+                      className="text-xs text-app-muted hover:text-app-text underline disabled:opacity-50"
+                    >
+                      أو اطلب التواصل معي
+                    </button>
+                  </div>
                 ) : (
                   <button
                     disabled={!canRequest}
