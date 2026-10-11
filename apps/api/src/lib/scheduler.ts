@@ -18,6 +18,7 @@
 import { Prisma, JournalSource } from '@prisma/client';
 import prisma from './prisma';
 import { runWithTenant, tryTenantId } from './tenantContext';
+import { runSubscriptionLifecycle } from './subscriptionLifecycle';
 import { postJournalEntry, ACCT } from './ledger';
 
 const round2 = (n: number) => Math.round(n * 100) / 100;
@@ -217,6 +218,17 @@ const HOUR_MS = 60 * 60 * 1000;
 /** Start the hourly tick. First run happens shortly after boot. */
 export function startScheduler(): void {
   const tick = () => {
+    runSubscriptionLifecycle()
+      .then((r) => {
+        if (r.trialsExpired || r.movedToPastDue || r.expired || r.reminders || r.errors.length) {
+          console.log(
+            `📅 الاشتراكات: تجارب منتهية ${r.trialsExpired} · سماح ${r.movedToPastDue} · منتهية ${r.expired} · تذكيرات ${r.reminders}` +
+            (r.errors.length ? ` · أخطاء: ${r.errors.join(' | ')}` : ''),
+          );
+        }
+      })
+      .catch((err) => console.error('📅 فشل فحص الاشتراكات:', err));
+
     runScheduledJobs()
       .then((r) => {
         if (r.recurringPosted || r.depreciationPosted || r.errors.length) {

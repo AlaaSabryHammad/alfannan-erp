@@ -43,6 +43,10 @@ const ACTION_LABELS: Record<string, string> = {
   SUB_CANCEL: 'إلغاء اشتراك',
   SUB_OVERRIDES: 'حدود/مزايا مخصصة',
   UPGRADE_REQUEST_HANDLED: 'معالجة طلب ترقية',
+  SUB_AUTO_EXPIRE: 'انتهاء تلقائي للاشتراك',
+  SUB_AUTO_PAST_DUE: 'بدء فترة السماح (تلقائي)',
+  SUB_REMINDER: 'تذكير قبل الانتهاء',
+  LIFECYCLE_RUN: 'تشغيل فحص الاشتراكات',
 };
 
 const METHOD_LABELS: Record<string, string> = {
@@ -598,6 +602,20 @@ export function PlatformDashboardPage() {
     queryFn: async () => (await platformApi.get<PlatformUpgradeRequest[]>('/upgrade-requests')).data,
   });
   const qc = useQueryClient();
+  const [lifecycleMsg, setLifecycleMsg] = useState<string | null>(null);
+  const lifecycle = useMutation({
+    mutationFn: async () =>
+      (await platformApi.post<{ trialsExpired: number; movedToPastDue: number; expired: number; reminders: number; errors: string[] }>('/lifecycle/run')).data,
+    onSuccess: (r) => {
+      setLifecycleMsg(
+        r.errors.length
+          ? `أخطاء: ${r.errors.join(' | ')}`
+          : `تجارب انتهت ${r.trialsExpired} · دخلت السماح ${r.movedToPastDue} · انتهت ${r.expired} · تذكيرات ${r.reminders}`,
+      );
+      qc.invalidateQueries({ queryKey: ['platform'] });
+    },
+    onError: () => setLifecycleMsg('تعذّر تشغيل الفحص'),
+  });
   const handle = useMutation({
     mutationFn: async (id: number) => platformApi.post(`/upgrade-requests/${id}/handle`),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['platform'] }),
@@ -676,6 +694,19 @@ export function PlatformDashboardPage() {
             </ul>
           </section>
         )}
+
+        <div className="flex items-center gap-3 flex-wrap text-sm">
+          <button
+            onClick={() => { setLifecycleMsg(null); lifecycle.mutate(); }}
+            disabled={lifecycle.isPending}
+            className="font-semibold border border-slate-300 bg-white hover:bg-slate-50 text-slate-700 px-3 py-1.5 rounded-lg disabled:opacity-60 flex items-center gap-2"
+          >
+            {lifecycle.isPending && <Loader2 size={14} className="animate-spin" />}
+            تشغيل فحص الاشتراكات الآن
+          </button>
+          {lifecycleMsg && <span className="text-slate-600">{lifecycleMsg}</span>}
+          <span className="text-xs text-slate-400 mr-auto">يعمل تلقائيًا كل ساعة</span>
+        </div>
 
         {s && <SignupsChart data={s.signupsByDay} />}
 

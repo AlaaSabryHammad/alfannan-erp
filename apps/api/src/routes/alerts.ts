@@ -8,6 +8,7 @@
 import { Router, Request, Response, NextFunction } from 'express';
 import prisma from '../lib/prisma';
 import { requireAuth } from '../middleware/auth';
+import { getEntitlements } from '../lib/entitlements';
 
 const router = Router();
 router.use(requireAuth);
@@ -32,6 +33,7 @@ router.get('/summary', async (req: Request, res: Response, next: NextFunction) =
         myRejectedEntriesCount: 0,
         overLimitCustomersCount: 0,
         expiringProductsCount: 0,
+        subscriptionAlert: 0,
         total: 0,
       });
       return;
@@ -60,7 +62,16 @@ router.get('/summary', async (req: Request, res: Response, next: NextFunction) =
       (c) => Number(c.currentBalance) > Number(c.creditLimit),
     ).length;
 
-    const total = lowStockCount + unpaidSalesCount + pendingPurchasesCount + pendingApprovalsCount + myRejectedEntriesCount + overLimitCustomersCount + expiringProductsCount;
+    // the subscription needs attention: read-only, grace period, or ending within a week
+    const ent = await getEntitlements(req.user!.tenantId);
+    const subscriptionAlert =
+      ent.readOnly ||
+      ent.status === 'PAST_DUE' ||
+      ((ent.status === 'TRIALING' || ent.status === 'ACTIVE') && ent.daysLeft !== null && ent.daysLeft <= 7)
+        ? 1
+        : 0;
+
+    const total = lowStockCount + unpaidSalesCount + pendingPurchasesCount + pendingApprovalsCount + myRejectedEntriesCount + overLimitCustomersCount + expiringProductsCount + subscriptionAlert;
 
     res.json({
       enabled: true,
@@ -71,6 +82,7 @@ router.get('/summary', async (req: Request, res: Response, next: NextFunction) =
       myRejectedEntriesCount,
       overLimitCustomersCount,
       expiringProductsCount,
+      subscriptionAlert,
       total,
     });
   } catch (err) {

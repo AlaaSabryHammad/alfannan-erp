@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useQuery, useMutation } from '@tanstack/react-query';
 import {
-  AlertTriangle, Bell, CheckCircle, Package, FileText, ShoppingCart, Filter, UserX, ShieldCheck, CalendarClock, MessageCircle, XCircle,
+  AlertTriangle, Bell, CheckCircle, Package, FileText, ShoppingCart, Filter, UserX, ShieldCheck, CalendarClock, MessageCircle, XCircle, CreditCard,
 } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { PageHeader } from '../../components/ui/PageHeader';
@@ -10,6 +10,7 @@ import { Button } from '../../components/ui/Button';
 import { Card, CardHeader } from '../../components/ui/Card';
 import { formatDate, formatMoney, getApiErrorMessage } from '../../lib/utils';
 import apiClient from '../../lib/api';
+import { daysLabel, useSubscription } from '../../hooks/useSubscription';
 
 function toast(msg: string, type: 'success' | 'error' = 'success') {
   const div = document.createElement('div');
@@ -92,7 +93,7 @@ interface ExpiringProduct {
 }
 
 // ─── Alert types ──────────────────────────────────────────────────────────────
-type AlertType = 'low-stock' | 'unpaid-sale' | 'pending-purchase' | 'over-credit-limit' | 'pending-approval' | 'rejected-entry' | 'expiring-product';
+type AlertType = 'low-stock' | 'unpaid-sale' | 'pending-purchase' | 'over-credit-limit' | 'pending-approval' | 'rejected-entry' | 'expiring-product' | 'subscription';
 
 interface AlertItem {
   id: string;
@@ -115,6 +116,7 @@ const filterLabels: Record<FilterType, string> = {
   'pending-approval': 'قيود تحتاج اعتماد',
   'rejected-entry': 'قيودي المرفوضة',
   'expiring-product': 'قرب/انتهاء الصلاحية',
+  subscription: 'الاشتراك',
 };
 
 const typeIcons: Record<AlertType, React.ReactNode> = {
@@ -125,6 +127,7 @@ const typeIcons: Record<AlertType, React.ReactNode> = {
   'pending-approval': <ShieldCheck size={18} />,
   'rejected-entry': <XCircle size={18} />,
   'expiring-product': <CalendarClock size={18} />,
+  subscription: <CreditCard size={18} />,
 };
 
 const severityConfig: Record<'danger' | 'warning' | 'info', { bg: string; iconColor: string; borderColor: string }> = {
@@ -177,6 +180,7 @@ export function AlertsPage() {
       (await apiClient.get<PaginatedApprovals>('/journal-approvals', { params: { status: 'REJECTED', page: 1, pageSize: 200 } })).data,
   });
 
+  const { data: subscription } = useSubscription();
   const { data: expiringProducts, isLoading: expiringLoading } = useQuery({
     queryKey: ['reports-expiring-products', 'alerts'],
     queryFn: async () => (await apiClient.get<ExpiringProduct[]>('/reports/expiring-products', { params: { days: 30 } })).data,
@@ -289,6 +293,30 @@ export function AlertsPage() {
       meta: p.sku,
     });
   });
+
+  // Subscription: read-only / grace period / ending within a week
+  if (subscription) {
+    const left = subscription.daysLeft;
+    const ending = (subscription.status === 'TRIALING' || subscription.status === 'ACTIVE') && left !== null && left <= 7;
+    if (subscription.readOnly || subscription.status === 'PAST_DUE' || ending) {
+      alerts.push({
+        id: 'subscription',
+        type: 'subscription',
+        severity: subscription.readOnly || subscription.status === 'PAST_DUE' ? 'danger' : 'warning',
+        title: subscription.readOnly
+          ? 'انتهى الاشتراك — النظام للقراءة فقط'
+          : subscription.status === 'PAST_DUE'
+            ? 'فترة السماح — جدّد اشتراكك'
+            : subscription.status === 'TRIALING'
+              ? 'التجربة المجانية على وشك الانتهاء'
+              : 'الاشتراك على وشك الانتهاء',
+        message: subscription.readOnly
+          ? 'لا يمكن إضافة أو تعديل بيانات حتى يُجدَّد الاشتراك — راجع صفحة الاشتراك والباقة'
+          : `باقي ${daysLabel(Math.max(left ?? 0, 0))} — راجع صفحة الاشتراك والباقة`,
+        date: new Date().toISOString(),
+      });
+    }
+  }
 
   // Sort: danger first, then warning, then info; within each group by date desc
   alerts.sort((a, b) => {

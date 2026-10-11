@@ -15,6 +15,7 @@ import { z } from 'zod';
 import { Prisma } from '@prisma/client';
 import { platformPrisma as db } from '../lib/platformPrisma';
 import { invalidateEntitlements } from '../lib/entitlements';
+import { getLastLifecycleResult, runSubscriptionLifecycle } from '../lib/subscriptionLifecycle';
 
 const router = Router();
 
@@ -270,6 +271,22 @@ router.put('/tenants/:id/subscription/overrides', async (req: Request, res: Resp
     invalidateEntitlements(loaded.tenantId);
     await audit(req, 'SUB_OVERRIDES', loaded.tenantId, JSON.stringify({ l: body.limitOverrides, f: body.featureOverrides }));
     res.json(updated);
+  } catch (err) {
+    next(err);
+  }
+});
+
+// ── lifecycle job ─────────────────────────────────────────────────────────────
+
+router.get('/lifecycle', (_req: Request, res: Response) => {
+  res.json(getLastLifecycleResult());
+});
+
+router.post('/lifecycle/run', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const result = await runSubscriptionLifecycle();
+    await audit(req, 'LIFECYCLE_RUN', null, JSON.stringify({ t: result.trialsExpired, p: result.movedToPastDue, e: result.expired, r: result.reminders }));
+    res.json(result);
   } catch (err) {
     next(err);
   }
