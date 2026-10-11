@@ -1751,6 +1751,7 @@ model Tenant {
   payrollRunRows PayrollRun[]
   payrollItemRows PayrollItem[]
   subscription Subscription?
+  subscriptionPayments SubscriptionPayment[]
 }
 
 // ── PLATFORM ADMINS (SaaS owner console — not tenant users, no tenantId, no RLS) ──────────────
@@ -1825,4 +1826,26 @@ model Subscription {
   notes              String?
   createdAt          DateTime           @default(now())
   updatedAt          DateTime           @updatedAt
+}
+
+// Payments are recorded by the platform owner (bank transfer / cash for now). A company can read its
+// own history; only the owner connection writes.
+model SubscriptionPayment {
+  id             Int       @id @default(autoincrement())
+  tenantId       Int       @default(dbgenerated("(current_setting('app.tenant_id'::text))::integer"))
+  tenant         Tenant    @relation(fields: [tenantId], references: [id])
+  planId         Int
+  amount         Decimal   @db.Decimal(12, 2)
+  currency       String    @default("SAR")
+  method         String // CASH | BANK_TRANSFER | CARD | OTHER
+  reference      String?
+  months         Int
+  periodStart    DateTime
+  periodEnd      DateTime
+  note           String?
+  recordedByName String?
+  createdAt      DateTime  @default(now())
+
+  @@index([tenantId])
+  @@index([createdAt])
 }

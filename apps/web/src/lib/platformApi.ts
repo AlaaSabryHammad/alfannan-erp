@@ -48,9 +48,11 @@ export interface PlatformTenant {
   isActive: boolean;
   createdAt: string;
   usage: PlatformUsage;
+  subscription: PlatformSubscription | null;
 }
 
 export interface PlatformTenantDetail extends PlatformTenant {
+  payments: PlatformPayment[];
   users: Array<{
     id: number;
     name: string;
@@ -62,6 +64,7 @@ export interface PlatformTenantDetail extends PlatformTenant {
 }
 
 export interface PlatformStats {
+  revenue: PlatformRevenue;
   tenants: { total: number; active: number; suspended: number; newLast7Days: number; newLast30Days: number };
   users: number;
   signupsByDay: Array<{ date: string; count: number }>;
@@ -74,4 +77,94 @@ export interface PlatformAuditRow {
   detail: string | null;
   createdAt: string;
   admin: { name: string; email: string } | null;
+}
+
+// ── plans, subscriptions, payments ───────────────────────────────────────────────
+
+export type LimitKey = 'users' | 'branches' | 'warehouses' | 'products' | 'salesInvoicesPerMonth';
+export type FeatureKey = 'zatca' | 'manufacturing' | 'advancedReports';
+
+export const LIMIT_LABELS: Record<LimitKey, string> = {
+  users: 'المستخدمون',
+  branches: 'الفروع',
+  warehouses: 'المستودعات',
+  products: 'الأصناف',
+  salesInvoicesPerMonth: 'فواتير البيع / شهر',
+};
+
+export const FEATURE_LABELS: Record<FeatureKey, string> = {
+  zatca: 'الفوترة الإلكترونية (ZATCA)',
+  manufacturing: 'التصنيع',
+  advancedReports: 'التقارير المتقدمة',
+};
+
+export interface PlatformPlan {
+  id: number;
+  code: string;
+  nameAr: string;
+  priceMonthly: number | string;
+  priceYearly: number | string;
+  currency: string;
+  trialDays: number;
+  limits: Record<LimitKey, number | null>;
+  features: Record<FeatureKey, boolean>;
+  isActive: boolean;
+  sortOrder: number;
+  subscribers: number;
+}
+
+export type SubscriptionStatus = 'TRIALING' | 'ACTIVE' | 'PAST_DUE' | 'EXPIRED' | 'CANCELED';
+
+export const STATUS_LABELS: Record<SubscriptionStatus, string> = {
+  TRIALING: 'تجربة',
+  ACTIVE: 'مشترك',
+  PAST_DUE: 'متأخر (سماح)',
+  EXPIRED: 'منتهٍ',
+  CANCELED: 'ملغى',
+};
+
+export interface PlatformSubscription {
+  planId: number;
+  planCode: string;
+  planName: string;
+  priceMonthly: number;
+  status: SubscriptionStatus;
+  trialEndsAt: string | null;
+  currentPeriodEnd: string | null;
+  daysLeft: number | null;
+  limitOverrides: Partial<Record<LimitKey, number | null>> | null;
+  featureOverrides: Partial<Record<FeatureKey, boolean>> | null;
+  notes: string | null;
+}
+
+export interface PlatformPayment {
+  id: number;
+  tenantId: number;
+  tenantName?: string;
+  planId: number;
+  amount: number;
+  currency: string;
+  method: string;
+  reference: string | null;
+  months: number;
+  periodStart: string;
+  periodEnd: string;
+  note: string | null;
+  recordedByName: string | null;
+  createdAt: string;
+}
+
+export interface PlatformRevenue {
+  mrr: number;
+  payingTenants: number;
+  trialingTenants: number;
+  paidLast30Days: number;
+  attention: Array<{
+    tenantId: number;
+    name: string;
+    planName: string;
+    status: SubscriptionStatus;
+    endsAt: string | null;
+    daysLeft: number | null;
+  }>;
 }
