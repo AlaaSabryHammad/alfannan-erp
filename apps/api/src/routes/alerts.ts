@@ -18,6 +18,25 @@ const EXPIRY_WARNING_DAYS = 30;
 router.get('/summary', async (req: Request, res: Response, next: NextFunction) => {
   try {
     const userId = req.user!.userId;
+
+    // «تفعيل الإشعارات» off → the bell counter shows nothing. The detailed
+    // alerts page and the underlying data are untouched.
+    const notif = await prisma.setting.findUnique({ where: { key: 'enableNotifications' } });
+    if (notif?.value === 'false') {
+      res.json({
+        enabled: false,
+        lowStockCount: 0,
+        unpaidSalesCount: 0,
+        pendingPurchasesCount: 0,
+        pendingApprovalsCount: 0,
+        myRejectedEntriesCount: 0,
+        overLimitCustomersCount: 0,
+        expiringProductsCount: 0,
+        total: 0,
+      });
+      return;
+    }
+
     const expiryCutoff = new Date();
     expiryCutoff.setDate(expiryCutoff.getDate() + EXPIRY_WARNING_DAYS);
 
@@ -44,6 +63,7 @@ router.get('/summary', async (req: Request, res: Response, next: NextFunction) =
     const total = lowStockCount + unpaidSalesCount + pendingPurchasesCount + pendingApprovalsCount + myRejectedEntriesCount + overLimitCustomersCount + expiringProductsCount;
 
     res.json({
+      enabled: true,
       lowStockCount,
       unpaidSalesCount,
       pendingPurchasesCount,

@@ -45,8 +45,7 @@ const settingsSchema = z.object({
   sellerVatNumber: z.string().optional()
     .refine((v) => !v || /^\d{15}$/.test(v), 'الرقم الضريبي يجب أن يكون 15 رقمًا'),
   sellerName: z.string().optional(),
-  enableNotifications: z.boolean().optional(),
-  enableAutoBackup: z.boolean().optional(),
+  enableNotifications: z.string().optional(),
 });
 
 type SettingsFormValues = z.infer<typeof settingsSchema>;
@@ -54,7 +53,7 @@ type SettingsFormValues = z.infer<typeof settingsSchema>;
 // Keys we send to the API (subset that the backend stores)
 const API_KEYS = [
   'companyName', 'companyPhone', 'companyAddress', 'currency', 'taxRate', 'vatNumber', 'crNumber', 'logoUrl', 'lowStockThreshold', 'itemsPerPage',
-  'loyaltyEnabled', 'loyaltyEarnRate', 'loyaltyPointValue',
+  'loyaltyEnabled', 'loyaltyEarnRate', 'loyaltyPointValue', 'enableNotifications',
   'whatsappEnabled', 'whatsappApiUrl', 'whatsappApiToken', 'whatsappSenderId',
   'smsEnabled', 'smsApiUrl', 'smsApiKey', 'smsSenderId', 'notificationAdminPhone',
   'zatcaEnabled', 'zatcaEnvironment', 'zatcaApiBaseUrl', 'zatcaBinarySecurityToken', 'zatcaSecret', 'sellerVatNumber', 'sellerName',
@@ -90,8 +89,7 @@ const defaultSettings: SettingsFormValues = {
   zatcaSecret: '',
   sellerVatNumber: '',
   sellerName: 'الفنان للتوريدات العمومية',
-  enableNotifications: true,
-  enableAutoBackup: false,
+  enableNotifications: 'true',
 };
 
 // ─── Toast ────────────────────────────────────────────────────────────────────
@@ -375,28 +373,21 @@ export function SettingsPage() {
             <label className="flex items-center gap-3 cursor-pointer group">
               <input
                 type="checkbox"
-                {...register('enableNotifications')}
+                checked={watch('enableNotifications') !== 'false'}
+                onChange={(e) => setValue('enableNotifications', e.target.checked ? 'true' : 'false', { shouldDirty: true })}
                 disabled={!canEdit}
                 className="w-4 h-4 rounded accent-primary"
               />
               <div>
                 <p className="text-sm font-medium text-app-text group-hover:text-primary transition-colors">تفعيل الإشعارات</p>
-                <p className="text-xs text-app-muted">عرض إشعارات التنبيه لنقص المخزون والفواتير غير المسددة</p>
+                <p className="text-xs text-app-muted">عرض عدّاد التنبيهات في الشريط العلوي (نقص المخزون، الفواتير غير المسددة، تجاوز الحد الائتماني…)</p>
               </div>
             </label>
 
-            <label className="flex items-center gap-3 cursor-pointer group">
-              <input
-                type="checkbox"
-                {...register('enableAutoBackup')}
-                disabled={!canEdit}
-                className="w-4 h-4 rounded accent-primary"
-              />
-              <div>
-                <p className="text-sm font-medium text-app-text group-hover:text-primary transition-colors">النسخ الاحتياطي التلقائي</p>
-                <p className="text-xs text-app-muted">حفظ نسخة احتياطية تلقائية يومياً (يتطلب تهيئة الخادم)</p>
-              </div>
-            </label>
+            <p className="text-xs text-app-muted">
+              النسخ الاحتياطي لقاعدة البيانات يتم عبر سكربت الخادم <span dir="ltr" className="font-mono">scripts/backup-db.ps1</span>،
+              ولا يُضبط من هذه الصفحة.
+            </p>
           </div>
         </SectionCard>
 
