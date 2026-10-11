@@ -12,6 +12,7 @@
 
 import { Request, Response, NextFunction } from 'express';
 import prisma from '../lib/prisma';
+import { runWithTenant } from '../lib/tenantContext';
 
 /** Map method + path prefix → friendly Arabic action label */
 function deriveAction(method: string, path: string): { action: string; entity: string } {
@@ -74,9 +75,10 @@ export function auditMiddleware(req: Request, res: Response, next: NextFunction)
     // Fire-and-forget — must not throw
     try {
       const user = req.user;
+      if (!user) return; // unauthenticated request — no tenant to attribute the row to
       const { action, entity } = deriveAction(req.method, fullPath);
 
-      prisma.auditLog.create({
+      runWithTenant(user.tenantId, () => prisma.auditLog.create({
         data: {
           userId:     user?.userId  ?? null,
           userName:   user?.email   ?? null,
@@ -87,7 +89,7 @@ export function auditMiddleware(req: Request, res: Response, next: NextFunction)
           statusCode: res.statusCode,
           ip:         req.ip ?? null,
         },
-      }).catch(() => {
+      })).catch(() => {
         // Silently swallow DB errors — audit must never affect the response
       });
     } catch {

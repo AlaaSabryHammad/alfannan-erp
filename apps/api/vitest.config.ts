@@ -21,6 +21,8 @@ export default defineConfig({
     hookTimeout: 120_000,
     env: {
       NODE_ENV: 'test',
+      // Fixture code that talks to prisma outside a request lands in the seeded tenant (id 1).
+      TENANT_FALLBACK_ID: '1',
       DATABASE_URL: testDatabaseUrl(),
     },
   },

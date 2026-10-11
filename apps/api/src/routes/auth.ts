@@ -4,6 +4,7 @@ import jwt from 'jsonwebtoken';
 import { z } from 'zod';
 import prisma from '../lib/prisma';
 import { requireAuth, AuthPayload } from '../middleware/auth';
+import { runUnscoped, runWithTenant } from '../lib/tenantContext';
 import { lockRemainingSeconds, recordFailure, recordSuccess } from '../lib/loginThrottle';
 
 const router = Router();
@@ -34,6 +35,7 @@ async function buildToken(userId: number): Promise<{ token: string; user: object
 
   const payload: AuthPayload = {
     userId: user.id,
+    tenantId: user.tenantId,
     email: user.email,
     roleCode: user.role.code,
     permissions,
@@ -72,8 +74,9 @@ router.post('/login', async (req: Request, res: Response, next: NextFunction) =>
       return;
     }
 
-    const user = await prisma.user.findUnique({ where: { email } });
-    if (!user || !user.isActive) {
+    // E-mail is globally unique and identifies the tenant — the only unscoped lookup in the request path.
+    const user = await runUnscoped(() => prisma.user.findUnique({ where: { email }, include: { tenant: true } }));
+    if (!user || !user.isActive || !user.tenant.isActive) {
       recordFailure(email);
       res.status(401).json({ error: 'البريد الإلكتروني أو كلمة المرور غير صحيحة' });
       return;
@@ -91,7 +94,7 @@ router.post('/login', async (req: Request, res: Response, next: NextFunction) =>
     }
 
     recordSuccess(email);
-    const result = await buildToken(user.id);
+    const result = await runWithTenant(user.tenantId, () => buildToken(user.id));
     res.json(result);
   } catch (err) {
     next(err);

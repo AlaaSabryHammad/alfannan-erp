@@ -12,6 +12,7 @@
  * returns, invoice deletes) never change the average — only receipts do.
  */
 import { Prisma } from '@prisma/client';
+import type { Tx } from './prisma';
 
 const round2 = (n: number) => Math.round(n * 100) / 100;
 
@@ -24,7 +25,7 @@ const round2 = (n: number) => Math.round(n * 100) / 100;
  * has been prorated onto the line.
  */
 export async function applyMovingAverageCost(
-  tx: Prisma.TransactionClient,
+  tx: Tx,
   productId: number,
   receivedQty: number,
   unitNetCost: number,
@@ -68,7 +69,7 @@ export async function applyMovingAverageCost(
  * stock never changes the unit average, only the quantity.
  */
 export async function reverseMovingAverageCost(
-  tx: Prisma.TransactionClient,
+  tx: Tx,
   productId: number,
   removedQty: number,
   removedUnitNetCost: number,

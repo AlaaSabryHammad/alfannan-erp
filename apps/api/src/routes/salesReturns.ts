@@ -9,7 +9,7 @@
 import { Router, Request, Response, NextFunction } from 'express';
 import { z } from 'zod';
 import { Prisma, JournalSource, AccountType } from '@prisma/client';
-import prisma from '../lib/prisma';
+import prisma, { type Tx } from '../lib/prisma';
 import { requireAuth, requirePermission } from '../middleware/auth';
 import { getPagination, paginatedResponse } from '../lib/paginate';
 import { parseDateRange } from '../lib/dateRange';
@@ -32,7 +32,7 @@ const createReturnSchema = z.object({
   })).min(1),
 });
 
-async function generateReturnNo(tx: Prisma.TransactionClient, date: Date): Promise<string> {
+async function generateReturnNo(tx: Tx, date: Date): Promise<string> {
   const y = date.getFullYear();
   const m = String(date.getMonth() + 1).padStart(2, '0');
   const d = String(date.getDate()).padStart(2, '0');
@@ -46,8 +46,8 @@ async function generateReturnNo(tx: Prisma.TransactionClient, date: Date): Promi
   return `${prefix}${String(lastSeq + 1).padStart(4, '0')}`;
 }
 
-async function getOrCreateSalesReturnsAccount(tx: Prisma.TransactionClient) {
-  const existing = await tx.account.findUnique({ where: { code: ACCT.SALES_RETURNS } });
+async function getOrCreateSalesReturnsAccount(tx: Tx) {
+  const existing = await tx.account.findFirst({ where: { code: ACCT.SALES_RETURNS } });
   if (existing) return existing;
   return tx.account.create({
     data: { code: ACCT.SALES_RETURNS, nameAr: 'مردودات المبيعات', type: AccountType.REVENUE },
@@ -59,7 +59,7 @@ async function getOrCreateSalesReturnsAccount(tx: Prisma.TransactionClient) {
  * (a product may appear on more than one line), minus what previous returns
  * already took back.
  */
-async function getReturnableMap(tx: Prisma.TransactionClient, salesInvoiceId: number) {
+async function getReturnableMap(tx: Tx, salesInvoiceId: number) {
   const [invoiceItems, returnedItems] = await Promise.all([
     tx.salesInvoiceItem.findMany({ where: { invoiceId: salesInvoiceId } }),
     tx.salesReturnItem.findMany({ where: { return: { salesInvoiceId } } }),

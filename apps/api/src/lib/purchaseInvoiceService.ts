@@ -7,6 +7,7 @@
  * ITS OWN transaction atomically with marking the order converted.
  */
 import { Prisma, JournalSource } from '@prisma/client';
+import type { Tx } from './prisma';
 import { postJournalEntry, ACCT } from './ledger';
 import { applyMovingAverageCost } from './costing';
 
@@ -38,7 +39,7 @@ function generatePoNo(): string {
   return `PO-${y}${m}${d}-${seq}`;
 }
 
-export async function createPurchaseInvoiceInTx(tx: Prisma.TransactionClient, body: CreatePurchaseInvoiceInput) {
+export async function createPurchaseInvoiceInTx(tx: Tx, body: CreatePurchaseInvoiceInput) {
   const userId = body.userId;
   const subtotal = body.items.reduce((s, item) => s + item.qty * item.unitCost, 0);
   const total = subtotal - (body.discount ?? 0) + (body.tax ?? 0);

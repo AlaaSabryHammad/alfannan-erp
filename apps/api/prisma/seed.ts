@@ -5,11 +5,14 @@ import {
   TransferStatus, JournalSource,
 } from '@prisma/client';
 import bcrypt from 'bcrypt';
+import prisma, { basePrisma } from '../src/lib/prisma';
+import { runWithTenant, currentTenantId } from '../src/lib/tenantContext';
 
 // Import ledger service (compiled TS not available here, inline the essentials)
 // We'll use a minimal inline version of postJournalEntry for the seed.
 
-const prisma = new PrismaClient();
+// The seed provisions one tenant (الفنان). The shared client scopes every query to it.
+const DEFAULT_TENANT_SLUG = 'alfannan';
 
 type AccountRecord = { id: number; type: AccountType };
 
@@ -64,7 +67,7 @@ async function postEntry(params: {
   // Resolve account codes
   const resolved: Array<{ accountId: number; accountType: AccountType; debit: number; credit: number; description?: string }> = [];
   for (const line of lines) {
-    const acct = await prisma.account.findUnique({
+    const acct = await prisma.account.findFirst({
       where: { code: line.accountCode },
       select: { id: true, type: true },
     });
@@ -354,7 +357,7 @@ async function main() {
   const roles: Record<string, { id: number }> = {};
   for (const r of roleDefs) {
     const role = await prisma.role.upsert({
-      where: { code: r.code },
+      where: { tenantId_code: { tenantId: currentTenantId(), code: r.code } },
       update: { nameAr: r.nameAr, description: r.description },
       create: { code: r.code, nameAr: r.nameAr, description: r.description },
     });
@@ -411,7 +414,7 @@ async function main() {
   const units: Record<string, { id: number }> = {};
   for (const u of unitDefs) {
     const unit = await prisma.unit.upsert({
-      where: { code: u.code },
+      where: { tenantId_code: { tenantId: currentTenantId(), code: u.code } },
       update: {},
       create: u,
     });
@@ -568,7 +571,7 @@ async function main() {
   const products: { id: number; sku: string; costPrice: number }[] = [];
   for (const p of productDefs) {
     const prod = await prisma.product.upsert({
-      where: { sku: p.sku },
+      where: { tenantId_sku: { tenantId: currentTenantId(), sku: p.sku } },
       update: {},
       create: {
         nameAr: p.nameAr,
@@ -692,7 +695,7 @@ async function main() {
   const accountMap: Record<string, { id: number }> = {};
   for (const a of accountDefs) {
     const acct = await prisma.account.upsert({
-      where: { code: a.code },
+      where: { tenantId_code: { tenantId: currentTenantId(), code: a.code } },
       update: { currentBalance: a.openingBalance }, // reset to opening on reseed
       create: {
         code: a.code,
@@ -714,7 +717,7 @@ async function main() {
 
   for (const a of equityChildren) {
     const acct = await prisma.account.upsert({
-      where: { code: a.code },
+      where: { tenantId_code: { tenantId: currentTenantId(), code: a.code } },
       update: { currentBalance: a.openingBalance },
       create: {
         code: a.code,
@@ -890,7 +893,7 @@ async function main() {
   ];
 
   for (const po of purchaseDefs) {
-    const existing = await prisma.purchaseInvoice.findUnique({ where: { refNo: po.refNo } });
+    const existing = await prisma.purchaseInvoice.findFirst({ where: { refNo: po.refNo } });
     if (existing) continue;
 
     const subtotal = po.items.reduce((s, item) => s + item.qty * item.unitCost, 0);
@@ -1045,7 +1048,7 @@ async function main() {
   ];
 
   for (const inv of invoiceDefs) {
-    const existing = await prisma.salesInvoice.findUnique({ where: { refNo: inv.refNo } });
+    const existing = await prisma.salesInvoice.findFirst({ where: { refNo: inv.refNo } });
     if (existing) continue;
 
     const discount = 0;
@@ -1155,7 +1158,7 @@ async function main() {
   ];
 
   for (const tr of transferDefs) {
-    const existing = await prisma.stockTransfer.findUnique({ where: { transferNo: tr.transferNo } });
+    const existing = await prisma.stockTransfer.findFirst({ where: { transferNo: tr.transferNo } });
     if (existing) continue;
 
     const transfer = await prisma.stockTransfer.create({
@@ -1275,7 +1278,7 @@ async function main() {
   ];
   for (const s of settingDefaults) {
     await prisma.setting.upsert({
-      where:  { key: s.key },
+      where:  { tenantId_key: { tenantId: currentTenantId(), key: s.key } },
       update: {},           // don't overwrite values the user may have customised
       create: s,
     });
@@ -1536,11 +1539,21 @@ async function main() {
   console.log('🎉 Seed complete!');
 }
 
-main()
+async function run() {
+  // Tenants are not tenant-scoped — create/find the default one, then seed inside its context.
+  const tenant = await basePrisma.tenant.upsert({
+    where: { slug: DEFAULT_TENANT_SLUG },
+    update: {},
+    create: { name: 'الفنان للتوريدات العمومية', slug: DEFAULT_TENANT_SLUG },
+  });
+  await runWithTenant(tenant.id, main);
+}
+
+run()
   .catch(e => {
     console.error(e);
     process.exit(1);
   })
   .finally(async () => {
-    await prisma.$disconnect();
+    await basePrisma.$disconnect();
   });

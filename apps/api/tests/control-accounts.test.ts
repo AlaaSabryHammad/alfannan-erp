@@ -8,8 +8,8 @@ import { api, prisma, expectLedgerInvariants } from './helpers';
 describe('control accounts & opening balances', () => {
   it('blocks manual journal entries that post directly to AR/AP', async () => {
     const [ar, rev] = await Promise.all([
-      prisma.account.findUniqueOrThrow({ where: { code: '3000' } }),
-      prisma.account.findUniqueOrThrow({ where: { code: '4000' } }),
+      prisma.account.findFirstOrThrow({ where: { code: '3000' } }),
+      prisma.account.findFirstOrThrow({ where: { code: '4000' } }),
     ]);
     const res = await api('post', '/journal', {
       description: 'محاولة تقييد يدوي على العملاء',
@@ -25,12 +25,12 @@ describe('control accounts & opening balances', () => {
 
   it('a customer opening balance posts to AR so subledger and GL stay in sync', async () => {
     const before = (await api('get', '/reports/control-reconciliation')).body;
-    const arBefore = Number((await prisma.account.findUniqueOrThrow({ where: { code: '3000' } })).currentBalance);
+    const arBefore = Number((await prisma.account.findFirstOrThrow({ where: { code: '3000' } })).currentBalance);
 
     const cust = await api('post', '/customers', { nameAr: `عميل رصيد افتتاحي ${Date.now()}`, openingBalance: 500 });
     expect(cust.status).toBe(201);
 
-    const arAfter = Number((await prisma.account.findUniqueOrThrow({ where: { code: '3000' } })).currentBalance);
+    const arAfter = Number((await prisma.account.findFirstOrThrow({ where: { code: '3000' } })).currentBalance);
     expect(arAfter - arBefore).toBeCloseTo(500, 2); // GL control account moved with the subledger
 
     const after = (await api('get', '/reports/control-reconciliation')).body;

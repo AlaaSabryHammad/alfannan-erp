@@ -6,6 +6,7 @@
  * document types at once. Months with no row are OPEN by default.
  */
 import { Router, Request, Response, NextFunction } from 'express';
+import { currentTenantId } from '../lib/tenantContext';
 import { z } from 'zod';
 import prisma from '../lib/prisma';
 import { requireAuth, requirePermission } from '../middleware/auth';
@@ -32,7 +33,7 @@ router.get('/', requirePermission('fiscalperiods.view'), async (req: Request, re
     const entryCounts = await prisma.$queryRaw<Array<{ month: number; count: bigint }>>`
       SELECT EXTRACT(MONTH FROM "date")::int AS month, COUNT(*) AS count
       FROM "JournalEntry"
-      WHERE EXTRACT(YEAR FROM "date") = ${year}
+      WHERE "tenantId" = ${currentTenantId()} AND EXTRACT(YEAR FROM "date") = ${year}
       GROUP BY 1
     `;
     const countByMonth = new Map(entryCounts.map((r) => [r.month, Number(r.count)]));
@@ -63,7 +64,7 @@ router.post('/lock', requirePermission('fiscalperiods.edit'), async (req: Reques
     const userId = req.user!.userId;
 
     const period = await prisma.fiscalPeriod.upsert({
-      where: { year_month: { year, month } },
+      where: { tenantId_year_month: { tenantId: currentTenantId(), year, month } },
       update: { status: 'LOCKED', lockedAt: new Date(), lockedById: userId },
       create: { year, month, status: 'LOCKED', lockedAt: new Date(), lockedById: userId },
     });
@@ -79,7 +80,7 @@ router.post('/unlock', requirePermission('fiscalperiods.edit'), async (req: Requ
     const { year, month } = periodSchema.parse(req.body);
 
     const period = await prisma.fiscalPeriod.upsert({
-      where: { year_month: { year, month } },
+      where: { tenantId_year_month: { tenantId: currentTenantId(), year, month } },
       update: { status: 'OPEN', lockedAt: null, lockedById: null },
       create: { year, month, status: 'OPEN' },
     });

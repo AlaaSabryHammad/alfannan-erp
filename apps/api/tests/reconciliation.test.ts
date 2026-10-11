@@ -6,7 +6,7 @@ import { api, prisma, expectLedgerInvariants } from './helpers';
 
 describe('bank reconciliation', () => {
   it('reconciles deposits with zero difference and enforces once-only lines', async () => {
-    const bank = await prisma.account.findUniqueOrThrow({ where: { code: '1100' } });
+    const bank = await prisma.account.findFirstOrThrow({ where: { code: '1100' } });
     const opening = Number(bank.openingBalance);
 
     const v1 = await api('post', '/vouchers', { type: 'DEPOSIT', treasuryAccountId: bank.id, amount: 300, description: 'إيداع اختبار 1' });

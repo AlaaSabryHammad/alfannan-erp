@@ -17,7 +17,7 @@ async function ledgerNet(type: 'REVENUE' | 'EXPENSE') {
 }
 
 async function balance(code: string) {
-  const a = await prisma.account.findUniqueOrThrow({ where: { code } });
+  const a = await prisma.account.findFirstOrThrow({ where: { code } });
   return Number(a.currentBalance);
 }
 

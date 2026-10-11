@@ -1,7 +1,7 @@
 import { Router, Request, Response, NextFunction } from 'express';
 import { z } from 'zod';
 import { Prisma, JournalSource, VoucherType, PartyType } from '@prisma/client';
-import prisma from '../lib/prisma';
+import prisma, { type Tx } from '../lib/prisma';
 import { requireAuth, requirePermission } from '../middleware/auth';
 import { getPagination, paginatedResponse } from '../lib/paginate';
 import { parseDateRange } from '../lib/dateRange';
@@ -53,7 +53,7 @@ const createVoucherSchema = z.object({
 
 /** Build a Voucher number: {RV|PV|DV|BD}-YYYYMMDD-NNNN (count-based sequence). */
 async function generateVoucherNo(
-  tx: Prisma.TransactionClient,
+  tx: Tx,
   type: VoucherTypeT,
   date: Date,
 ): Promise<string> {
@@ -77,7 +77,7 @@ async function generateVoucherNo(
  * Resolve the treasury (cash/bank) account code from its id.
  * Returns the account code so it can be used in ledger lines.
  */
-async function getTreasuryCode(tx: Prisma.TransactionClient, accountId: number): Promise<string> {
+async function getTreasuryCode(tx: Tx, accountId: number): Promise<string> {
   const acct = await tx.account.findUniqueOrThrow({
     where: { id: accountId },
     select: { code: true, type: true },
@@ -97,7 +97,7 @@ async function getTreasuryCode(tx: Prisma.TransactionClient, accountId: number):
  * combination (e.g. a PAYMENT refund to a customer) never touched the balance,
  * so reversing it here would corrupt the balance.
  */
-async function reversePartyBalance(tx: Prisma.TransactionClient, voucherId: number): Promise<void> {
+async function reversePartyBalance(tx: Tx, voucherId: number): Promise<void> {
   const v = await tx.voucher.findUniqueOrThrow({ where: { id: voucherId } });
   const amount = Number(v.totalAmount);
   if (amount === 0 || !v.partyType || !v.partyId) return;
@@ -267,18 +267,18 @@ router.post('/', requirePermission('treasury.create'), async (req: Request, res:
         }
         let counterAccountId: number;
         if (type === 'RECEIPT') {
-          counterAccountId = (await tx.account.findUniqueOrThrow({ where: { code: ACCT.AR }, select: { id: true } })).id;
+          counterAccountId = (await tx.account.findFirstOrThrow({ where: { code: ACCT.AR }, select: { id: true } })).id;
         } else if (type === 'PAYMENT') {
-          counterAccountId = (await tx.account.findUniqueOrThrow({ where: { code: ACCT.AP }, select: { id: true } })).id;
+          counterAccountId = (await tx.account.findFirstOrThrow({ where: { code: ACCT.AP }, select: { id: true } })).id;
         } else if (type === 'DISCOUNT') {
           if (body.partyType === 'SUPPLIER') {
-            counterAccountId = (await tx.account.findUniqueOrThrow({ where: { code: ACCT.AP }, select: { id: true } })).id;
+            counterAccountId = (await tx.account.findFirstOrThrow({ where: { code: ACCT.AP }, select: { id: true } })).id;
           } else {
-            counterAccountId = (await tx.account.findUniqueOrThrow({ where: { code: ACCT.AR }, select: { id: true } })).id;
+            counterAccountId = (await tx.account.findFirstOrThrow({ where: { code: ACCT.AR }, select: { id: true } })).id;
           }
         } else {
           // DEPOSIT: source is cash (from treasury = bank destination, source = cash)
-          counterAccountId = (await tx.account.findUniqueOrThrow({ where: { code: ACCT.CASH }, select: { id: true } })).id;
+          counterAccountId = (await tx.account.findFirstOrThrow({ where: { code: ACCT.CASH }, select: { id: true } })).id;
         }
         voucherLines = [{ accountId: counterAccountId, amount: totalAmount, description: body.description ?? null }];
       }
