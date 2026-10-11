@@ -15,6 +15,8 @@ router.use(requireAuth);
 /** Default values returned when a key is absent from the DB */
 export const SETTING_DEFAULTS: Record<string, string> = {
   companyName:       'الفنان للتوريدات العمومية',
+  companyPhone:      '',
+  companyAddress:    '',
   currency:          'ر.س',
   taxRate:           '15',
   vatNumber:         '', // الرقم الضريبي — 15 رقمًا، يبدأ وينتهي بـ 3 (هيئة الزكاة والضريبة والجمارك)

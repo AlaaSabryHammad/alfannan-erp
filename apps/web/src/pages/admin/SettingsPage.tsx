@@ -53,7 +53,7 @@ type SettingsFormValues = z.infer<typeof settingsSchema>;
 
 // Keys we send to the API (subset that the backend stores)
 const API_KEYS = [
-  'companyName', 'currency', 'taxRate', 'vatNumber', 'crNumber', 'logoUrl', 'lowStockThreshold', 'itemsPerPage',
+  'companyName', 'companyPhone', 'companyAddress', 'currency', 'taxRate', 'vatNumber', 'crNumber', 'logoUrl', 'lowStockThreshold', 'itemsPerPage',
   'loyaltyEnabled', 'loyaltyEarnRate', 'loyaltyPointValue',
   'whatsappEnabled', 'whatsappApiUrl', 'whatsappApiToken', 'whatsappSenderId',
   'smsEnabled', 'smsApiUrl', 'smsApiKey', 'smsSenderId', 'notificationAdminPhone',
