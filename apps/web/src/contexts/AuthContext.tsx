@@ -1,6 +1,14 @@
 import React, { createContext, useContext, useState, useCallback, useEffect } from 'react';
 import type { User, LoginPayload, AuthResponse } from '../types';
+import { useQueryClient } from '@tanstack/react-query';
 import apiClient from '../lib/api';
+
+export interface RegisterCompanyPayload {
+  companyName: string;
+  adminName: string;
+  email: string;
+  password: string;
+}
 
 interface AuthContextValue {
   user: User | null;
@@ -8,6 +16,7 @@ interface AuthContextValue {
   isAuthenticated: boolean;
   isLoading: boolean;
   login: (payload: LoginPayload) => Promise<void>;
+  registerCompany: (payload: RegisterCompanyPayload) => Promise<void>;
   logout: () => void;
   hasPermission: (code: string) => boolean;
 }
@@ -18,6 +27,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [token, setToken] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const queryClient = useQueryClient();
 
   // Rehydrate from localStorage on mount
   useEffect(() => {
@@ -35,22 +45,32 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setIsLoading(false);
   }, []);
 
-  const login = useCallback(async (payload: LoginPayload) => {
-    const response = await apiClient.post<AuthResponse>('/auth/login', payload);
-    const { token: newToken, user: newUser } = response.data;
-
+  // A new session may belong to a different company — never show the previous one's cached data.
+  const startSession = useCallback((newToken: string, newUser: User) => {
+    queryClient.clear();
     localStorage.setItem('auth_token', newToken);
     localStorage.setItem('auth_user', JSON.stringify(newUser));
     setToken(newToken);
     setUser(newUser);
-  }, []);
+  }, [queryClient]);
+
+  const login = useCallback(async (payload: LoginPayload) => {
+    const response = await apiClient.post<AuthResponse>('/auth/login', payload);
+    startSession(response.data.token, response.data.user);
+  }, [startSession]);
+
+  const registerCompany = useCallback(async (payload: RegisterCompanyPayload) => {
+    const response = await apiClient.post<AuthResponse>('/auth/register-tenant', payload);
+    startSession(response.data.token, response.data.user);
+  }, [startSession]);
 
   const logout = useCallback(() => {
+    queryClient.clear();
     localStorage.removeItem('auth_token');
     localStorage.removeItem('auth_user');
     setToken(null);
     setUser(null);
-  }, []);
+  }, [queryClient]);
 
   const hasPermission = useCallback(
     (code: string) => {
@@ -68,6 +88,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     isAuthenticated: !!token && !!user,
     isLoading,
     login,
+    registerCompany,
     logout,
     hasPermission,
   };
