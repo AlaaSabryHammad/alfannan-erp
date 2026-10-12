@@ -75,6 +75,29 @@ router.get('/', requirePermission('sales.view'), async (req: Request, res: Respo
   }
 });
 
+// GET /api/sales-invoices/summary — real totals for the KPI cards (same date/branch filters as the list)
+router.get('/summary', requirePermission('sales.view'), async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const where: Record<string, unknown> = {};
+    if (req.query.branchId) where.branchId = parseInt(req.query.branchId as string);
+    const dateRange = parseDateRange(req.query.from as string | undefined, req.query.to as string | undefined);
+    if (dateRange) where.date = dateRange;
+
+    const [all, paid] = await Promise.all([
+      prisma.salesInvoice.aggregate({ where, _count: { _all: true }, _sum: { total: true } }),
+      prisma.salesInvoice.count({ where: { ...where, paidStatus: 'PAID' } }),
+    ]);
+    res.json({
+      count: all._count._all,
+      total: Number(all._sum.total ?? 0),
+      paidCount: paid,
+      unpaidCount: all._count._all - paid,
+    });
+  } catch (err) {
+    next(err);
+  }
+});
+
 // GET /api/sales-invoices/:id
 router.get('/:id', requirePermission('sales.view'), async (req: Request, res: Response, next: NextFunction) => {
   try {

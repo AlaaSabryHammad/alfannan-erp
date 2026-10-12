@@ -43,6 +43,20 @@ router.get('/', requirePermission('customers.view'), async (req: Request, res: R
   }
 });
 
+// GET /api/customers/summary — real totals for the KPI cards (not computed from one page)
+router.get('/summary', requirePermission('customers.view'), async (_req: Request, res: Response, next: NextFunction) => {
+  try {
+    const [total, active, debt] = await Promise.all([
+      prisma.customer.count(),
+      prisma.customer.count({ where: { status: 'ACTIVE' } }),
+      prisma.customer.aggregate({ _sum: { currentBalance: true } }),
+    ]);
+    res.json({ total, active, totalDebt: Number(debt._sum.currentBalance ?? 0) });
+  } catch (err) {
+    next(err);
+  }
+});
+
 // GET /api/customers/walk-in — the cash customer of this company (created on first use).
 // Must stay above '/:id'.
 router.get('/walk-in', requirePermission('sales.create'), async (_req: Request, res: Response, next: NextFunction) => {

@@ -442,18 +442,22 @@ export function SalesInvoicesPage() {
     queryFn: () => fetchInvoices({ page, pageSize, search, from, to, branchId }),
   });
 
-  // All invoices for KPIs (also respects date range + branch)
-  const { data: allData } = useQuery({
-    queryKey: ['sales-invoices-all', from, to, branchId],
-    queryFn: () => fetchInvoices({ page: 1, pageSize: 1000, search: '', from, to, branchId }),
+  // Real totals computed by the server for the selected date range + branch
+  const { data: kpi } = useQuery({
+    queryKey: ['sales-invoices-all', 'summary', from, to, branchId],
+    queryFn: async () => {
+      const params: Record<string, string | number> = {};
+      if (from) params.from = from;
+      if (to) params.to = to;
+      if (branchId != null) params.branchId = branchId;
+      return (await apiClient.get<{ count: number; total: number; paidCount: number; unpaidCount: number }>('/sales-invoices/summary', { params })).data;
+    },
     staleTime: 1000 * 60 * 2,
   });
-
-  const allInvoices = allData?.data ?? [];
-  const totalInvoices = allData?.pagination.total ?? 0;
-  const totalSales = allInvoices.reduce((s, inv) => s + Number(inv.total), 0);
-  const paidCount = allInvoices.filter((i) => i.paidStatus === 'PAID').length;
-  const unpaidCount = allInvoices.filter((i) => i.paidStatus !== 'PAID').length;
+  const totalInvoices = kpi?.count ?? 0;
+  const totalSales = kpi?.total ?? 0;
+  const paidCount = kpi?.paidCount ?? 0;
+  const unpaidCount = kpi?.unpaidCount ?? 0;
 
   const whatsappMutation = useMutation({
     mutationFn: (id: number) => apiClient.post(`/notifications/sales-invoices/${id}/whatsapp`),

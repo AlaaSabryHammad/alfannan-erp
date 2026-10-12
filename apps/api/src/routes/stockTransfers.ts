@@ -31,6 +31,21 @@ function generateTransferNo(): string {
 }
 
 // GET /api/stock-transfers
+// GET /api/stock-transfers/summary — real totals for the KPI cards
+router.get('/summary', requirePermission('transfers.view'), async (_req: Request, res: Response, next: NextFunction) => {
+  try {
+    const [total, done, pending, qty] = await Promise.all([
+      prisma.stockTransfer.count(),
+      prisma.stockTransfer.count({ where: { status: 'DONE' } }),
+      prisma.stockTransfer.count({ where: { status: 'PENDING' } }),
+      prisma.stockTransferItem.aggregate({ _sum: { qty: true } }),
+    ]);
+    res.json({ total, done, pending, totalQty: Number(qty._sum.qty ?? 0) });
+  } catch (err) {
+    next(err);
+  }
+});
+
 router.get('/', requirePermission('transfers.view'), async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { page, pageSize, search, skip } = getPagination(req);
