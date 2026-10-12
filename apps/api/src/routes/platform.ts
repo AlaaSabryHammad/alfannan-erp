@@ -31,6 +31,7 @@ import { invalidateUserSessions } from '../lib/userSession';
 import billingRouter from './platformBilling';
 import systemRouter from './platformSystem';
 import adminsRouter from './platformAdmins';
+import analyticsRouter from './platformAnalytics';
 import { sendVerificationEmail } from '../lib/emailVerification';
 import { mailEnabled } from '../lib/mail/mailer';
 
@@ -100,6 +101,7 @@ router.use((req: Request, res: Response, next: NextFunction) => {
 router.use(billingRouter);
 router.use(systemRouter);
 router.use(adminsRouter);
+router.use(analyticsRouter);
 
 // Change my own password. Needs the current one; every other session of this account is ended and the
 // caller continues with a fresh token.
