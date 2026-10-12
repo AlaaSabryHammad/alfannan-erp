@@ -58,6 +58,8 @@ model User {
   sessionsValidAfter DateTime?
   // set when the owner of the mailbox opened the confirmation link
   emailVerifiedAt    DateTime?
+  // last successful login (support: who is actually using the system)
+  lastLoginAt        DateTime?
 
   branchId     Int?
 
@@ -1700,6 +1702,9 @@ model Tenant {
   termsAcceptedAt DateTime?
   termsAcceptedBy String?
   termsAcceptedIp String?
+
+  // internal notes of the platform owner (never shown to the company)
+  platformNote String?
 
   roleRows Role[]
   userRows User[]

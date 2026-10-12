@@ -2,7 +2,8 @@ import { useState } from 'react';
 import { Navigate, useNavigate } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
-  AlertTriangle, KeyRound, Loader2, LogOut, PauseCircle, PlayCircle, Plus, Search, Users, X,
+  AlertTriangle, BadgeCheck, Copy, Download, KeyRound, Loader2, LogOut, Mail, PauseCircle, PlayCircle, Plus, Search,
+  UserCheck, UserX, Users, X,
 } from 'lucide-react';
 import { BrandMark } from '../../components/BrandLogo';
 import type { AxiosError } from 'axios';
@@ -37,6 +38,12 @@ const ACTION_LABELS: Record<string, string> = {
   TENANT_ACTIVATE: 'تفعيل شركة',
   TENANT_RENAME: 'تغيير اسم شركة',
   USER_PASSWORD_RESET: 'إعادة تعيين كلمة مرور',
+  USER_ACTIVATE: 'تفعيل مستخدم',
+  USER_DEACTIVATE: 'تعطيل مستخدم',
+  USER_FORCE_LOGOUT: 'إنهاء جلسات مستخدم',
+  USER_EMAIL_VERIFIED: 'تأكيد بريد مستخدم يدويًا',
+  USER_VERIFICATION_RESENT: 'إعادة إرسال رسالة التأكيد',
+  TENANT_NOTE: 'تعديل ملاحظة شركة',
   PLAN_CREATE: 'إنشاء باقة',
   PLAN_UPDATE: 'تعديل باقة',
   SUB_CHANGE_PLAN: 'تغيير باقة شركة',
@@ -454,9 +461,43 @@ function SubscriptionCard({ tenant, plans }: { tenant: PlatformTenantDetail; pla
   );
 }
 
+interface ConfirmState {
+  title: string;
+  body: string;
+  confirmLabel: string;
+  danger?: boolean;
+  onOk: () => void;
+}
+
+function ConfirmDialog({ state, onClose }: { state: ConfirmState; onClose: () => void }) {
+  return (
+    <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/50" dir="rtl">
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm p-6 flex flex-col gap-4">
+        <h2 className="text-lg font-bold text-slate-900">{state.title}</h2>
+        <p className="text-sm leading-7 text-slate-600">{state.body}</p>
+        <div className="flex gap-2 justify-end">
+          <button onClick={onClose} className="px-4 py-2 text-sm font-semibold rounded-lg border border-slate-300 text-slate-700 hover:bg-slate-50">
+            تراجع
+          </button>
+          <button
+            onClick={() => { state.onOk(); onClose(); }}
+            className={`px-4 py-2 text-sm font-semibold rounded-lg text-white ${state.danger ? 'bg-red-600 hover:bg-red-700' : 'bg-teal-700 hover:bg-teal-800'}`}
+          >
+            {state.confirmLabel}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function TenantPanel({ tenantId, onClose }: { tenantId: number; onClose: () => void }) {
   const qc = useQueryClient();
   const [temp, setTemp] = useState<{ email: string; password: string } | null>(null);
+  const [confirm, setConfirm] = useState<ConfirmState | null>(null);
+  const [notice, setNotice] = useState<{ ok: boolean; text: string } | null>(null);
+  const [note, setNote] = useState<string | null>(null);
+  const [copied, setCopied] = useState(false);
 
   const { data, isLoading } = useQuery({
     queryKey: ['platform', 'tenant', tenantId],
@@ -483,12 +524,49 @@ function TenantPanel({ tenantId, onClose }: { tenantId: number; onClose: () => v
     },
   });
 
+  // one mutation for every per-user support action
+  const userAction = useMutation({
+    mutationFn: async (a: { userId: number; action: string; body?: object; okText: string }) => {
+      const r = await platformApi.post(`/tenants/${tenantId}/users/${a.userId}/${a.action}`, a.body ?? {});
+      return { ...(r.data as object), okText: a.okText };
+    },
+    onSuccess: (r) => {
+      setNotice({ ok: true, text: (r as { okText: string }).okText });
+      qc.invalidateQueries({ queryKey: ['platform'] });
+    },
+    onError: (e) => setNotice({ ok: false, text: errorOf(e) }),
+  });
+
+  const saveNote = useMutation({
+    mutationFn: async (text: string) => (await platformApi.patch(`/tenants/${tenantId}`, { platformNote: text.trim() || null })).data,
+    onSuccess: () => {
+      setNote(null);
+      setNotice({ ok: true, text: 'تم حفظ الملاحظة' });
+      qc.invalidateQueries({ queryKey: ['platform'] });
+    },
+    onError: (e) => setNotice({ ok: false, text: errorOf(e) }),
+  });
+
   const confirmToggle = () => {
     if (!data) return;
-    const msg = data.isActive
-      ? `إيقاف «${data.name}»؟ سيُمنع كل مستخدميها من الدخول فورًا.`
-      : `إعادة تفعيل «${data.name}»؟`;
-    if (window.confirm(msg)) toggle.mutate(!data.isActive);
+    setConfirm({
+      title: data.isActive ? 'إيقاف الشركة؟' : 'إعادة تفعيل الشركة؟',
+      body: data.isActive
+        ? `سيُمنع كل مستخدمي «${data.name}» من الدخول فورًا، وتبقى بياناتها محفوظة.`
+        : `سيتمكّن مستخدمو «${data.name}» من الدخول مجددًا.`,
+      confirmLabel: data.isActive ? 'إيقاف الشركة' : 'تفعيل الشركة',
+      danger: data.isActive,
+      onOk: () => toggle.mutate(!data.isActive),
+    });
+  };
+
+  const copyTemp = async () => {
+    if (!temp) return;
+    try {
+      await navigator.clipboard.writeText(temp.password);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch { /* clipboard unavailable: the value stays selectable */ }
   };
 
   return (
@@ -541,25 +619,105 @@ function TenantPanel({ tenantId, onClose }: { tenantId: number; onClose: () => v
 
             <h3 className="text-sm font-semibold text-slate-700 mb-2 flex items-center gap-2"><Users size={16} /> المستخدمون</h3>
             <ul className="divide-y divide-slate-100 border border-slate-200 rounded-lg">
-              {data.users.map((u) => (
-                <li key={u.id} className="p-3 flex items-center gap-3">
-                  <div className="min-w-0 flex-1">
-                    <p className="text-sm font-medium text-slate-900 truncate">{u.name}</p>
-                    <p className="text-xs text-slate-500 truncate" dir="ltr">{u.email}</p>
-                  </div>
-                  <span className="text-xs bg-slate-100 text-slate-600 px-2 py-0.5 rounded">{u.role.nameAr}</span>
-                  <button
-                    title="إعادة تعيين كلمة المرور"
-                    disabled={reset.isPending}
-                    onClick={() => {
-                      if (window.confirm(`إنشاء كلمة مرور مؤقتة جديدة لـ ${u.email}؟`)) reset.mutate(u.id);
-                    }}
-                    className="p-1.5 text-slate-500 hover:text-teal-700 disabled:opacity-50"
-                  >
-                    <KeyRound size={16} />
-                  </button>
-                </li>
-              ))}
+              {data.users.map((u) => {
+                const ask = (c: Omit<ConfirmState, 'onOk'> & { run: () => void }) =>
+                  setConfirm({ title: c.title, body: c.body, confirmLabel: c.confirmLabel, danger: c.danger, onOk: c.run });
+                const btn = 'p-1.5 text-slate-500 disabled:opacity-50';
+                return (
+                  <li key={u.id} className={`p-3 flex flex-col gap-2 ${u.isActive ? '' : 'bg-slate-50'}`}>
+                    <div className="flex items-center gap-3">
+                      <div className="min-w-0 flex-1">
+                        <p className={`text-sm font-medium truncate ${u.isActive ? 'text-slate-900' : 'text-slate-400 line-through'}`}>{u.name}</p>
+                        <p className="text-xs text-slate-500 truncate" dir="ltr">{u.email}</p>
+                      </div>
+                      <span className="text-xs bg-slate-100 text-slate-600 px-2 py-0.5 rounded">{u.role.nameAr}</span>
+                    </div>
+                    <div className="flex items-center gap-2 flex-wrap text-xs">
+                      {u.emailVerifiedAt ? (
+                        <span className="bg-emerald-50 text-emerald-700 px-2 py-0.5 rounded-full">البريد مؤكَّد</span>
+                      ) : (
+                        <span className="bg-amber-50 text-amber-700 px-2 py-0.5 rounded-full">البريد غير مؤكَّد</span>
+                      )}
+                      {!u.isActive && <span className="bg-red-50 text-red-700 px-2 py-0.5 rounded-full">معطّل</span>}
+                      <span className="text-slate-400">آخر دخول: {fmtDate(u.lastLoginAt)}</span>
+                      <span className="mr-auto flex items-center">
+                        <button
+                          title="إعادة تعيين كلمة المرور"
+                          disabled={reset.isPending}
+                          onClick={() => ask({
+                            title: 'إعادة تعيين كلمة المرور',
+                            body: `ستُنشأ كلمة مرور مؤقتة جديدة لـ ${u.email} وتنتهي جلساته الحالية.`,
+                            confirmLabel: 'إنشاء كلمة مرور مؤقتة',
+                            run: () => reset.mutate(u.id),
+                          })}
+                          className={`${btn} hover:text-teal-700`}
+                        >
+                          <KeyRound size={16} />
+                        </button>
+                        <button
+                          title="إنهاء كل جلساته"
+                          disabled={userAction.isPending}
+                          onClick={() => ask({
+                            title: 'إنهاء الجلسات',
+                            body: `سيُسجَّل خروج ${u.email} من كل الأجهزة فورًا.`,
+                            confirmLabel: 'إنهاء الجلسات',
+                            run: () => userAction.mutate({ userId: u.id, action: 'force-logout', okText: 'تم إنهاء جلسات المستخدم' }),
+                          })}
+                          className={`${btn} hover:text-teal-700`}
+                        >
+                          <LogOut size={16} />
+                        </button>
+                        {!u.emailVerifiedAt && (
+                          <>
+                            <button
+                              title="إعادة إرسال رسالة التأكيد"
+                              disabled={userAction.isPending}
+                              onClick={() => userAction.mutate({ userId: u.id, action: 'resend-verification', okText: 'أُرسلت رسالة التأكيد' })}
+                              className={`${btn} hover:text-teal-700`}
+                            >
+                              <Mail size={16} />
+                            </button>
+                            <button
+                              title="اعتماد البريد يدويًا"
+                              disabled={userAction.isPending}
+                              onClick={() => ask({
+                                title: 'اعتماد البريد يدويًا',
+                                body: `سيُعتبر ${u.email} مؤكَّدًا دون الضغط على الرابط. استخدمها فقط بعد التحقق من صاحبه.`,
+                                confirmLabel: 'اعتماد',
+                                run: () => userAction.mutate({ userId: u.id, action: 'verify-email', okText: 'تم اعتماد البريد' }),
+                              })}
+                              className={`${btn} hover:text-emerald-700`}
+                            >
+                              <BadgeCheck size={16} />
+                            </button>
+                          </>
+                        )}
+                        <button
+                          title={u.isActive ? 'تعطيل المستخدم' : 'تفعيل المستخدم'}
+                          disabled={userAction.isPending}
+                          onClick={() => ask({
+                            title: u.isActive ? 'تعطيل المستخدم' : 'تفعيل المستخدم',
+                            body: u.isActive
+                              ? `لن يتمكن ${u.email} من الدخول وتنتهي جلساته الحالية.`
+                              : `سيتمكن ${u.email} من الدخول مجددًا.`,
+                            confirmLabel: u.isActive ? 'تعطيل' : 'تفعيل',
+                            danger: u.isActive,
+                            run: () => userAction.mutate({
+                              userId: u.id,
+                              action: 'active',
+                              body: { isActive: !u.isActive },
+                              okText: u.isActive ? 'تم تعطيل المستخدم' : 'تم تفعيل المستخدم',
+                            }),
+                          })}
+                          className={`${btn} ${u.isActive ? 'hover:text-red-600' : 'hover:text-emerald-700'}`}
+                        >
+                          {u.isActive ? <UserX size={16} /> : <UserCheck size={16} />}
+                        </button>
+                      </span>
+                    </div>
+                  </li>
+                );
+              })}
             </ul>
 
             {temp && (
@@ -567,12 +725,41 @@ function TenantPanel({ tenantId, onClose }: { tenantId: number; onClose: () => v
                 <p className="text-sm font-semibold text-amber-900">كلمة مرور مؤقتة لـ <span dir="ltr">{temp.email}</span></p>
                 <p className="mt-2 font-mono text-base select-all bg-white border border-amber-200 rounded px-3 py-2" dir="ltr">{temp.password}</p>
                 <p className="text-xs text-amber-800 mt-2">تُعرض مرة واحدة فقط — سلّمها للمستخدم ليغيّرها بعد الدخول.</p>
-                <button onClick={() => setTemp(null)} className="text-xs text-amber-900 underline mt-2">إخفاء</button>
+                <div className="flex items-center gap-4 mt-2">
+                  <button onClick={copyTemp} className="text-xs font-semibold text-amber-900 flex items-center gap-1">
+                    <Copy size={13} /> {copied ? 'تم النسخ' : 'نسخ'}
+                  </button>
+                  <button onClick={() => setTemp(null)} className="text-xs text-amber-900 underline">إخفاء</button>
+                </div>
               </div>
             )}
+
+            {notice && (
+              <p className={`mt-3 text-sm rounded-lg px-3 py-2 border ${notice.ok ? 'bg-emerald-50 border-emerald-200 text-emerald-800' : 'bg-red-50 border-red-200 text-red-700'}`}>
+                {notice.text}
+              </p>
+            )}
+
+            <h3 className="text-sm font-semibold text-slate-700 mt-6 mb-2">ملاحظات داخلية</h3>
+            <textarea
+              value={note ?? data.platformNote ?? ''}
+              onChange={(e) => setNote(e.target.value)}
+              rows={3}
+              maxLength={2000}
+              placeholder="ملاحظات لا تظهر للشركة (اتفاقات، متابعات، سبب الإيقاف…)"
+              className={input}
+            />
+            <button
+              disabled={note === null || saveNote.isPending}
+              onClick={() => saveNote.mutate(note ?? '')}
+              className="mt-2 text-sm font-semibold bg-slate-800 hover:bg-slate-900 text-white px-4 py-1.5 rounded-lg disabled:opacity-40 flex items-center gap-2"
+            >
+              {saveNote.isPending && <Loader2 size={13} className="animate-spin" />} حفظ الملاحظة
+            </button>
           </>
         )}
       </aside>
+      {confirm && <ConfirmDialog state={confirm} onClose={() => setConfirm(null)} />}
     </div>
   );
 }
@@ -648,6 +835,7 @@ type Tab = 'tenants' | 'requests' | 'plans' | 'payments' | 'audit';
 export function PlatformDashboardPage() {
   const navigate = useNavigate();
   const [search, setSearch] = useState('');
+  const [statusFilter, setStatusFilter] = useState('all');
   const [selected, setSelected] = useState<number | null>(null);
   const [tab, setTab] = useState<Tab>('tenants');
   const [editingPlan, setEditingPlan] = useState<PlatformPlan | 'new' | null>(null);
@@ -725,6 +913,39 @@ export function PlatformDashboardPage() {
   };
 
   const s = stats.data;
+
+  const shownTenants = (tenants.data ?? []).filter((t) => {
+    switch (statusFilter) {
+      case 'active': return t.isActive;
+      case 'suspended': return !t.isActive;
+      case 'TRIALING':
+      case 'ACTIVE':
+      case 'PAST_DUE':
+      case 'EXPIRED':
+      case 'CANCELED': return t.subscription?.status === statusFilter;
+      default: return true;
+    }
+  });
+
+  const exportCsv = () => {
+    const cell = (v: string | number | null | undefined) => '"' + String(v ?? '').replace(/"/g, '""') + '"';
+    const rows = [
+      ['الشركة', 'المعرّف', 'الباقة', 'حالة الاشتراك', 'الحساب', 'المستخدمون', 'الأصناف', 'العملاء', 'فواتير 30 يوم', 'مبيعات 30 يوم', 'آخر نشاط', 'تاريخ التسجيل'],
+      ...shownTenants.map((t) => [
+        t.name, t.slug, t.subscription?.planName ?? '', t.subscription ? STATUS_LABELS[t.subscription.status] : '',
+        t.isActive ? 'نشطة' : 'موقوفة', t.usage.users, t.usage.products, t.usage.customers,
+        t.usage.invoicesLast30Days, t.usage.salesLast30Days, t.usage.lastActivityAt?.slice(0, 10) ?? '', t.createdAt.slice(0, 10),
+      ]),
+    ];
+    const csv = '\uFEFF' + rows.map((r) => r.map(cell).join(',')).join('\r\n');
+    const url = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8' }));
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `companies-${new Date().toISOString().slice(0, 10)}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
   const tabs: Array<[Tab, string]> = [
     ['tenants', 'الشركات'],
     ['requests', `طلبات الترقية${s?.pendingUpgradeRequests ? ` (${s.pendingUpgradeRequests})` : ''}`],
@@ -759,6 +980,7 @@ export function PlatformDashboardPage() {
           <StatCard label="المحصَّل — آخر 30 يومًا (ر.س)" value={s ? fmtMoney(s.revenue.paidLast30Days) : '—'} />
           <StatCard label="شركات في التجربة" value={s?.revenue.trialingTenants ?? '—'} />
           <StatCard label="إجمالي الشركات" value={s?.tenants.total ?? '—'} hint={`${s?.tenants.suspended ?? 0} موقوفة · ${s?.tenants.newLast7Days ?? 0} جديدة (7 أيام)`} />
+          <StatCard label="مديرون لم يؤكدوا بريدهم" value={s?.unverifiedAdmins ?? '—'} hint="افتح الشركة لإعادة الإرسال أو الاعتماد" />
         </section>
 
         {s && s.revenue.attention.length > 0 && (
@@ -810,7 +1032,32 @@ export function PlatformDashboardPage() {
               </button>
             ))}
             {tab === 'tenants' && (
-              <div className="mr-auto relative">
+              <div className="mr-auto flex items-center gap-2">
+                <select
+                  value={statusFilter}
+                  onChange={(e) => setStatusFilter(e.target.value)}
+                  className="border border-slate-300 rounded-lg px-2 py-1.5 text-sm bg-white"
+                >
+                  <option value="all">كل الشركات</option>
+                  <option value="active">حساب نشط</option>
+                  <option value="suspended">موقوفة</option>
+                  <option value="TRIALING">في التجربة</option>
+                  <option value="ACTIVE">مشتركة</option>
+                  <option value="PAST_DUE">فترة سماح</option>
+                  <option value="EXPIRED">منتهية</option>
+                  <option value="CANCELED">ملغاة</option>
+                </select>
+                <button
+                  onClick={exportCsv}
+                  disabled={shownTenants.length === 0}
+                  className="flex items-center gap-1.5 text-sm font-semibold border border-slate-300 bg-white hover:bg-slate-50 text-slate-700 px-3 py-1.5 rounded-lg disabled:opacity-50"
+                >
+                  <Download size={15} /> تصدير CSV
+                </button>
+              </div>
+            )}
+            {tab === 'tenants' && (
+              <div className="relative">
                 <Search size={16} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400" />
                 <input
                   value={search}
@@ -835,7 +1082,7 @@ export function PlatformDashboardPage() {
                 </thead>
                 <tbody className="divide-y divide-slate-100">
                   {tenants.isLoading && <Loading cols={8} />}
-                  {tenants.data?.map((t) => (
+                  {shownTenants.map((t) => (
                     <tr key={t.id} onClick={() => setSelected(t.id)} className="hover:bg-slate-50 cursor-pointer">
                       <td className="px-4 py-3 font-medium text-slate-900">{t.name}</td>
                       <td className="px-4 py-3 text-slate-600">{t.subscription?.planName ?? '—'}</td>
@@ -851,7 +1098,7 @@ export function PlatformDashboardPage() {
                       </td>
                     </tr>
                   ))}
-                  {tenants.data?.length === 0 && (
+                  {tenants.data && shownTenants.length === 0 && (
                     <tr><td colSpan={8} className="py-10 text-center text-slate-400">لا توجد شركات مطابقة</td></tr>
                   )}
                 </tbody>

@@ -11,6 +11,10 @@
  *   GET   /api/platform/tenants/:id
  *   PATCH /api/platform/tenants/:id                       { isActive?, name? }
  *   POST  /api/platform/tenants/:id/users/:userId/reset-password
+ *   POST  /api/platform/tenants/:id/users/:userId/active          { isActive }
+ *   POST  /api/platform/tenants/:id/users/:userId/force-logout
+ *   POST  /api/platform/tenants/:id/users/:userId/verify-email    (mark confirmed)
+ *   POST  /api/platform/tenants/:id/users/:userId/resend-verification
  *   GET   /api/platform/audit-log
  */
 import { Router, Request, Response, NextFunction } from 'express';
@@ -25,6 +29,8 @@ import { computeEntitlements } from '../lib/entitlements';
 import { rateLimit } from '../middleware/rateLimit';
 import { invalidateUserSessions } from '../lib/userSession';
 import billingRouter from './platformBilling';
+import { sendVerificationEmail } from '../lib/emailVerification';
+import { mailEnabled } from '../lib/mail/mailer';
 
 const router = Router();
 
@@ -263,6 +269,7 @@ router.get('/stats', async (_req: Request, res: Response, next: NextFunction) =>
         newLast30Days: tenants.filter((t) => t.createdAt >= daysAgo(30)).length,
       },
       users,
+      unverifiedAdmins: await db.user.count({ where: { emailVerifiedAt: null, role: { code: 'ADMIN' }, isActive: true } }),
       signupsByDay,
     });
   } catch (err) {
@@ -308,6 +315,8 @@ router.get('/tenants/:id', async (req: Request, res: Response, next: NextFunctio
           email: true,
           isActive: true,
           createdAt: true,
+          emailVerifiedAt: true,
+          lastLoginAt: true,
           role: { select: { code: true, nameAr: true } },
         },
         orderBy: { id: 'asc' },
@@ -333,6 +342,7 @@ router.get('/tenants/:id', async (req: Request, res: Response, next: NextFunctio
 const patchSchema = z.object({
   isActive: z.boolean().optional(),
   name: z.string().trim().min(2).max(100).optional(),
+  platformNote: z.string().max(2000).nullable().optional(),
 });
 
 router.patch('/tenants/:id', async (req: Request, res: Response, next: NextFunction) => {
@@ -352,7 +362,111 @@ router.patch('/tenants/:id', async (req: Request, res: Response, next: NextFunct
     if (data.name && data.name !== before.name) {
       await audit(req, 'TENANT_RENAME', id, `${before.name} → ${data.name}`);
     }
+    if (data.platformNote !== undefined && data.platformNote !== before.platformNote) {
+      await audit(req, 'TENANT_NOTE', id, before.name);
+    }
     res.json(updated);
+  } catch (err) {
+    next(err);
+  }
+});
+
+// ── support actions on one company user ───────────────────────────────────────
+
+async function findCompanyUser(req: Request, res: Response) {
+  const tenantId = Number(req.params.id);
+  const userId = Number(req.params.userId);
+  const user = await db.user.findFirst({
+    where: { id: userId, tenantId },
+    include: { role: { select: { code: true } }, tenant: { select: { name: true } } },
+  });
+  if (!user) {
+    res.status(404).json({ error: 'المستخدم غير موجود في هذه الشركة' });
+    return null;
+  }
+  return { user, tenantId };
+}
+
+// enable / disable one user (a disabled user cannot sign in and loses the open session at once)
+router.post('/tenants/:id/users/:userId/active', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { isActive } = z.object({ isActive: z.boolean() }).parse(req.body);
+    const found = await findCompanyUser(req, res);
+    if (!found) return;
+    const { user, tenantId } = found;
+
+    if (!isActive && user.role.code === 'ADMIN') {
+      const otherAdmins = await db.user.count({
+        where: { tenantId, isActive: true, id: { not: user.id }, role: { code: 'ADMIN' } },
+      });
+      if (otherAdmins === 0) {
+        res.status(400).json({ error: 'لا يمكن تعطيل آخر مدير نشط في الشركة' });
+        return;
+      }
+    }
+    await db.user.update({
+      where: { id: user.id },
+      data: { isActive, ...(isActive ? {} : { sessionsValidAfter: new Date() }) },
+    });
+    invalidateUserSessions(tenantId, user.id);
+    await audit(req, isActive ? 'USER_ACTIVATE' : 'USER_DEACTIVATE', tenantId, user.email);
+    res.json({ id: user.id, isActive });
+  } catch (err) {
+    next(err);
+  }
+});
+
+// end every open session of the user (lost device, suspected leak)
+router.post('/tenants/:id/users/:userId/force-logout', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const found = await findCompanyUser(req, res);
+    if (!found) return;
+    const { user, tenantId } = found;
+    await db.user.update({ where: { id: user.id }, data: { sessionsValidAfter: new Date() } });
+    invalidateUserSessions(tenantId, user.id);
+    await audit(req, 'USER_FORCE_LOGOUT', tenantId, user.email);
+    res.json({ success: true });
+  } catch (err) {
+    next(err);
+  }
+});
+
+// the owner confirmed the address by other means (a phone call, a mailbox that filters our mail)
+router.post('/tenants/:id/users/:userId/verify-email', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const found = await findCompanyUser(req, res);
+    if (!found) return;
+    const { user, tenantId } = found;
+    if (!user.emailVerifiedAt) {
+      await db.user.update({ where: { id: user.id }, data: { emailVerifiedAt: new Date() } });
+      await audit(req, 'USER_EMAIL_VERIFIED', tenantId, user.email);
+    }
+    res.json({ success: true });
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.post('/tenants/:id/users/:userId/resend-verification', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const found = await findCompanyUser(req, res);
+    if (!found) return;
+    const { user, tenantId } = found;
+    if (user.emailVerifiedAt) {
+      res.json({ sent: false, alreadyVerified: true });
+      return;
+    }
+    if (!mailEnabled()) {
+      res.status(503).json({ error: 'خدمة البريد غير مفعّلة على الخادم' });
+      return;
+    }
+    const sent = await sendVerificationEmail(user, user.tenant.name);
+    if (!sent) {
+      res.status(502).json({ error: 'تعذّر إرسال الرسالة — راجع إعدادات SMTP' });
+      return;
+    }
+    await audit(req, 'USER_VERIFICATION_RESENT', tenantId, user.email);
+    res.json({ sent: true, alreadyVerified: false });
   } catch (err) {
     next(err);
   }
