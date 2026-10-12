@@ -126,7 +126,11 @@ router.post('/login', rateLimit({ name: 'login', windowMs: 10 * 60 * 1000, max: 
     }
 
     recordSuccess(email);
-    const result = await runWithTenant(user.tenantId, () => buildToken(user.id));
+    const result = await runWithTenant(user.tenantId, async () => {
+      // best effort: a failed bookkeeping write must never block a login
+      await prisma.user.update({ where: { id: user.id }, data: { lastLoginAt: new Date() } }).catch(() => undefined);
+      return buildToken(user.id);
+    });
     res.json(result);
   } catch (err) {
     next(err);

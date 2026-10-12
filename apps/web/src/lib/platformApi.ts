@@ -50,6 +50,7 @@ export interface PlatformTenant {
   termsVersion: string | null;
   termsAcceptedAt: string | null;
   termsAcceptedBy: string | null;
+  platformNote: string | null;
   usage: PlatformUsage;
   subscription: PlatformSubscription | null;
 }
@@ -62,6 +63,8 @@ export interface PlatformTenantDetail extends PlatformTenant {
     email: string;
     isActive: boolean;
     createdAt: string;
+    emailVerifiedAt: string | null;
+    lastLoginAt: string | null;
     role: { code: string; nameAr: string };
   }>;
 }
@@ -71,6 +74,7 @@ export interface PlatformStats {
   revenue: PlatformRevenue;
   tenants: { total: number; active: number; suspended: number; newLast7Days: number; newLast30Days: number };
   users: number;
+  unverifiedAdmins: number;
   signupsByDay: Array<{ date: string; count: number }>;
 }
 
