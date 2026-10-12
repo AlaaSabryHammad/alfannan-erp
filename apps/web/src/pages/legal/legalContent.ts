@@ -12,7 +12,7 @@ export const LEGAL_UPDATED_AR = '12 أكتوبر 2026';
 const env = import.meta.env as Record<string, string | undefined>;
 
 export const LEGAL_ENTITY = env.VITE_LEGAL_ENTITY?.trim() || 'حلول الفنان';
-export const SERVICE_NAME = 'نظام الفنان للتوريدات والمخازن';
+export const SERVICE_NAME = 'الفنان السعودي';
 export const SUPPORT_EMAIL = env.VITE_SUPPORT_EMAIL?.trim() || '';
 export const SUPPORT_PHONE = env.VITE_SUPPORT_PHONE?.trim() || '';
 

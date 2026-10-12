@@ -13,7 +13,7 @@
    SMTP_PORT=465
    SMTP_USER=no-reply@handaza.cloud
    SMTP_PASS=كلمة-سر-الصندوق
-   MAIL_FROM="نظام الفنان <no-reply@handaza.cloud>"
+   MAIL_FROM="الفنان السعودي <no-reply@handaza.cloud>"
    ```
 
    المنفذ 465 = SSL مباشر (الافتراضي). لو استخدمت 587 أضف `SMTP_SECURE=false`.

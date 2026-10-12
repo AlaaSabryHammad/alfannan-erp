@@ -3,9 +3,10 @@ import { Link, useNavigate } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { Eye, EyeOff, Loader2, Building2 } from 'lucide-react';
+import { Eye, EyeOff, Loader2 } from 'lucide-react';
 import type { AxiosError } from 'axios';
 import { useAuth } from '../../contexts/AuthContext';
+import { BrandLockup } from '../../components/BrandLogo';
 
 const registerSchema = z
   .object({
@@ -57,8 +58,8 @@ export function RegisterPage() {
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-100 to-slate-200 flex items-center justify-center p-4">
       <div className="w-full max-w-md bg-white rounded-2xl shadow-2xl p-8">
-        <div className="w-14 h-14 bg-primary/10 rounded-2xl flex items-center justify-center mb-4">
-          <Building2 className="text-primary" size={26} />
+        <div className="mb-4">
+          <BrandLockup size={44} />
         </div>
         <h1 className="text-2xl font-bold text-app-text mb-1">أنشئ شركتك</h1>
         <p className="text-app-muted text-sm mb-6">

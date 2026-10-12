@@ -43,6 +43,7 @@ import {
   Lock,
 } from 'lucide-react';
 import { cn } from '../lib/utils';
+import { BrandMark, BRAND_NAME } from '../components/BrandLogo';
 
 interface NavItem {
   label: string;
@@ -248,11 +249,9 @@ export function Sidebar() {
       {/* Brand block */}
       <div className="px-4 py-5 border-b border-white/10">
         <div className="flex items-center gap-3 mb-3">
-          <div className="w-10 h-10 bg-primary rounded-xl flex items-center justify-center flex-shrink-0">
-            <span className="text-white font-bold text-lg">ف</span>
-          </div>
+          <BrandMark size={40} tone="onDark" className="flex-shrink-0" />
           <div className="min-w-0">
-            <p className="text-white font-bold text-sm leading-tight truncate">الفنان للتوريدات</p>
+            <p className="text-white font-bold text-base leading-tight truncate" style={{ fontFamily: "'Reem Kufi', Tahoma, sans-serif" }}>{BRAND_NAME}</p>
             <p className="text-white/50 text-xs truncate">لوحة التحكم الإدارية</p>
           </div>
         </div>
@@ -272,7 +271,7 @@ export function Sidebar() {
       {/* Footer */}
       <div className="px-4 py-3 border-t border-white/10">
         <p className="text-white/30 text-[10px] text-center">
-          © 2026 نظام الفنان · حلول الفنان
+          © 2026 الفنان السعودي · حلول الفنان
         </p>
       </div>
     </aside>
