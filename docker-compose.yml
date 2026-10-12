@@ -26,6 +26,12 @@ services:
       context: .
       dockerfile: deploy/api.Dockerfile
     restart: unless-stopped
+    # nginx reaches the API by this name. "api" alone is too generic: on a server where the web container
+    # also joins a shared proxy network, another project's "api" service could answer instead.
+    networks:
+      default:
+        aliases:
+          - alfannan-api
     environment:
       # The app runs as the non-superuser role alfannan_app so Row-Level Security (tenant isolation)
       # is enforced by the database; migrations use the owner connection (DIRECT_DATABASE_URL).

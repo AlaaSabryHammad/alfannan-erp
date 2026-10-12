@@ -5,7 +5,7 @@
 | الطبقة | ماذا | أين |
 |---|---|---|
 | 1. على السيرفر | حاوية `backup` تأخذ كل 24 ساعة: `pg_dump` مضغوطًا **وأرشيفًا للصور المرفوعة**، وتُبقي آخر 30 من كل نوع | `/opt/alfannan/backups/alfannan-YYYYMMDD-HHMMSS.dump` و`uploads-YYYYMMDD-HHMMSS.tgz` |
-| 2. خارج السيرفر | `scripts/pull-backups.ps1` يسحب أي نسخة جديدة من النوعين، يتحقق منها، ويُبقي آخر 60 من كل نوع | `D:\backups\alfannan` على جهازك |
+| 2. خارج السيرفر | `scripts/pull-backups.ps1` يسحب أي نسخة جديدة من النوعين، يتحقق منها، ويُبقي آخر 60 من كل نوع | `D:\backups\alfannan-prod` على جهازك |
 
 الطبقة 1 وحدها تحميك من خطأ في البيانات، لكنها على نفس جهاز قاعدة البيانات؛ ضياع الجهاز يضيّعها معه. الطبقة 2 هي النسخة «خارج الموقع».
 
@@ -20,13 +20,13 @@ if (-not (Test-Path $env:USERPROFILE\.ssh\id_ed25519)) { ssh-keygen -t ed25519 -
 ```
 
 ```powershell
-type $env:USERPROFILE\.ssh\id_ed25519.pub | ssh root@100.64.92.110 "mkdir -p ~/.ssh && cat >> ~/.ssh/authorized_keys && chmod 600 ~/.ssh/authorized_keys"
+type $env:USERPROFILE\.ssh\id_ed25519.pub | ssh root@145.223.82.253 "mkdir -p ~/.ssh && cat >> ~/.ssh/authorized_keys && chmod 600 ~/.ssh/authorized_keys"
 ```
 
 تأكد (لا يجب أن يطلب كلمة سر):
 
 ```powershell
-ssh -o BatchMode=yes root@100.64.92.110 "ls /opt/alfannan/backups | tail -3"
+ssh -o BatchMode=yes root@145.223.82.253 "ls /opt/alfannan/backups | tail -3"
 ```
 
 ### 2) أول سحب يدويًا
@@ -45,7 +45,7 @@ powershell -ExecutionPolicy Bypass -File D:\projects\Alfannan\scripts\register-b
 
 ## المتابعة
 
-* السجل: `D:\backups\alfannan\pull-backups.log`
+* السجل: `D:\backups\alfannan-prod\pull-backups.log`
 * رموز الخروج: `0` سليم · `1` خطأ (نسخة فشل نسخها/تحققها، أو السيرفر لا يردّ) · `2` السيرفر لم ينتج نسخة منذ أكثر من 36 ساعة
 * آخر نتيجة للمهمة: `Get-ScheduledTaskInfo -TaskName Alfannan-Pull-Backups | Select LastRunTime, LastTaskResult`
 
