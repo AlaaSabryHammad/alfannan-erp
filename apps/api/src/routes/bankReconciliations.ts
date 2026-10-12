@@ -18,6 +18,13 @@ router.use(requireAuth);
 
 const round2 = (n: number) => Math.round(n * 100) / 100;
 
+/**
+ * The statement date is a calendar day stored at midnight, but journal entries carry the time of the
+ * day they were posted: "up to the statement date" must include that whole day, otherwise every entry
+ * of the statement day itself is silently left out.
+ */
+const endOfDay = (d: Date) => new Date(d.getTime() + 24 * 3600 * 1000 - 1);
+
 async function generateReconNo(tx: Tx, date: Date): Promise<string> {
   const y = date.getFullYear();
   const m = String(date.getMonth() + 1).padStart(2, '0');
@@ -93,7 +100,7 @@ router.get('/:id/unreconciled', requirePermission('reconciliation.view'), async 
       where: {
         accountId: recon.accountId,
         reconciliationLine: null, // not reconciled anywhere
-        entry: { date: { lte: recon.statementDate } },
+        entry: { date: { lte: endOfDay(recon.statementDate) } },
       },
       include: { entry: { select: { entryNo: true, date: true, description: true } } },
       orderBy: { entry: { date: 'asc' } },
@@ -178,7 +185,7 @@ router.put('/:id/lines', requirePermission('reconciliation.create'), async (req:
           where: {
             id: { in: body.journalLineIds },
             accountId: recon.accountId,
-            entry: { date: { lte: recon.statementDate } },
+            entry: { date: { lte: endOfDay(recon.statementDate) } },
             OR: [{ reconciliationLine: null }, { reconciliationLine: { reconciliationId: id } }],
           },
         });

@@ -173,7 +173,7 @@ export function BankReconciliationPage() {
   const [stmtBalance, setStmtBalance] = useState('');
   const [createError, setCreateError] = useState('');
 
-  const { data, isLoading } = useQuery({
+  const { data, isLoading, isError, error: listError } = useQuery({
     queryKey: ['bank-reconciliations', page, pageSize],
     queryFn: async () => (await apiClient.get<PaginatedResponse<Recon>>('/bank-reconciliations', { params: { page, pageSize } })).data,
   });
@@ -248,6 +248,12 @@ export function BankReconciliationPage() {
     <div>
       <PageHeader title="التسوية البنكية" subtitle="مطابقة حركات البنك في الدفاتر مع كشف البنك الفعلي"
         actions={canCreate ? <Button icon={<Plus size={16} />} onClick={() => setCreateOpen(true)}>جلسة تسوية جديدة</Button> : undefined} />
+
+      {isError && (
+        <div className="bg-danger-bg text-danger text-sm font-medium px-4 py-3 rounded-lg mb-4">
+          {getApiErrorMessage(listError, 'تعذّر تحميل جلسات التسوية')}
+        </div>
+      )}
 
       <div className="bg-white rounded-2xl border border-app-border shadow-sm p-5">
         <DataTable columns={columns} data={data?.data ?? []} pagination={data?.pagination as PaginationMeta | undefined}
