@@ -55,11 +55,10 @@ const fetchProductsAll = async (): Promise<Product[]> => {
   return res.data.data;
 };
 
+// /departments answers with the tree (no `data` wrapper) — the flat list has every department
 const fetchDepartmentsAll = async (): Promise<Department[]> => {
-  const res = await apiClient.get<PaginatedResponse<Department>>('/departments', {
-    params: { page: 1, pageSize: 200 },
-  });
-  return res.data.data;
+  const res = await apiClient.get<Department[]>('/departments/flat');
+  return res.data;
 };
 
 // mm → px approximation (96 dpi)
