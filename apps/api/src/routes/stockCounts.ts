@@ -14,6 +14,7 @@ import prisma from '../lib/prisma';
 import { requireAuth, requirePermission } from '../middleware/auth';
 import { getPagination, paginatedResponse } from '../lib/paginate';
 
+import { postStockAdjustmentEntry, type StockChange } from '../lib/stockAdjustment';
 const router = Router();
 router.use(requireAuth);
 
@@ -215,9 +216,15 @@ router.post('/:id/post', requirePermission('stockcount.adjust'), async (req: Req
         throw new Error('هذا الجرد مُرحَّل مسبقاً');
       }
 
+      const changes: StockChange[] = [];
       for (const line of stockCount.lines) {
         const countedQty = Number(line.countedQty);
-        const variance = countedQty - Number(line.systemQty);
+        // against what is on hand at posting time: sales made since the line was added are not a "shortage"
+        const current = await tx.stockBalance.findUnique({
+          where: { productId_warehouseId: { productId: line.productId, warehouseId: stockCount.warehouseId } },
+        });
+        const variance = countedQty - Number(current?.quantity ?? 0);
+        changes.push({ productId: line.productId, delta: variance });
 
         await tx.stockBalance.upsert({
           where: { productId_warehouseId: { productId: line.productId, warehouseId: stockCount.warehouseId } },
@@ -241,6 +248,13 @@ router.post('/:id/post', requirePermission('stockcount.adjust'), async (req: Req
           });
         }
       }
+
+      await postStockAdjustmentEntry(tx, {
+        description: `تسوية جرد مخزني ${stockCount.countNo}`,
+        sourceId: stockCount.id,
+        createdById: userId,
+        changes,
+      });
     });
 
     const full = await prisma.stockCount.findUniqueOrThrow({

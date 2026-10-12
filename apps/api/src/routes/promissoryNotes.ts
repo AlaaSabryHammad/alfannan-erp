@@ -190,6 +190,11 @@ router.post('/:id/settle', requirePermission('promissory.create'), async (req: R
       if (note.status !== 'PENDING') {
         throw new Error('الكمبيالة ليست قيد الانتظار');
       }
+      // claim it atomically: two concurrent settlements must not both post
+      const claimed = await tx.promissoryNote.updateMany({ where: { id, status: 'PENDING' }, data: { status: 'SETTLED' } });
+      if (claimed.count === 0) {
+        throw new Error('الكمبيالة ليست قيد الانتظار');
+      }
       const amount = Number(note.amount);
 
       const treasury = await tx.account.findUniqueOrThrow({
@@ -271,7 +276,11 @@ router.post('/:id/settle', requirePermission('promissory.create'), async (req: R
 
     res.json(result);
   } catch (err: any) {
-    if (typeof err?.message === 'string' && err.message.includes('القيد غير متوازن')) {
+    if (typeof err?.message === 'string' && (
+      err.message.includes('القيد غير متوازن') ||
+      err.message.includes('ليست قيد الانتظار') ||
+      err.message.includes('يجب أن يكون أصلاً')
+    )) {
       res.status(400).json({ error: err.message });
       return;
     }

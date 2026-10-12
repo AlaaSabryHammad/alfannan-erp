@@ -7,6 +7,7 @@ import { parseDateRange } from '../lib/dateRange';
 
 const MOVEMENT_TYPES = ['IN', 'OUT', 'TRANSFER', 'ADJUST'] as const;
 
+import { postStockAdjustmentEntry } from '../lib/stockAdjustment';
 const router = Router();
 router.use(requireAuth);
 
@@ -96,6 +97,11 @@ router.post('/adjust', requirePermission('stock.adjust'), async (req: Request, r
     const userId = req.user!.userId;
 
     const result = await prisma.$transaction(async (tx) => {
+      const before = await tx.stockBalance.findUnique({
+        where: { productId_warehouseId: { productId, warehouseId } },
+      });
+      const delta = quantity - Number(before?.quantity ?? 0);
+
       const balance = await tx.stockBalance.upsert({
         where: { productId_warehouseId: { productId, warehouseId } },
         update: { quantity },
@@ -106,11 +112,18 @@ router.post('/adjust', requirePermission('stock.adjust'), async (req: Request, r
           productId,
           warehouseId,
           type: 'ADJUST',
-          quantity: Math.abs(quantity),
+          // the size of the change, not the new balance
+          quantity: Math.abs(delta),
           balanceAfter: quantity,
           reason: reason ?? 'تسوية مخزون',
           createdById: userId,
         },
+      });
+      await postStockAdjustmentEntry(tx, {
+        description: `تسوية مخزون — ${reason ?? 'تسوية يدوية'}`,
+        sourceId: movement.id,
+        createdById: userId,
+        changes: [{ productId, delta }],
       });
       return { balance, movement };
     });
