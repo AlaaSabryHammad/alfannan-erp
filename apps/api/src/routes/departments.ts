@@ -20,6 +20,8 @@ type DeptNode = {
   parentId: number | null;
   icon: string | null;
   children: DeptNode[];
+  /** number of products filed directly under this department (children are summed by the client) */
+  _count?: { products: number };
 };
 
 function buildTree(items: DeptNode[]): DeptNode[] {
@@ -40,7 +42,10 @@ function buildTree(items: DeptNode[]): DeptNode[] {
 // GET /api/departments — returns tree
 router.get('/', requirePermission('departments.view'), async (_req: Request, res: Response, next: NextFunction) => {
   try {
-    const all = await prisma.department.findMany({ orderBy: { id: 'asc' } });
+    const all = await prisma.department.findMany({
+      orderBy: { id: 'asc' },
+      include: { _count: { select: { products: true } } },
+    });
     const tree = buildTree(all as unknown as DeptNode[]);
     res.json(tree);
   } catch (err) {
@@ -51,7 +56,10 @@ router.get('/', requirePermission('departments.view'), async (_req: Request, res
 // GET /api/departments/flat — flat list
 router.get('/flat', requirePermission('departments.view'), async (_req: Request, res: Response, next: NextFunction) => {
   try {
-    const all = await prisma.department.findMany({ orderBy: { id: 'asc' } });
+    const all = await prisma.department.findMany({
+      orderBy: { id: 'asc' },
+      include: { _count: { select: { products: true } } },
+    });
     res.json(all);
   } catch (err) {
     next(err);
