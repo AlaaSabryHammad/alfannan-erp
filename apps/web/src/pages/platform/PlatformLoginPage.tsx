@@ -17,7 +17,7 @@ export function PlatformLoginPage() {
     setBusy(true);
     setError(null);
     try {
-      const { data } = await platformApi.post<{ token: string; admin: { name: string; email: string } }>(
+      const { data } = await platformApi.post<{ token: string; admin: { id: number; name: string; email: string; role: string; mustChangePassword: boolean } }>(
         '/auth/login',
         { email, password },
       );

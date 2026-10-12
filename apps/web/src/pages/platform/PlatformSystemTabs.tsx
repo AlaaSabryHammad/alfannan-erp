@@ -5,7 +5,7 @@ import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { AlertTriangle, CheckCircle2, Loader2, Megaphone, Pencil, Plus, Send, Trash2, X, XCircle } from 'lucide-react';
 import type { AxiosError } from 'axios';
-import { platformApi } from '../../lib/platformApi';
+import { platformApi, platformRole } from '../../lib/platformApi';
 
 const errorOf = (err: unknown) => (err as AxiosError<{ error?: string }>).response?.data?.error ?? 'تعذّر تنفيذ العملية';
 const input =
@@ -146,7 +146,7 @@ export function AnnouncementsTab() {
       <div className="flex items-center gap-3 p-4 border-b border-slate-100">
         <Megaphone size={18} className="text-teal-700" />
         <p className="text-sm text-slate-600">تظهر الإعلانات الفعّالة كشريط أعلى النظام لكل مستخدمي كل الشركات.</p>
-        <button onClick={() => setEditing('new')} className="mr-auto flex items-center gap-1.5 text-sm font-semibold bg-teal-700 hover:bg-teal-800 text-white px-3 py-1.5 rounded-lg">
+        <button disabled={platformRole() !== 'OWNER'} onClick={() => setEditing('new')} className="disabled:opacity-50 mr-auto flex items-center gap-1.5 text-sm font-semibold bg-teal-700 hover:bg-teal-800 text-white px-3 py-1.5 rounded-lg">
           <Plus size={16} /> إعلان جديد
         </button>
       </div>
@@ -252,7 +252,7 @@ export function SystemTab() {
         </Row>
         <div className="flex gap-2 mt-2 flex-wrap">
           <button
-            disabled={signup.isPending}
+            disabled={signup.isPending || platformRole() !== 'OWNER'}
             onClick={() => signup.mutate(!s.signup.enabled)}
             className={`text-sm font-semibold px-3 py-1.5 rounded-lg text-white disabled:opacity-60 ${s.signup.enabled ? 'bg-red-600 hover:bg-red-700' : 'bg-emerald-600 hover:bg-emerald-700'}`}
           >
@@ -260,7 +260,7 @@ export function SystemTab() {
           </button>
           {s.signup.source === 'console' && (
             <button
-              disabled={signup.isPending}
+              disabled={signup.isPending || platformRole() !== 'OWNER'}
               onClick={() => signup.mutate(null)}
               className="text-sm font-semibold px-3 py-1.5 rounded-lg border border-slate-300 text-slate-700 hover:bg-slate-50"
             >

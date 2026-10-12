@@ -6,6 +6,16 @@ const API_BASE = import.meta.env.VITE_API_URL ?? 'http://localhost:4000/api';
 export const PLATFORM_TOKEN_KEY = 'platform_token';
 export const PLATFORM_ADMIN_KEY = 'platform_admin';
 
+/** Role of the signed-in console admin (the server enforces it; this only shapes the UI). */
+export function platformRole(): 'OWNER' | 'SUPPORT' {
+  try {
+    const a = JSON.parse(localStorage.getItem(PLATFORM_ADMIN_KEY) ?? 'null') as { role?: string } | null;
+    return a?.role === 'SUPPORT' ? 'SUPPORT' : 'OWNER';
+  } catch {
+    return 'OWNER';
+  }
+}
+
 export const platformApi = axios.create({
   baseURL: `${API_BASE}/platform`,
   headers: { 'Content-Type': 'application/json' },
