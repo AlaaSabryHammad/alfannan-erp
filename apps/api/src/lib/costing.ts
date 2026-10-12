@@ -14,7 +14,8 @@
 import { Prisma } from '@prisma/client';
 import type { Tx } from './prisma';
 
-const round2 = (n: number) => Math.round(n * 100) / 100;
+// the average keeps 4 decimals (amounts posted to the ledger are rounded to 2 where they are posted)
+const round4 = (n: number) => Math.round(n * 10000) / 10000;
 
 /**
  * Re-average a product's costPrice for a received quantity.
@@ -45,10 +46,10 @@ export async function applyMovingAverageCost(
     ? (onHand * currentAvg + receivedQty * unitNetCost) / (onHand + receivedQty)
     : unitNetCost;
 
-  if (round2(newAvg) !== round2(currentAvg)) {
+  if (round4(newAvg) !== round4(currentAvg)) {
     await tx.product.update({
       where: { id: productId },
-      data: { costPrice: new Prisma.Decimal(round2(newAvg)) },
+      data: { costPrice: new Prisma.Decimal(round4(newAvg)) },
     });
   }
 }
@@ -89,8 +90,8 @@ export async function reverseMovingAverageCost(
   const remainingValue = onHand * currentAvg - removedQty * removedUnitNetCost;
   if (remainingValue <= 0) return; // guard against a corrupt pool
 
-  const newAvg = round2(remainingValue / remainingQty);
-  if (newAvg > 0 && newAvg !== round2(currentAvg)) {
+  const newAvg = round4(remainingValue / remainingQty);
+  if (newAvg > 0 && newAvg !== round4(currentAvg)) {
     await tx.product.update({
       where: { id: productId },
       data: { costPrice: new Prisma.Decimal(newAvg) },
