@@ -119,7 +119,7 @@ app.use(
 
 // ── Health check ──────────────────────────────────────────────────────────────
 app.get('/health', (_req, res) => {
-  res.json({ status: 'ok', system: 'نظام الفنان للتوريدات والمخازن', timestamp: new Date().toISOString() });
+  res.json({ status: 'ok', system: 'الفنان السعودي', timestamp: new Date().toISOString() });
 });
 
 // ── Routes ────────────────────────────────────────────────────────────────────
@@ -192,7 +192,7 @@ app.use(errorHandler);
 // Tests import `app` and drive it with supertest — no listener, no scheduler.
 if (process.env.NODE_ENV !== 'test') {
   app.listen(PORT, () => {
-    console.log(`✅ الفنان ERP API running on http://localhost:${PORT}`);
+    console.log(`✅ الفنان السعودي API running on http://localhost:${PORT}`);
     startScheduler();
   });
 }

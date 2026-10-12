@@ -2,8 +2,9 @@ import { useState } from 'react';
 import { Navigate, useNavigate } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
-  AlertTriangle, Building2, KeyRound, Loader2, LogOut, PauseCircle, PlayCircle, Plus, Search, Users, X,
+  AlertTriangle, KeyRound, Loader2, LogOut, PauseCircle, PlayCircle, Plus, Search, Users, X,
 } from 'lucide-react';
+import { BrandMark } from '../../components/BrandLogo';
 import type { AxiosError } from 'axios';
 import {
   platformApi,
@@ -740,7 +741,7 @@ export function PlatformDashboardPage() {
     <div className="min-h-screen bg-slate-50" dir="rtl">
       <header className="bg-slate-900 text-white">
         <div className="max-w-6xl mx-auto px-4 h-14 flex items-center gap-3">
-          <Building2 size={20} className="text-teal-400" />
+          <BrandMark size={30} tone="onDark" />
           <h1 className="font-bold">لوحة إدارة المنصة</h1>
           <span className="mr-auto text-sm text-slate-300">{admin?.name}</span>
           <button onClick={() => setChangingPassword(true)} className="flex items-center gap-1.5 text-sm text-slate-300 hover:text-white">

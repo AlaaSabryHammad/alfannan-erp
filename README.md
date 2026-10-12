@@ -1,4 +1,4 @@
-# نظام الفنان للتوريدات والمخازن — ERP
+# الفنان السعودي — برنامج المبيعات والمحاسبة (ERP)
 
 Arabic RTL ERP system for Al-Fannan Supplies & Warehouses.
 

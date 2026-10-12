@@ -3,9 +3,11 @@
  * Gmail, Outlook and phone clients. Every dynamic value is HTML-escaped.
  */
 
-const BRAND = 'نظام الفنان';
-const TEAL = '#0f766e';
-const TEAL_DARK = '#115e59';
+const BRAND = 'الفنان السعودي';
+// brand palette: red / deep red / gold (kept under the old constant names)
+const TEAL = '#9B2C1F';
+const TEAL_DARK = '#6E1E15';
+const GOLD = '#E2A33C';
 
 export function escapeHtml(value: string): string {
   return value
@@ -38,11 +40,11 @@ export function verificationEmail(input: VerificationEmailInput): { subject: str
 <meta name="color-scheme" content="light">
 <title>${escapeHtml(subject)}</title>
 </head>
-<body style="margin:0;padding:0;background:#f1f5f9;">
+<body style="margin:0;padding:0;background:#F2E8D5;">
   <div style="display:none;max-height:0;overflow:hidden;opacity:0;color:#f1f5f9;">
     خطوة واحدة تفصلك عن تفعيل حسابك — أكّد بريدك الإلكتروني.
   </div>
-  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#f1f5f9;padding:32px 12px;">
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#F2E8D5;padding:32px 12px;">
     <tr>
       <td align="center">
         <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:560px;background:#ffffff;border-radius:16px;overflow:hidden;border:1px solid #e2e8f0;">
@@ -54,7 +56,8 @@ export function verificationEmail(input: VerificationEmailInput): { subject: str
                 </tr>
               </table>
               <div style="font-family:Tahoma,'Segoe UI',Arial,sans-serif;font-size:22px;font-weight:bold;color:#ffffff;margin-top:14px;">${BRAND}</div>
-              <div style="font-family:Tahoma,'Segoe UI',Arial,sans-serif;font-size:13px;color:#ccfbf1;margin-top:4px;">للتوريدات والمخازن والمحاسبة</div>
+              <div style="font-family:Tahoma,'Segoe UI',Arial,sans-serif;font-size:13px;color:#F2E8D5;margin-top:4px;">برنامج المبيعات والمحاسبة</div>
+              <div style="width:64px;height:3px;background:${GOLD};border-radius:2px;margin:14px auto 0 auto;font-size:0;line-height:0;">&nbsp;</div>
             </td>
           </tr>
           <tr>

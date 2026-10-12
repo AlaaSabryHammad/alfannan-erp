@@ -7,6 +7,7 @@ import { Eye, EyeOff, BarChart3, QrCode, GitBranch, Loader2 } from 'lucide-react
 import { useAuth } from '../../contexts/AuthContext';
 import type { AxiosError } from 'axios';
 import apiClient from '../../lib/api';
+import { BrandLockup, BrandMark, BRAND_NAME, BRAND_TAGLINE, SaduRule } from '../../components/BrandLogo';
 
 const loginSchema = z.object({
   email: z.string().email('البريد الإلكتروني غير صحيح'),
@@ -87,13 +88,12 @@ export function LoginPage() {
           <div>
             {/* Brand name */}
             <div className="mb-8">
-              <div className="w-14 h-14 bg-white/10 rounded-2xl flex items-center justify-center mb-4">
-                <span className="text-2xl font-bold text-white">ف</span>
-              </div>
-              <h1 className="text-xl font-bold leading-snug mb-2">
-                نظام الفنان للتوريدات والمخازن
+              <BrandMark size={72} tone="onDark" className="mb-4" />
+              <h1 className="text-3xl font-bold leading-snug mb-2" style={{ fontFamily: "'Reem Kufi', Tahoma, sans-serif" }}>
+                {BRAND_NAME}
               </h1>
-              <p className="text-white/60 text-sm">إدارة أعمالك باحترافية</p>
+              <SaduRule width={110} color="#E2A33C" className="mb-3" />
+              <p className="text-white/60 text-sm">{BRAND_TAGLINE}</p>
             </div>
 
             {/* Feature bullets */}
@@ -137,6 +137,9 @@ export function LoginPage() {
         {/* LEFT = Form panel */}
         <div className="flex-1 p-8 flex flex-col justify-center">
           <div className="max-w-sm mx-auto w-full">
+            <div className="md:hidden mb-6">
+              <BrandLockup size={44} />
+            </div>
             <h2 className="text-2xl font-bold text-app-text mb-1">أهلاً بك مجدداً!</h2>
             <p className="text-app-muted text-sm mb-8">سجل دخولك للمتابعة إلى النظام</p>
 

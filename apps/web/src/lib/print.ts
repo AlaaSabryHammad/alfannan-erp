@@ -3,7 +3,7 @@ import { formatMoney, formatDate } from './utils';
 import { buildZatcaQrPayload } from './zatcaQr';
 
 const COMPANY = 'الفنان للتوريدات العمومية';
-const SYSTEM = 'نظام الفنان للتوريدات والمخازن';
+const SYSTEM = 'الفنان السعودي';
 const PRIMARY = '#0e9384';
 
 function esc(s: string | number | null | undefined): string {

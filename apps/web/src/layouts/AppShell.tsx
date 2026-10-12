@@ -29,7 +29,7 @@ export function AppShell() {
         {/* Footer */}
         <footer className="border-t border-app-border bg-white px-6 py-3">
           <p className="text-xs text-app-muted text-center">
-            © 2026 نظام الفنان للتوريدات والمخازن · حلول الفنان · جميع الحقوق محفوظة
+            © 2026 الفنان السعودي · حلول الفنان · جميع الحقوق محفوظة
           </p>
         </footer>
       </div>

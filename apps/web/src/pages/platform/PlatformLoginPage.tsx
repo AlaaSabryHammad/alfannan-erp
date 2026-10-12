@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Loader2, ShieldCheck } from 'lucide-react';
+import { Loader2 } from 'lucide-react';
+import { BrandLockup } from '../../components/BrandLogo';
 import type { AxiosError } from 'axios';
 import { platformApi, PLATFORM_ADMIN_KEY, PLATFORM_TOKEN_KEY } from '../../lib/platformApi';
 
@@ -37,9 +38,7 @@ export function PlatformLoginPage() {
   return (
     <div className="min-h-screen bg-slate-900 flex items-center justify-center p-4" dir="rtl">
       <form onSubmit={submit} className="w-full max-w-sm bg-white rounded-2xl shadow-2xl p-8 flex flex-col gap-4">
-        <div className="w-14 h-14 rounded-2xl bg-teal-50 flex items-center justify-center">
-          <ShieldCheck className="text-teal-700" size={28} />
-        </div>
+        <BrandLockup size={44} />
         <div>
           <h1 className="text-xl font-bold text-slate-900">لوحة إدارة المنصة</h1>
           <p className="text-sm text-slate-500 mt-1">دخول مالك المنصة فقط</p>
