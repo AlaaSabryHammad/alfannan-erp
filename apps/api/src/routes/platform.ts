@@ -30,6 +30,7 @@ import { rateLimit } from '../middleware/rateLimit';
 import { invalidateUserSessions } from '../lib/userSession';
 import billingRouter from './platformBilling';
 import systemRouter from './platformSystem';
+import adminsRouter from './platformAdmins';
 import { sendVerificationEmail } from '../lib/emailVerification';
 import { mailEnabled } from '../lib/mail/mailer';
 
@@ -66,9 +67,10 @@ router.post('/auth/login', rateLimit({ name: 'platform-login', windowMs: 10 * 60
     recordSuccess(key);
     req.platformAdmin = { scope: 'platform', adminId: admin.id, email: admin.email, name: admin.name };
     await audit(req, 'LOGIN', null);
+    await db.platformAdmin.update({ where: { id: admin.id }, data: { lastLoginAt: new Date() } });
     res.json({
       token: signPlatformToken({ adminId: admin.id, email: admin.email, name: admin.name }),
-      admin: { id: admin.id, name: admin.name, email: admin.email },
+      admin: { id: admin.id, name: admin.name, email: admin.email, role: admin.role, mustChangePassword: admin.mustChangePassword },
     });
   } catch (err) {
     next(err);
@@ -77,8 +79,27 @@ router.post('/auth/login', rateLimit({ name: 'platform-login', windowMs: 10 * 60
 
 router.use(requirePlatformAdmin);
 
+// SUPPORT can read everything and help users; every other change is the owner's.
+const SUPPORT_MAY = [
+  /^\/tenants\/\d+\/users\/\d+\/(reset-password|force-logout|resend-verification|verify-email|active)$/,
+  /^\/me\/password$/,
+  /^\/system\/test-email$/,
+];
+router.use((req: Request, res: Response, next: NextFunction) => {
+  if (req.platformAdmin?.role !== 'SUPPORT' || req.method === 'GET') return next();
+  if (SUPPORT_MAY.some((re) => re.test(req.path))) return next();
+  const onlyNote =
+    req.method === 'PATCH' &&
+    /^\/tenants\/\d+$/.test(req.path) &&
+    Object.keys(req.body ?? {}).length > 0 &&
+    Object.keys(req.body ?? {}).every((k) => k === 'platformNote');
+  if (onlyNote) return next();
+  res.status(403).json({ error: 'هذه العملية للمالك فقط' });
+});
+
 router.use(billingRouter);
 router.use(systemRouter);
+router.use(adminsRouter);
 
 // Change my own password. Needs the current one; every other session of this account is ended and the
 // caller continues with a fresh token.
@@ -111,7 +132,7 @@ router.post(
 
       await db.platformAdmin.update({
         where: { id: admin.id },
-        data: { passwordHash: await bcrypt.hash(newPassword, 12), sessionsValidAfter: new Date() },
+        data: { passwordHash: await bcrypt.hash(newPassword, 12), sessionsValidAfter: new Date(), mustChangePassword: false },
       });
       await audit(req, 'PLATFORM_PASSWORD_CHANGE', null, admin.email);
       res.json({
@@ -126,7 +147,7 @@ router.post(
 
 router.get('/me', (req: Request, res: Response) => {
   const a = req.platformAdmin!;
-  res.json({ id: a.adminId, name: a.name, email: a.email });
+  res.json({ id: a.adminId, name: a.name, email: a.email, role: a.role });
 });
 
 // ── usage ─────────────────────────────────────────────────────────────────────

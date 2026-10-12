@@ -7,11 +7,13 @@ import {
 } from 'lucide-react';
 import { BrandMark } from '../../components/BrandLogo';
 import { AnnouncementsTab, SystemTab } from './PlatformSystemTabs';
+import { AdminsTab, ROLE_LABEL } from './PlatformAdminsTab';
 import type { AxiosError } from 'axios';
 import {
   platformApi,
   PLATFORM_ADMIN_KEY,
   PLATFORM_TOKEN_KEY,
+  platformRole,
   FEATURE_LABELS,
   LIMIT_LABELS,
   STATUS_LABELS,
@@ -45,6 +47,12 @@ const ACTION_LABELS: Record<string, string> = {
   USER_EMAIL_VERIFIED: 'تأكيد بريد مستخدم يدويًا',
   USER_VERIFICATION_RESENT: 'إعادة إرسال رسالة التأكيد',
   TENANT_NOTE: 'تعديل ملاحظة شركة',
+  ADMIN_CREATE: 'إضافة مدير منصة',
+  ADMIN_UPDATE: 'تعديل مدير منصة',
+  ADMIN_ROLE_CHANGE: 'تغيير دور مدير منصة',
+  ADMIN_ACTIVATE: 'تفعيل مدير منصة',
+  ADMIN_DEACTIVATE: 'تعطيل مدير منصة',
+  ADMIN_RESET_PASSWORD: 'إعادة تعيين كلمة مرور مدير منصة',
   ANNOUNCEMENT_CREATE: 'نشر إعلان',
   ANNOUNCEMENT_UPDATE: 'تعديل إعلان',
   ANNOUNCEMENT_DELETE: 'حذف إعلان',
@@ -598,7 +606,7 @@ function TenantPanel({ tenantId, onClose }: { tenantId: number; onClose: () => v
               <span className="text-xs text-slate-500">منذ {fmtDate(data.createdAt)}</span>
               <button
                 onClick={confirmToggle}
-                disabled={toggle.isPending}
+                disabled={toggle.isPending || platformRole() !== 'OWNER'}
                 className={`mr-auto flex items-center gap-1.5 text-sm font-semibold px-3 py-1.5 rounded-lg disabled:opacity-60 ${data.isActive ? 'bg-red-600 hover:bg-red-700 text-white' : 'bg-emerald-600 hover:bg-emerald-700 text-white'}`}
               >
                 {data.isActive ? <PauseCircle size={16} /> : <PlayCircle size={16} />}
@@ -772,7 +780,7 @@ function TenantPanel({ tenantId, onClose }: { tenantId: number; onClose: () => v
 
 // ── page ──────────────────────────────────────────────────────────────────────
 
-function ChangePasswordDialog({ onClose }: { onClose: () => void }) {
+function ChangePasswordDialog({ onClose, forced }: { onClose: () => void; forced?: boolean }) {
   const [current, setCurrent] = useState('');
   const [next, setNext] = useState('');
   const [confirm, setConfirm] = useState('');
@@ -784,6 +792,10 @@ function ChangePasswordDialog({ onClose }: { onClose: () => void }) {
       (await platformApi.post<{ token: string }>('/me/password', { currentPassword: current, newPassword: next })).data,
     onSuccess: (r) => {
       localStorage.setItem(PLATFORM_TOKEN_KEY, r.token); // the other sessions were ended; keep this one
+      try {
+        const a = JSON.parse(localStorage.getItem(PLATFORM_ADMIN_KEY) ?? 'null') as Record<string, unknown> | null;
+        if (a) localStorage.setItem(PLATFORM_ADMIN_KEY, JSON.stringify({ ...a, mustChangePassword: false }));
+      } catch { /* ignore */ }
       setDone(true);
     },
     onError: (e) => setError(errorOf(e)),
@@ -796,8 +808,8 @@ function ChangePasswordDialog({ onClose }: { onClose: () => void }) {
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40" dir="rtl">
       <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm p-6 flex flex-col gap-4">
         <div className="flex items-center justify-between">
-          <h2 className="text-lg font-bold text-slate-900">تغيير كلمة المرور</h2>
-          <button onClick={onClose} className="text-slate-500 hover:text-slate-900"><X size={20} /></button>
+          <h2 className="text-lg font-bold text-slate-900">{forced ? 'اختر كلمة مرور جديدة' : 'تغيير كلمة المرور'}</h2>
+          {!forced && <button onClick={onClose} className="text-slate-500 hover:text-slate-900"><X size={20} /></button>}
         </div>
         {done ? (
           <>
@@ -836,7 +848,7 @@ function ChangePasswordDialog({ onClose }: { onClose: () => void }) {
   );
 }
 
-type Tab = 'tenants' | 'requests' | 'plans' | 'payments' | 'announcements' | 'system' | 'audit';
+type Tab = 'tenants' | 'requests' | 'plans' | 'payments' | 'announcements' | 'system' | 'admins' | 'audit';
 
 export function PlatformDashboardPage() {
   const navigate = useNavigate();
@@ -846,6 +858,13 @@ export function PlatformDashboardPage() {
   const [tab, setTab] = useState<Tab>('tenants');
   const [editingPlan, setEditingPlan] = useState<PlatformPlan | 'new' | null>(null);
   const [changingPassword, setChangingPassword] = useState(false);
+  const [mustChange, setMustChange] = useState(() => {
+    try {
+      return (JSON.parse(localStorage.getItem(PLATFORM_ADMIN_KEY) ?? 'null') as { mustChangePassword?: boolean } | null)?.mustChangePassword === true;
+    } catch {
+      return false;
+    }
+  });
   const hasToken = !!localStorage.getItem(PLATFORM_TOKEN_KEY);
   const admin = (() => {
     try { return JSON.parse(localStorage.getItem(PLATFORM_ADMIN_KEY) ?? 'null') as { name: string } | null; } catch { return null; }
@@ -919,6 +938,7 @@ export function PlatformDashboardPage() {
   };
 
   const s = stats.data;
+  const isOwner = platformRole() === 'OWNER';
 
   const shownTenants = (tenants.data ?? []).filter((t) => {
     switch (statusFilter) {
@@ -959,6 +979,7 @@ export function PlatformDashboardPage() {
     ['payments', 'المدفوعات'],
     ['announcements', 'الإعلانات'],
     ['system', 'حالة النظام'],
+    ...(isOwner ? ([['admins', 'مديرو المنصة']] as Array<[Tab, string]>) : []),
     ['audit', 'سجل العمليات'],
   ];
   const Loading = ({ cols }: { cols: number }) => (
@@ -972,7 +993,10 @@ export function PlatformDashboardPage() {
         <div className="max-w-6xl mx-auto px-4 h-14 flex items-center gap-3">
           <BrandMark size={30} tone="onDark" />
           <h1 className="font-bold">لوحة إدارة المنصة</h1>
-          <span className="mr-auto text-sm text-slate-300">{admin?.name}</span>
+          <span className="mr-auto text-sm text-slate-300">
+            {admin?.name}
+            <span className="mr-2 text-xs bg-white/10 px-2 py-0.5 rounded-full">{ROLE_LABEL[platformRole()]}</span>
+          </span>
           <button onClick={() => setChangingPassword(true)} className="flex items-center gap-1.5 text-sm text-slate-300 hover:text-white">
             <KeyRound size={16} /> كلمة المرور
           </button>
@@ -1016,7 +1040,7 @@ export function PlatformDashboardPage() {
         <div className="flex items-center gap-3 flex-wrap text-sm">
           <button
             onClick={() => { setLifecycleMsg(null); lifecycle.mutate(); }}
-            disabled={lifecycle.isPending}
+            disabled={lifecycle.isPending || !isOwner}
             className="font-semibold border border-slate-300 bg-white hover:bg-slate-50 text-slate-700 px-3 py-1.5 rounded-lg disabled:opacity-60 flex items-center gap-2"
           >
             {lifecycle.isPending && <Loader2 size={14} className="animate-spin" />}
@@ -1075,7 +1099,7 @@ export function PlatformDashboardPage() {
                 />
               </div>
             )}
-            {tab === 'plans' && (
+            {tab === 'plans' && isOwner && (
               <button onClick={() => setEditingPlan('new')} className="mr-auto flex items-center gap-1.5 text-sm font-semibold bg-teal-700 hover:bg-teal-800 text-white px-3 py-1.5 rounded-lg">
                 <Plus size={16} /> باقة جديدة
               </button>
@@ -1252,6 +1276,7 @@ export function PlatformDashboardPage() {
 
           {tab === 'announcements' && <AnnouncementsTab />}
           {tab === 'system' && <SystemTab />}
+          {tab === 'admins' && isOwner && <AdminsTab myId={(admin as { id?: number } | null)?.id ?? null} />}
 
           {tab === 'audit' && (
             <ul className="divide-y divide-slate-100">
@@ -1271,7 +1296,12 @@ export function PlatformDashboardPage() {
         </section>
       </main>
 
-      {changingPassword && <ChangePasswordDialog onClose={() => setChangingPassword(false)} />}
+      {(changingPassword || mustChange) && (
+        <ChangePasswordDialog
+          forced={mustChange}
+          onClose={() => { setChangingPassword(false); setMustChange(false); }}
+        />
+      )}
       {selected !== null && <TenantPanel tenantId={selected} onClose={() => setSelected(null)} />}
       {editingPlan !== null && (
         <PlanForm plan={editingPlan === 'new' ? null : editingPlan} onClose={() => setEditingPlan(null)} />

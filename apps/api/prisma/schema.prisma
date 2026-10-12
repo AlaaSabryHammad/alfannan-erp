@@ -1783,6 +1783,11 @@ model PlatformAdmin {
   createdAt    DateTime @default(now())
   // tokens issued before this instant are rejected (set when the password changes)
   sessionsValidAfter DateTime?
+  // OWNER = everything · SUPPORT = read + help users (see routes/platformAdmins.ts)
+  role               String    @default("OWNER")
+  // set when an owner created the account or reset the password: the console asks for a new one
+  mustChangePassword Boolean   @default(false)
+  lastLoginAt        DateTime?
 
   auditLogs PlatformAuditLog[]
 }
