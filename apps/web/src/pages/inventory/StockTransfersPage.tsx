@@ -469,21 +469,16 @@ export function StockTransfersPage() {
     queryFn: () => fetchTransfers({ page, pageSize, search }),
   });
 
-  // All transfers for KPIs
-  const { data: allData } = useQuery({
-    queryKey: ['stock-transfers-all'],
-    queryFn: () => fetchTransfers({ page: 1, pageSize: 1000, search: '' }),
+  // Real totals computed by the server
+  const { data: kpi } = useQuery({
+    queryKey: ['stock-transfers-all', 'summary'],
+    queryFn: async () => (await apiClient.get<{ total: number; done: number; pending: number; totalQty: number }>('/stock-transfers/summary')).data,
     staleTime: 1000 * 60 * 2,
   });
-
-  const allTransfers = allData?.data ?? [];
-  const totalTransfers = allData?.pagination.total ?? 0;
-  const doneCount = allTransfers.filter((t) => t.status === 'DONE').length;
-  const pendingCount = allTransfers.filter((t) => t.status === 'PENDING').length;
-  const totalQty = allTransfers.reduce(
-    (s, t) => s + t.items.reduce((si, item) => si + Number(item.qty), 0),
-    0
-  );
+  const totalTransfers = kpi?.total ?? 0;
+  const doneCount = kpi?.done ?? 0;
+  const pendingCount = kpi?.pending ?? 0;
+  const totalQty = kpi?.totalQty ?? 0;
 
   const openView = (row: StockTransfer) => {
     setViewId(row.id);

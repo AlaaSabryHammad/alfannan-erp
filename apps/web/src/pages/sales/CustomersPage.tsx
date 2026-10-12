@@ -226,17 +226,15 @@ export function CustomersPage() {
     queryFn: () => fetchCustomers({ page, pageSize, search }),
   });
 
-  // Fetch all customers for KPIs (large page)
-  const { data: allData } = useQuery({
-    queryKey: ['customers', 'all'],
-    queryFn: () => fetchCustomers({ page: 1, pageSize: 1000, search: '' }),
-    staleTime: 1000 * 60 * 2,
+  // Real totals computed by the server (not from one page of rows)
+  const { data: kpi } = useQuery({
+    queryKey: ['customers', 'summary'],
+    queryFn: async () => (await apiClient.get<{ total: number; active: number; totalDebt: number }>('/customers/summary')).data,
+    staleTime: 1000 * 60,
   });
-
-  const allCustomers = allData?.data ?? [];
-  const totalCustomers = allData?.pagination.total ?? 0;
-  const activeCustomers = allCustomers.filter((c) => c.status === 'ACTIVE').length;
-  const totalDebt = allCustomers.reduce((s, c) => s + Number(c.currentBalance ?? 0), 0);
+  const totalCustomers = kpi?.total ?? 0;
+  const activeCustomers = kpi?.active ?? 0;
+  const totalDebt = kpi?.totalDebt ?? 0;
 
   const { register, handleSubmit, reset, formState: { errors } } = useForm<CustomerFormValues>({
     resolver: zodResolver(customerSchema),
