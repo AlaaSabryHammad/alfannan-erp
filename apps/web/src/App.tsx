@@ -83,6 +83,7 @@ export function App() {
             <Route path="/privacy" element={<PrivacyPage />} />
             <Route path="/platform/login" element={<PlatformLoginPage />} />
             <Route path="/platform" element={<PlatformDashboardPage />} />
+            <Route path="/platform/:section" element={<PlatformDashboardPage />} />
 
             {/* Protected routes — all inside the AppShell */}
             <Route

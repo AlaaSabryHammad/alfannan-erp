@@ -40,8 +40,8 @@ const pct = (part: number, whole: number) => (whole > 0 ? Math.round((part / who
 
 function Box({ title, children, className = '' }: { title: string; children: React.ReactNode; className?: string }) {
   return (
-    <section className={`border border-slate-200 rounded-xl p-4 ${className}`}>
-      <h3 className="font-semibold text-slate-800 mb-3">{title}</h3>
+    <section className={`border border-najd-line rounded-xl p-4 ${className}`}>
+      <h3 className="font-semibold text-najd-ink/80 mb-3">{title}</h3>
       {children}
     </section>
   );
@@ -53,9 +53,9 @@ function Bars({ data, format }: { data: Array<{ label: string; value: number }>;
     <div className="flex items-end gap-1.5 h-28" dir="ltr">
       {data.map((d) => (
         <div key={d.label} className="flex-1 flex flex-col items-center justify-end gap-1 min-w-0" title={`${d.label}: ${format ? format(d.value) : d.value}`}>
-          <span className="text-[10px] text-slate-500">{d.value > 0 ? (format ? format(d.value) : d.value) : ''}</span>
-          <div className="w-full bg-teal-600/80 rounded-t" style={{ height: `${Math.max(2, (d.value / max) * 80)}%` }} />
-          <span className="text-[10px] text-slate-400 truncate w-full text-center">{d.label}</span>
+          <span className="text-[10px] text-najd-muted">{d.value > 0 ? (format ? format(d.value) : d.value) : ''}</span>
+          <div className="w-full bg-najd-green/80 rounded-t" style={{ height: `${Math.max(2, (d.value / max) * 80)}%` }} />
+          <span className="text-[10px] text-najd-muted/70 truncate w-full text-center">{d.label}</span>
         </div>
       ))}
     </div>
@@ -71,7 +71,7 @@ export function AnalyticsTab({ onOpenTenant }: { onOpenTenant: (id: number) => v
     queryFn: async () => (await platformApi.get<Analytics>('/analytics', { params: { days } })).data,
   });
 
-  if (isLoading || !data) return <div className="py-10 text-center text-slate-400"><Loader2 className="inline animate-spin" /></div>;
+  if (isLoading || !data) return <div className="py-10 text-center text-najd-muted/70"><Loader2 className="inline animate-spin" /></div>;
   const f = data.funnel;
   const steps = [
     { label: 'سجّلت', value: f.registered },
@@ -83,12 +83,12 @@ export function AnalyticsTab({ onOpenTenant }: { onOpenTenant: (id: number) => v
   return (
     <div className="p-4 flex flex-col gap-4">
       <div className="flex items-center gap-2 text-sm">
-        <span className="text-slate-500">الفترة:</span>
+        <span className="text-najd-muted">الفترة:</span>
         {[30, 90, 180].map((d) => (
           <button
             key={d}
             onClick={() => setDays(d)}
-            className={`px-3 py-1 rounded-lg font-semibold ${days === d ? 'bg-teal-700 text-white' : 'border border-slate-300 text-slate-600 hover:bg-slate-50'}`}
+            className={`px-3 py-1 rounded-lg font-semibold ${days === d ? 'bg-najd-green text-white' : 'border border-najd-line text-najd-muted hover:bg-najd-sand/70'}`}
           >
             {d} يومًا
           </button>
@@ -101,11 +101,11 @@ export function AnalyticsTab({ onOpenTenant }: { onOpenTenant: (id: number) => v
             {steps.map((s) => (
               <div key={s.label}>
                 <div className="flex justify-between text-sm mb-1">
-                  <span className="text-slate-700">{s.label}</span>
-                  <span className="text-slate-500">{s.value} ({pct(s.value, f.registered)}%)</span>
+                  <span className="text-najd-ink/80">{s.label}</span>
+                  <span className="text-najd-muted">{s.value} ({pct(s.value, f.registered)}%)</span>
                 </div>
-                <div className="h-2.5 bg-slate-100 rounded-full overflow-hidden">
-                  <div className="h-full bg-teal-600 rounded-full" style={{ width: `${pct(s.value, f.registered)}%` }} />
+                <div className="h-2.5 bg-najd-sand rounded-full overflow-hidden">
+                  <div className="h-full bg-najd-gold rounded-full" style={{ width: `${pct(s.value, f.registered)}%` }} />
                 </div>
               </div>
             ))}
@@ -119,33 +119,33 @@ export function AnalyticsTab({ onOpenTenant }: { onOpenTenant: (id: number) => v
         <Box title="الإيراد">
           <div className="flex gap-6 mb-4 flex-wrap">
             <div>
-              <p className="text-xs text-slate-500">الإيراد الشهري المتكرر (ر.س)</p>
-              <p className="text-2xl font-bold text-slate-900">{money(data.revenue.mrr)}</p>
+              <p className="text-xs text-najd-muted">الإيراد الشهري المتكرر (ر.س)</p>
+              <p className="text-2xl font-bold text-najd-ink">{money(data.revenue.mrr)}</p>
             </div>
             <div>
-              <p className="text-xs text-slate-500">مشتركون مدفوعون</p>
-              <p className="text-2xl font-bold text-slate-900">{data.revenue.payingNow}</p>
+              <p className="text-xs text-najd-muted">مشتركون مدفوعون</p>
+              <p className="text-2xl font-bold text-najd-ink">{data.revenue.payingNow}</p>
             </div>
           </div>
           <Bars
             data={data.revenue.monthly.map((m) => ({ label: MONTHS[Number(m.month.slice(5)) - 1] ?? m.month, value: m.amount }))}
             format={money}
           />
-          <p className="text-xs text-slate-400 mt-2">المحصَّل شهريًا (ر.س) — آخر 6 أشهر</p>
+          <p className="text-xs text-najd-muted/70 mt-2">المحصَّل شهريًا (ر.س) — آخر 6 أشهر</p>
         </Box>
 
         <Box title="الإيراد حسب الباقة">
           {data.revenue.byPlan.length === 0 ? (
-            <p className="text-sm text-slate-400">لا توجد اشتراكات بعد</p>
+            <p className="text-sm text-najd-muted/70">لا توجد اشتراكات بعد</p>
           ) : (
             <table className="w-full text-sm">
-              <thead className="text-xs text-slate-500">
+              <thead className="text-xs text-najd-muted">
                 <tr><th className="text-right font-medium pb-2">الباقة</th><th className="text-right font-medium pb-2">مدفوع</th><th className="text-right font-medium pb-2">تجربة</th><th className="text-right font-medium pb-2">إيراد شهري</th></tr>
               </thead>
-              <tbody className="divide-y divide-slate-100">
+              <tbody className="divide-y divide-najd-line/70">
                 {data.revenue.byPlan.map((p) => (
                   <tr key={p.planName}>
-                    <td className="py-2 font-medium text-slate-900">{p.planName}</td>
+                    <td className="py-2 font-medium text-najd-ink">{p.planName}</td>
                     <td className="py-2">{p.subscribers}</td>
                     <td className="py-2">{p.trialing}</td>
                     <td className="py-2">{money(p.mrr)}</td>
@@ -159,7 +159,7 @@ export function AnalyticsTab({ onOpenTenant }: { onOpenTenant: (id: number) => v
         <Box title="حالة الاشتراكات الآن">
           <div className="flex flex-wrap gap-2">
             {(Object.keys(data.statusCounts) as SubscriptionStatus[]).map((st) => (
-              <span key={st} className="text-sm bg-slate-50 border border-slate-200 rounded-lg px-3 py-1.5">
+              <span key={st} className="text-sm bg-najd-sand/60 border border-najd-line rounded-lg px-3 py-1.5">
                 {STATUS_LABELS[st] ?? st}: <strong>{data.statusCounts[st]}</strong>
               </span>
             ))}
@@ -168,18 +168,18 @@ export function AnalyticsTab({ onOpenTenant }: { onOpenTenant: (id: number) => v
 
         <Box title={`الفقد — آخر ${data.period.days} يومًا`}>
           <div className="flex gap-6 flex-wrap mb-3">
-            <div><p className="text-xs text-slate-500">تجارب انتهت دون اشتراك</p><p className="text-2xl font-bold text-slate-900">{data.churn.trialsExpired}</p></div>
-            <div><p className="text-xs text-slate-500">مشتركون مدفوعون فُقدوا</p><p className="text-2xl font-bold text-slate-900">{data.churn.paidLost}</p></div>
-            <div><p className="text-xs text-slate-500">معدل الفقد</p><p className="text-2xl font-bold text-slate-900">{data.churn.ratePct}%</p></div>
+            <div><p className="text-xs text-najd-muted">تجارب انتهت دون اشتراك</p><p className="text-2xl font-bold text-najd-ink">{data.churn.trialsExpired}</p></div>
+            <div><p className="text-xs text-najd-muted">مشتركون مدفوعون فُقدوا</p><p className="text-2xl font-bold text-najd-ink">{data.churn.paidLost}</p></div>
+            <div><p className="text-xs text-najd-muted">معدل الفقد</p><p className="text-2xl font-bold text-najd-ink">{data.churn.ratePct}%</p></div>
           </div>
           {data.churn.recent.length > 0 && (
-            <ul className="text-sm divide-y divide-slate-100">
+            <ul className="text-sm divide-y divide-najd-line/70">
               {data.churn.recent.map((r, i) => (
                 <li key={i} className="py-1.5 flex gap-2">
                   {r.tenantId ? (
-                    <button onClick={() => onOpenTenant(r.tenantId!)} className="text-teal-700 hover:underline">{r.name}</button>
+                    <button onClick={() => onOpenTenant(r.tenantId!)} className="text-najd-green hover:underline">{r.name}</button>
                   ) : <span>{r.name}</span>}
-                  <span className="text-slate-400 mr-auto text-xs">{r.action === 'SUB_CANCEL' ? 'إلغاء' : 'انتهاء'} · {new Date(r.at).toLocaleDateString('ar-SA')}</span>
+                  <span className="text-najd-muted/70 mr-auto text-xs">{r.action === 'SUB_CANCEL' ? 'إلغاء' : 'انتهاء'} · {new Date(r.at).toLocaleDateString('ar-SA')}</span>
                 </li>
               ))}
             </ul>
@@ -189,25 +189,25 @@ export function AnalyticsTab({ onOpenTenant }: { onOpenTenant: (id: number) => v
 
       <Box title={`شركات خاملة — بلا نشاط منذ ${data.period.dormantDays} يومًا أو أكثر (${data.dormant.length})`}>
         {data.dormant.length === 0 ? (
-          <p className="text-sm text-slate-400">لا توجد شركات خاملة</p>
+          <p className="text-sm text-najd-muted/70">لا توجد شركات خاملة</p>
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
-              <thead className="text-xs text-slate-500">
+              <thead className="text-xs text-najd-muted">
                 <tr>
                   {['الشركة', 'الباقة', 'الاشتراك', 'سجّلت', 'آخر نشاط', 'خاملة منذ'].map((h) => (
                     <th key={h} className="text-right font-medium pb-2">{h}</th>
                   ))}
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-100">
+              <tbody className="divide-y divide-najd-line/70">
                 {data.dormant.map((d) => (
-                  <tr key={d.tenantId} onClick={() => onOpenTenant(d.tenantId)} className="hover:bg-slate-50 cursor-pointer">
-                    <td className="py-2 font-medium text-slate-900">{d.name}</td>
-                    <td className="py-2 text-slate-600">{d.planName ?? '—'}</td>
-                    <td className="py-2 text-slate-600">{d.status ? STATUS_LABELS[d.status] : '—'}</td>
-                    <td className="py-2 text-slate-500">{new Date(d.createdAt).toLocaleDateString('ar-SA')}</td>
-                    <td className="py-2 text-slate-500">{d.lastActivityAt ? new Date(d.lastActivityAt).toLocaleDateString('ar-SA') : 'لم تبدأ'}</td>
+                  <tr key={d.tenantId} onClick={() => onOpenTenant(d.tenantId)} className="hover:bg-najd-sand/70 cursor-pointer">
+                    <td className="py-2 font-medium text-najd-ink">{d.name}</td>
+                    <td className="py-2 text-najd-muted">{d.planName ?? '—'}</td>
+                    <td className="py-2 text-najd-muted">{d.status ? STATUS_LABELS[d.status] : '—'}</td>
+                    <td className="py-2 text-najd-muted">{new Date(d.createdAt).toLocaleDateString('ar-SA')}</td>
+                    <td className="py-2 text-najd-muted">{d.lastActivityAt ? new Date(d.lastActivityAt).toLocaleDateString('ar-SA') : 'لم تبدأ'}</td>
                     <td className="py-2"><span className="bg-amber-50 text-amber-700 text-xs font-semibold px-2 py-0.5 rounded-full">{d.daysIdle} يومًا</span></td>
                   </tr>
                 ))}
@@ -219,15 +219,15 @@ export function AnalyticsTab({ onOpenTenant }: { onOpenTenant: (id: number) => v
 
       <Box title="الأكثر نشاطًا — مبيعات آخر 30 يومًا">
         {data.topTenants.length === 0 ? (
-          <p className="text-sm text-slate-400">لا توجد مبيعات مسجّلة</p>
+          <p className="text-sm text-najd-muted/70">لا توجد مبيعات مسجّلة</p>
         ) : (
-          <ul className="divide-y divide-slate-100 text-sm">
+          <ul className="divide-y divide-najd-line/70 text-sm">
             {data.topTenants.map((t, i) => (
               <li key={t.tenantId} className="py-2 flex gap-3 items-center">
-                <span className="text-slate-400 w-5">{i + 1}</span>
-                <button onClick={() => onOpenTenant(t.tenantId)} className="text-teal-700 hover:underline font-medium">{t.name}</button>
-                <span className="mr-auto text-slate-500">{t.invoices30} فاتورة</span>
-                <span className="font-semibold text-slate-900">{money(t.sales30)}</span>
+                <span className="text-najd-muted/70 w-5">{i + 1}</span>
+                <button onClick={() => onOpenTenant(t.tenantId)} className="text-najd-green hover:underline font-medium">{t.name}</button>
+                <span className="mr-auto text-najd-muted">{t.invoices30} فاتورة</span>
+                <span className="font-semibold text-najd-ink">{money(t.sales30)}</span>
               </li>
             ))}
           </ul>

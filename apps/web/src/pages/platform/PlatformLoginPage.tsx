@@ -1,7 +1,8 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Loader2 } from 'lucide-react';
-import { BrandLockup } from '../../components/BrandLogo';
+import { BrandMark, BRAND_NAME } from '../../components/BrandLogo';
+import { Ornament, SaduBand } from './PlatformShell';
 import type { AxiosError } from 'axios';
 import { platformApi, PLATFORM_ADMIN_KEY, PLATFORM_TOKEN_KEY } from '../../lib/platformApi';
 
@@ -33,37 +34,48 @@ export function PlatformLoginPage() {
   };
 
   const input =
-    'w-full border border-slate-300 rounded-lg px-3 py-2.5 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-teal-600/30 focus:border-teal-600';
+    'w-full border border-najd-line rounded-xl px-3.5 py-3 text-sm bg-najd-paper text-najd-ink focus:outline-none focus:ring-2 focus:ring-najd-gold/40 focus:border-najd-gold';
 
   return (
-    <div className="min-h-screen bg-slate-900 flex items-center justify-center p-4" dir="rtl">
-      <form onSubmit={submit} className="w-full max-w-sm bg-white rounded-2xl shadow-2xl p-8 flex flex-col gap-4">
-        <BrandLockup size={44} />
-        <div>
-          <h1 className="text-xl font-bold text-slate-900">لوحة إدارة المنصة</h1>
-          <p className="text-sm text-slate-500 mt-1">دخول مالك المنصة فقط</p>
+    <div className="platform-root platform-sidebar min-h-screen flex items-center justify-center p-4" dir="rtl">
+      <div className="w-full max-w-md">
+        <div className="flex flex-col items-center text-center mb-6">
+          <BrandMark size={84} tone="onDark" />
+          <h1 className="font-display text-4xl font-bold text-najd-gold-light mt-4">{BRAND_NAME}</h1>
+          <SaduBand className="w-48 mt-3 opacity-90" />
+          <p className="text-sm text-white/60 mt-3">لوحة إدارة المنصة</p>
         </div>
 
-        <label className="flex flex-col gap-1 text-sm font-medium text-slate-700">
-          البريد الإلكتروني
-          <input type="email" dir="ltr" value={email} onChange={(e) => setEmail(e.target.value)} required className={input} />
-        </label>
-        <label className="flex flex-col gap-1 text-sm font-medium text-slate-700">
-          كلمة المرور
-          <input type="password" dir="ltr" value={password} onChange={(e) => setPassword(e.target.value)} required className={input} />
-        </label>
+        <form onSubmit={submit} className="bg-najd-paper rounded-3xl shadow-2xl border border-najd-gold/40 p-8 flex flex-col gap-4">
+          <div>
+            <h2 className="font-display text-2xl font-bold text-najd-ink">تسجيل الدخول</h2>
+            <p className="text-sm text-najd-muted mt-1">للمالك وفريق الدعم المعتمد فقط</p>
+          </div>
+          <Ornament />
 
-        {error && <div className="bg-red-50 border border-red-200 text-red-700 text-sm rounded-lg px-4 py-3">{error}</div>}
+          <label className="flex flex-col gap-1.5 text-sm font-medium text-najd-ink/80">
+            البريد الإلكتروني
+            <input type="email" dir="ltr" value={email} onChange={(e) => setEmail(e.target.value)} required className={input} />
+          </label>
+          <label className="flex flex-col gap-1.5 text-sm font-medium text-najd-ink/80">
+            كلمة المرور
+            <input type="password" dir="ltr" value={password} onChange={(e) => setPassword(e.target.value)} required className={input} />
+          </label>
 
-        <button
-          type="submit"
-          disabled={busy}
-          className="bg-teal-700 hover:bg-teal-800 text-white font-semibold py-2.5 rounded-lg flex items-center justify-center gap-2 disabled:opacity-60"
-        >
-          {busy ? <Loader2 size={16} className="animate-spin" /> : null}
-          دخول
-        </button>
-      </form>
+          {error && <div className="bg-red-50 border border-red-200 text-red-700 text-sm rounded-xl px-4 py-3">{error}</div>}
+
+          <button
+            type="submit"
+            disabled={busy}
+            className="bg-najd-green hover:bg-najd-green-dark text-najd-gold-light font-display text-lg font-bold py-3 rounded-xl flex items-center justify-center gap-2 disabled:opacity-60 border border-najd-gold/50"
+          >
+            {busy ? <Loader2 size={16} className="animate-spin" /> : null}
+            دخول
+          </button>
+        </form>
+
+        <p className="text-center text-xs text-white/40 mt-5">© 2026 {BRAND_NAME} · حلول الفنان</p>
+      </div>
     </div>
   );
 }
