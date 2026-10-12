@@ -173,7 +173,7 @@ model Product {
   departmentId Int?
   brandId      Int?
   unitId       Int?
-  costPrice    Decimal        @db.Decimal(12, 2)
+  costPrice    Decimal        @db.Decimal(14, 4) // متوسط التكلفة المتحرك — 4 خانات حتى لا يتراكم فرق التقريب
   salePrice    Decimal        @db.Decimal(12, 2)
   wholesalePrice     Decimal? @db.Decimal(12, 2)
   halfWholesalePrice Decimal? @db.Decimal(12, 2)
@@ -585,7 +585,7 @@ model SalesInvoiceItem {
   productId Int
   qty       Decimal @db.Decimal(12, 2)
   unitPrice Decimal @db.Decimal(12, 2)
-  unitCost  Decimal @db.Decimal(12, 2) @default(0) // متوسط تكلفة الوحدة وقت البيع — لعكس تكلفة البضاعة عند المرتجع بدقة
+  unitCost  Decimal @db.Decimal(14, 4) @default(0) // متوسط تكلفة الوحدة وقت البيع — لعكس تكلفة البضاعة عند المرتجع بدقة
   lineTotal Decimal @db.Decimal(12, 2)
 
   invoice SalesInvoice @relation(fields: [invoiceId], references: [id], onDelete: Cascade)

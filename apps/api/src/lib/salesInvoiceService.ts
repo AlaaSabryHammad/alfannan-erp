@@ -247,11 +247,11 @@ export async function createSalesInvoiceInTx(tx: Tx, body: CreateSalesInvoiceInp
     body.paymentMethod === 'CARD'   ? ACCT.BANK :
     ACCT.CASH;
 
-  // COGS = Σ product.costPrice × qty
-  const cogs = body.items.reduce((sum, item) => {
+  // COGS = Σ product.costPrice × qty — the cost carries 4 decimals, the ledger 2
+  const cogs = Math.round(body.items.reduce((sum, item) => {
     const prod = productMap.get(item.productId);
     return sum + (prod ? Number(prod.costPrice) * item.qty : 0);
-  }, 0);
+  }, 0) * 100) / 100;
 
   const revenueAmount = subtotal - finalDiscount;
   const taxAmount = Number(body.tax ?? 0);
