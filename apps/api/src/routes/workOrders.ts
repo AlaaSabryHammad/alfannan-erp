@@ -15,6 +15,7 @@ import prisma from '../lib/prisma';
 import { requireAuth, requirePermission } from '../middleware/auth';
 import { getPagination, paginatedResponse } from '../lib/paginate';
 
+import { applyMovingAverageCost } from '../lib/costing';
 const router = Router();
 router.use(requireAuth);
 router.use(requireFeature('manufacturing'));
@@ -175,6 +176,19 @@ router.post('/:id/post', requirePermission('manufacturing.create'), async (req: 
             createdById: userId,
           },
         });
+      }
+
+      // The finished product's moving-average cost must reflect the components consumed; otherwise it is
+      // sold at a stale cost and the inventory value drifts from the ledger. Done BEFORE the stock increment.
+      const comps = await tx.product.findMany({
+        where: { id: { in: workOrder.lines.map((l) => l.componentId) } },
+        select: { id: true, costPrice: true },
+      });
+      const unitCostOf = new Map(comps.map((c) => [c.id, Number(c.costPrice)]));
+      const consumedValue = workOrder.lines.reduce(
+        (s, l) => s + Number(l.qtyRequired) * (unitCostOf.get(l.componentId) ?? 0), 0);
+      if (Number(workOrder.qty) > 0 && consumedValue > 0) {
+        await applyMovingAverageCost(tx, workOrder.productId, Number(workOrder.qty), consumedValue / Number(workOrder.qty));
       }
 
       const finishedBal = await tx.stockBalance.upsert({

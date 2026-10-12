@@ -1067,6 +1067,7 @@ enum JournalSource {
   PAYROLL
   YEAR_CLOSE
   RECURRING
+  STOCK_ADJUSTMENT
 }
 
 model JournalEntry {

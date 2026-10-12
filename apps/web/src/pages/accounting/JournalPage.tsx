@@ -15,7 +15,8 @@ import apiClient from '../../lib/api';
 // ─── Types ─────────────────────────────────────────────────────────────────────
 
 type SourceType = 'SALES_INVOICE' | 'PURCHASE_INVOICE' | 'EXPENSE' | 'MANUAL' | 'OPENING'
-  | 'VOUCHER' | 'DEPRECIATION' | 'PAYROLL' | 'YEAR_CLOSE' | 'RECURRING';
+  | 'VOUCHER' | 'DEPRECIATION' | 'PAYROLL' | 'YEAR_CLOSE' | 'RECURRING'
+  | 'SALES_RETURN' | 'PURCHASE_RETURN' | 'STOCK_ADJUSTMENT';
 
 interface JournalEntry {
   id: number;
@@ -71,6 +72,9 @@ const SOURCE_TYPE_META: Record<SourceType, { label: string; variant: 'success' |
   PAYROLL:          { label: 'رواتب',    variant: 'info' },
   YEAR_CLOSE:       { label: 'إقفال سنوي', variant: 'danger' },
   RECURRING:        { label: 'متكرر',     variant: 'default' },
+  STOCK_ADJUSTMENT: { label: 'تسوية مخزون', variant: 'default' },
+  SALES_RETURN:     { label: 'مردود مبيعات', variant: 'warning' },
+  PURCHASE_RETURN:  { label: 'مردود مشتريات', variant: 'warning' },
 };
 
 function toast(msg: string, type: 'success' | 'error' = 'success') {

@@ -4,6 +4,7 @@ import prisma from '../lib/prisma';
 import { requireAuth, requirePermission } from '../middleware/auth';
 import { getPagination, paginatedResponse } from '../lib/paginate';
 
+import type { Tx } from '../lib/prisma';
 const router = Router();
 router.use(requireAuth);
 
@@ -20,6 +21,60 @@ const createTransferSchema = z.object({
   notes: z.string().optional().nullable(),
   items: z.array(transferItemSchema).min(1),
 });
+
+/**
+ * Moves the stock of a transfer: decrement the source, increment the destination (atomic, so concurrent
+ * transfers cannot lose updates) and write both movements. Throws when the source cannot cover it.
+ */
+async function moveTransferStock(
+  tx: Tx,
+  tr: { id: number; transferNo: string; fromWarehouseId: number; toWarehouseId: number },
+  items: Array<{ productId: number; qty: number }>,
+  userId: number,
+): Promise<void> {
+  for (const item of items) {
+    const srcBal = await tx.stockBalance.upsert({
+      where: { productId_warehouseId: { productId: item.productId, warehouseId: tr.fromWarehouseId } },
+      update: { quantity: { decrement: item.qty } },
+      create: { productId: item.productId, warehouseId: tr.fromWarehouseId, quantity: -item.qty },
+    });
+    if (Number(srcBal.quantity) < 0) {
+      throw new Error(`الكمية غير متوفرة بالمخزون للمنتج رقم ${item.productId}`);
+    }
+    await tx.stockMovement.create({
+      data: {
+        productId: item.productId,
+        warehouseId: tr.fromWarehouseId,
+        type: 'TRANSFER',
+        quantity: item.qty,
+        balanceAfter: Number(srcBal.quantity),
+        refType: 'TRANSFER',
+        refId: tr.id,
+        reason: `تحويل مخزون ${tr.transferNo} (صادر)`,
+        createdById: userId,
+      },
+    });
+
+    const dstBal = await tx.stockBalance.upsert({
+      where: { productId_warehouseId: { productId: item.productId, warehouseId: tr.toWarehouseId } },
+      update: { quantity: { increment: item.qty } },
+      create: { productId: item.productId, warehouseId: tr.toWarehouseId, quantity: item.qty },
+    });
+    await tx.stockMovement.create({
+      data: {
+        productId: item.productId,
+        warehouseId: tr.toWarehouseId,
+        type: 'TRANSFER',
+        quantity: item.qty,
+        balanceAfter: Number(dstBal.quantity),
+        refType: 'TRANSFER',
+        refId: tr.id,
+        reason: `تحويل مخزون ${tr.transferNo} (وارد)`,
+        createdById: userId,
+      },
+    });
+  }
+}
 
 function generateTransferNo(): string {
   const date = new Date();
@@ -130,53 +185,9 @@ router.post('/', requirePermission('transfers.create'), async (req: Request, res
         include: { items: true },
       });
 
-      // If DONE → move stock atomically (decrement/increment, not read-then-write,
-      // so concurrent transfers of the same product can't lose updates).
+      // If DONE → move stock atomically
       if (body.status === 'DONE') {
-        for (const item of body.items) {
-          // OUT from source
-          const srcBal = await tx.stockBalance.upsert({
-            where: { productId_warehouseId: { productId: item.productId, warehouseId: body.fromWarehouseId } },
-            update: { quantity: { decrement: item.qty } },
-            create: { productId: item.productId, warehouseId: body.fromWarehouseId, quantity: -item.qty },
-          });
-          if (Number(srcBal.quantity) < 0) {
-            throw new Error(`الكمية غير متوفرة بالمخزون للمنتج رقم ${item.productId}`);
-          }
-          await tx.stockMovement.create({
-            data: {
-              productId: item.productId,
-              warehouseId: body.fromWarehouseId,
-              type: 'TRANSFER',
-              quantity: item.qty,
-              balanceAfter: Number(srcBal.quantity),
-              refType: 'TRANSFER',
-              refId: tr.id,
-              reason: `تحويل مخزون ${transferNo} (صادر)`,
-              createdById: userId,
-            },
-          });
-
-          // IN to destination
-          const dstBal = await tx.stockBalance.upsert({
-            where: { productId_warehouseId: { productId: item.productId, warehouseId: body.toWarehouseId } },
-            update: { quantity: { increment: item.qty } },
-            create: { productId: item.productId, warehouseId: body.toWarehouseId, quantity: item.qty },
-          });
-          await tx.stockMovement.create({
-            data: {
-              productId: item.productId,
-              warehouseId: body.toWarehouseId,
-              type: 'TRANSFER',
-              quantity: item.qty,
-              balanceAfter: Number(dstBal.quantity),
-              refType: 'TRANSFER',
-              refId: tr.id,
-              reason: `تحويل مخزون ${transferNo} (وارد)`,
-              createdById: userId,
-            },
-          });
-        }
+        await moveTransferStock(tx, tr, body.items, userId);
       }
 
       return tr;
@@ -194,6 +205,40 @@ router.post('/', requirePermission('transfers.create'), async (req: Request, res
     res.status(201).json(full);
   } catch (err: any) {
     if (err?.message?.includes('الكمية غير متوفرة بالمخزون')) {
+      res.status(400).json({ error: err.message });
+      return;
+    }
+    next(err);
+  }
+});
+
+// POST /api/stock-transfers/:id/complete — execute a PENDING transfer (moves the stock)
+router.post('/:id/complete', requirePermission('transfers.create'), async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const id = parseInt(req.params.id);
+    const userId = req.user!.userId;
+
+    await prisma.$transaction(async (tx) => {
+      // claim it first so two concurrent requests cannot both move the stock
+      const claimed = await tx.stockTransfer.updateMany({ where: { id, status: 'PENDING' }, data: { status: 'DONE' } });
+      if (claimed.count === 0) {
+        throw new Error('هذا التحويل منفَّذ بالفعل');
+      }
+      const tr = await tx.stockTransfer.findUniqueOrThrow({ where: { id }, include: { items: true } });
+      await moveTransferStock(tx, tr, tr.items.map((i) => ({ productId: i.productId, qty: Number(i.qty) })), userId);
+    });
+
+    const full = await prisma.stockTransfer.findUniqueOrThrow({
+      where: { id },
+      include: {
+        fromWarehouse: true,
+        toWarehouse: true,
+        items: { include: { product: { include: { unit: true } } } },
+      },
+    });
+    res.json(full);
+  } catch (err: any) {
+    if (typeof err?.message === 'string' && (err.message.includes('الكمية غير متوفرة') || err.message.includes('منفَّذ'))) {
       res.status(400).json({ error: err.message });
       return;
     }

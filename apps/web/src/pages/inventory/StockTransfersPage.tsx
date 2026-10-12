@@ -480,6 +480,19 @@ export function StockTransfersPage() {
   const pendingCount = kpi?.pending ?? 0;
   const totalQty = kpi?.totalQty ?? 0;
 
+  // A transfer saved as "قيد التنفيذ" moves no stock until it is executed
+  const completeMutation = useMutation({
+    mutationFn: (id: number) => apiClient.post(`/stock-transfers/${id}/complete`),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['stock-transfers'] });
+      qc.invalidateQueries({ queryKey: ['stock-transfers-all'] });
+      qc.invalidateQueries({ queryKey: ['stock-balances'] });
+      qc.invalidateQueries({ queryKey: ['stock'] });
+      toast('تم تنفيذ التحويل وتحريك المخزون');
+    },
+    onError: (err) => toast(getApiErrorMessage(err, 'تعذّر تنفيذ التحويل'), 'error'),
+  });
+
   const openView = (row: StockTransfer) => {
     setViewId(row.id);
     setViewOpen(true);
@@ -538,13 +551,29 @@ export function StockTransfersPage() {
       key: 'actions',
       header: 'العمليات',
       render: (row) => (
-        <button
-          onClick={() => openView(row)}
-          className="p-1.5 rounded-lg hover:bg-primary-50 text-app-muted hover:text-primary transition-colors"
-          title="عرض التفاصيل"
-        >
-          <Eye size={14} />
-        </button>
+        <div className="flex items-center gap-1">
+          <button
+            onClick={() => openView(row)}
+            className="p-1.5 rounded-lg hover:bg-primary-50 text-app-muted hover:text-primary transition-colors"
+            title="عرض التفاصيل"
+          >
+            <Eye size={14} />
+          </button>
+          {row.status === 'PENDING' && (
+            <button
+              onClick={() => {
+                if (window.confirm('تنفيذ التحويل الآن؟ سيتم خصم الكميات من المستودع المصدر وإضافتها للمستودع الهدف.')) {
+                  completeMutation.mutate(row.id);
+                }
+              }}
+              disabled={completeMutation.isPending}
+              className="p-1.5 rounded-lg hover:bg-green-50 text-app-muted hover:text-green-600 transition-colors disabled:opacity-50"
+              title="تنفيذ التحويل"
+            >
+              <CheckCircle2 size={14} />
+            </button>
+          )}
+        </div>
       ),
     },
   ];
