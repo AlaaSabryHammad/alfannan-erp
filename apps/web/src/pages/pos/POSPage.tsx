@@ -109,7 +109,8 @@ function toast(msg: string, type: 'success' | 'error' = 'success') {
 
 // --- API helpers ---
 const fetchDepartments = async (): Promise<Department[]> => {
-  const res = await apiClient.get<Department[]>('/departments');
+  // the flat list: '/departments' is a tree whose sub-departments are nested and would be missing here
+  const res = await apiClient.get<Department[]>('/departments/flat');
   return res.data;
 };
 
