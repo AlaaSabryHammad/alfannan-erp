@@ -5,6 +5,7 @@ import { requireAuth, requirePermission } from '../middleware/auth';
 import { getPagination, paginatedResponse } from '../lib/paginate';
 import { postOpeningBalanceEntry } from '../lib/ledger';
 
+import { WALK_IN_NAME, WALK_IN_NAMES } from '../lib/walkIn';
 const router = Router();
 router.use(requireAuth);
 
@@ -37,6 +38,18 @@ router.get('/', requirePermission('customers.view'), async (req: Request, res: R
       prisma.customer.count({ where }),
     ]);
     res.json(paginatedResponse(data, total, page, pageSize));
+  } catch (err) {
+    next(err);
+  }
+});
+
+// GET /api/customers/walk-in — the cash customer of this company (created on first use).
+// Must stay above '/:id'.
+router.get('/walk-in', requirePermission('sales.create'), async (_req: Request, res: Response, next: NextFunction) => {
+  try {
+    const found = await prisma.customer.findFirst({ where: { nameAr: { in: WALK_IN_NAMES } }, orderBy: { id: 'asc' } });
+    const customer = found ?? (await prisma.customer.create({ data: { nameAr: WALK_IN_NAME } }));
+    res.json({ id: customer.id, nameAr: customer.nameAr });
   } catch (err) {
     next(err);
   }

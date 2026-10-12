@@ -8,6 +8,7 @@ import { Router, Request, Response, NextFunction } from 'express';
 import { z } from 'zod';
 import { platformPrisma as db } from '../lib/platformPrisma';
 import { computeEntitlements } from '../lib/entitlements';
+import { WALK_IN_NAMES } from '../lib/walkIn';
 
 const router = Router();
 const DAY = 24 * 3600 * 1000;
@@ -40,7 +41,7 @@ router.get('/analytics', async (req: Request, res: Response, next: NextFunction)
         db.subscription.findMany({ include: { plan: true } }),
         db.plan.findMany({ orderBy: [{ sortOrder: 'asc' }, { id: 'asc' }] }),
         db.product.groupBy({ by: ['tenantId'] }),
-        db.customer.groupBy({ by: ['tenantId'] }),
+        db.customer.groupBy({ by: ['tenantId'], where: { nameAr: { notIn: WALK_IN_NAMES } } }),
         db.salesInvoice.groupBy({ by: ['tenantId'] }),
         db.user.groupBy({ by: ['tenantId'], where: { role: { code: 'ADMIN' }, emailVerifiedAt: { not: null } } }),
         db.subscriptionPayment.groupBy({ by: ['tenantId'] }),
