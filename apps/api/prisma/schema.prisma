@@ -1801,6 +1801,26 @@ model PlatformAuditLog {
   @@index([createdAt])
 }
 
+// Announcements published by the platform owner; every company's users see the active ones.
+model Announcement {
+  id        Int       @id @default(autoincrement())
+  title     String
+  body      String
+  level     String    @default("INFO") // INFO | WARNING | CRITICAL
+  isActive  Boolean   @default(true)
+  startsAt  DateTime?
+  endsAt    DateTime?
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+}
+
+// Platform-wide switches set from the console (e.g. signup.enabled). Owner connection only.
+model PlatformSetting {
+  key       String   @id
+  value     String
+  updatedAt DateTime @updatedAt
+}
+
 // ── PLANS & SUBSCRIPTIONS (SaaS billing) ──────────────────────────────────────────────────────
 // Plan is global (managed by the platform owner). Subscription is per tenant and read-only for the
 // tenant application role: only the owner console changes plans, periods and overrides.

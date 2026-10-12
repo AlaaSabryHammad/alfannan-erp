@@ -6,6 +6,7 @@ import {
   UserCheck, UserX, Users, X,
 } from 'lucide-react';
 import { BrandMark } from '../../components/BrandLogo';
+import { AnnouncementsTab, SystemTab } from './PlatformSystemTabs';
 import type { AxiosError } from 'axios';
 import {
   platformApi,
@@ -44,6 +45,11 @@ const ACTION_LABELS: Record<string, string> = {
   USER_EMAIL_VERIFIED: 'تأكيد بريد مستخدم يدويًا',
   USER_VERIFICATION_RESENT: 'إعادة إرسال رسالة التأكيد',
   TENANT_NOTE: 'تعديل ملاحظة شركة',
+  ANNOUNCEMENT_CREATE: 'نشر إعلان',
+  ANNOUNCEMENT_UPDATE: 'تعديل إعلان',
+  ANNOUNCEMENT_DELETE: 'حذف إعلان',
+  SIGNUP_SETTING: 'ضبط تسجيل الشركات',
+  TEST_EMAIL: 'رسالة بريد اختبار',
   PLAN_CREATE: 'إنشاء باقة',
   PLAN_UPDATE: 'تعديل باقة',
   SUB_CHANGE_PLAN: 'تغيير باقة شركة',
@@ -830,7 +836,7 @@ function ChangePasswordDialog({ onClose }: { onClose: () => void }) {
   );
 }
 
-type Tab = 'tenants' | 'requests' | 'plans' | 'payments' | 'audit';
+type Tab = 'tenants' | 'requests' | 'plans' | 'payments' | 'announcements' | 'system' | 'audit';
 
 export function PlatformDashboardPage() {
   const navigate = useNavigate();
@@ -951,6 +957,8 @@ export function PlatformDashboardPage() {
     ['requests', `طلبات الترقية${s?.pendingUpgradeRequests ? ` (${s.pendingUpgradeRequests})` : ''}`],
     ['plans', 'الباقات'],
     ['payments', 'المدفوعات'],
+    ['announcements', 'الإعلانات'],
+    ['system', 'حالة النظام'],
     ['audit', 'سجل العمليات'],
   ];
   const Loading = ({ cols }: { cols: number }) => (
@@ -1241,6 +1249,9 @@ export function PlatformDashboardPage() {
               </div>
             </div>
           )}
+
+          {tab === 'announcements' && <AnnouncementsTab />}
+          {tab === 'system' && <SystemTab />}
 
           {tab === 'audit' && (
             <ul className="divide-y divide-slate-100">

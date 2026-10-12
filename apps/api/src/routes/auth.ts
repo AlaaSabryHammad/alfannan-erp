@@ -12,6 +12,7 @@ import { LEGAL_VERSION } from '../lib/legal';
 import { invalidateUserSessions } from '../lib/userSession';
 import { confirmEmailToken, sendVerificationEmail } from '../lib/emailVerification';
 import { mailEnabled } from '../lib/mail/mailer';
+import { signupState } from '../lib/platformSettings';
 
 const router = Router();
 
@@ -138,15 +139,20 @@ router.post('/login', rateLimit({ name: 'login', windowMs: 10 * 60 * 1000, max: 
 });
 
 // GET /api/auth/config — public flags the login screen needs (no secrets)
-router.get('/config', (_req: Request, res: Response) => {
-  res.json({ signupEnabled: process.env.ALLOW_SIGNUP === 'true', legalVersion: LEGAL_VERSION });
+router.get('/config', async (_req: Request, res: Response, next: NextFunction) => {
+  try {
+    res.json({ signupEnabled: (await signupState()).enabled, legalVersion: LEGAL_VERSION });
+  } catch (err) {
+    next(err);
+  }
 });
 
 // POST /api/auth/register-tenant — create a new company with its first admin (public).
-// Off unless ALLOW_SIGNUP=true, so a private deployment can never be opened up by accident.
+// Off unless ALLOW_SIGNUP=true (or the owner opened it from the platform console), so a private
+// deployment can never be opened up by accident.
 router.post('/register-tenant', rateLimit({ name: 'register', windowMs: 60 * 60 * 1000, max: 10 }), async (req: Request, res: Response, next: NextFunction) => {
   try {
-    if (process.env.ALLOW_SIGNUP !== 'true') {
+    if (!(await signupState()).enabled) {
       res.status(403).json({ error: 'تسجيل الشركات الجديدة غير مفعّل على هذا الخادم' });
       return;
     }
