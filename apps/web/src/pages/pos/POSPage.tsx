@@ -79,7 +79,6 @@ const PAYMENT_METHODS: { code: PaymentMethod; label: string; icon: React.ReactNo
   { code: 'CREDIT', label: 'أجل', icon: <Receipt size={18} /> },
 ];
 
-const CASH_CUSTOMER_ID = 3; // "عميل نقدي عام" — matches the actual walk-in customer seeded in the DB
 
 type PriceTier = 'RETAIL' | 'HALF' | 'WHOLESALE';
 const PRICE_TIERS: { code: PriceTier; label: string }[] = [
@@ -211,7 +210,8 @@ export function POSPage() {
   const [couponError, setCouponError] = useState('');
   const [redeemPointsInput, setRedeemPointsInput] = useState('');
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('CASH');
-  const [customerId, setCustomerId] = useState<number>(CASH_CUSTOMER_ID);
+  // null until the company's walk-in customer is known (it is created on first use)
+  const [customerId, setCustomerId] = useState<number | null>(null);
   const [priceTier, setPriceTier] = useState<PriceTier>('RETAIL');
   const [tendered, setTendered] = useState<number>(0);
   const [lastReceipt, setLastReceipt] = useState<ReceiptDoc | null>(null);
@@ -262,6 +262,16 @@ export function POSPage() {
     queryKey: ['customers', 'pos'],
     queryFn: fetchCustomers,
   });
+
+  // The company's own cash customer — never a fixed id (every company has different ids).
+  const { data: walkIn } = useQuery({
+    queryKey: ['customers', 'walk-in'],
+    staleTime: Infinity,
+    queryFn: async () => (await apiClient.get<{ id: number; nameAr: string }>('/customers/walk-in')).data,
+  });
+  useEffect(() => {
+    if (customerId === null && walkIn) setCustomerId(walkIn.id);
+  }, [customerId, walkIn]);
 
   const { data: settings } = useQuery({
     queryKey: ['settings'],
@@ -380,7 +390,7 @@ export function POSPage() {
     setCouponError('');
     setRedeemPointsInput('');
     setPaymentMethod('CASH');
-    setCustomerId(CASH_CUSTOMER_ID);
+    setCustomerId(walkIn?.id ?? null);
   };
 
   const selectedCustomer = customers.find((c) => c.id === customerId);
@@ -525,6 +535,10 @@ export function POSPage() {
       toast('اختر مستودع البيع أولاً', 'error');
       return;
     }
+    if (customerId == null) {
+      toast('جارٍ تحميل بيانات العميل النقدي — أعد المحاولة بعد لحظة', 'error');
+      return;
+    }
     submitMutation.mutate();
   };
 
@@ -646,9 +660,9 @@ export function POSPage() {
       </div>
 
       {/* ====== RIGHT: Cart Panel ====== */}
-      <div className="w-80 flex-shrink-0 flex flex-col bg-white rounded-2xl border border-app-border shadow-sm overflow-hidden">
+      <div className="w-80 flex-shrink-0 flex flex-col bg-white rounded-2xl border border-app-border shadow-sm overflow-y-auto">
         {/* Cart Header */}
-        <div className="px-4 py-3 border-b border-app-border bg-gray-50 flex items-center justify-between flex-shrink-0">
+        <div className="px-4 py-3 border-b border-app-border bg-gray-50 flex items-center justify-between flex-shrink-0 sticky top-0 z-10">
           <div className="flex items-center gap-2">
             <ShoppingCart size={18} className="text-primary" />
             <span className="font-bold text-sm text-app-text">سلة المبيعات</span>
@@ -673,10 +687,13 @@ export function POSPage() {
           <label className="text-xs font-medium text-app-muted mb-1 block">الزبون / العميل الحالي</label>
           <div className="relative">
             <select
-              value={customerId}
+              value={customerId ?? ''}
               onChange={(e) => setCustomerId(Number(e.target.value))}
               className="w-full border border-app-border rounded-lg px-3 py-1.5 text-sm text-app-text bg-white focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary appearance-none pr-8"
             >
+              {walkIn && !customers.some((c) => c.id === walkIn.id) && (
+                <option value={walkIn.id}>{walkIn.nameAr}</option>
+              )}
               {customers.map((c) => (
                 <option key={c.id} value={c.id}>
                   {c.nameAr}{c.company ? ` — ${c.company}` : ''}
@@ -688,7 +705,7 @@ export function POSPage() {
         </div>
 
         {/* Cart Items */}
-        <div className="flex-1 overflow-y-auto px-3 py-2 space-y-2">
+        <div className="flex-1 min-h-[260px] overflow-y-auto px-3 py-2 space-y-2">
           {cart.length === 0 ? (
             <div className="flex flex-col items-center justify-center h-full text-app-muted gap-3 py-10">
               <ShoppingCart size={36} className="text-gray-200" />
