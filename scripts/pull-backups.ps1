@@ -13,9 +13,9 @@
   Runs unattended (Task Scheduler) - see register-backup-task.ps1. Needs key-based SSH to the
   server (BatchMode, no password prompt): see docs/BACKUP-RESTORE.md.
 
-.PARAMETER Remote      user@host of the server                       (default root@100.64.92.110)
+.PARAMETER Remote      user@host of the server                       (default root@145.223.82.253)
 .PARAMETER RemoteDir   backups directory on the server                (default /opt/alfannan/backups)
-.PARAMETER Destination where the copies are kept on this machine      (default D:\backups\alfannan)
+.PARAMETER Destination where the copies are kept on this machine      (default D:\backups\alfannan-prod)
 .PARAMETER Keep        how many files of each kind to keep locally    (default 60)
 .PARAMETER MaxAgeHours alarm when the newest server backup is older   (default 36)
 .PARAMETER SourceDir   copy from a local folder instead of the server (testing the script itself)
@@ -25,9 +25,9 @@
 #>
 [CmdletBinding()]
 param(
-  [string]$Remote = 'root@100.64.92.110',
+  [string]$Remote = 'root@145.223.82.253',
   [string]$RemoteDir = '/opt/alfannan/backups',
-  [string]$Destination = 'D:\backups\alfannan',
+  [string]$Destination = 'D:\backups\alfannan-prod',
   [int]$Keep = 60,
   [int]$MaxAgeHours = 36,
   [string]$SourceDir = ''

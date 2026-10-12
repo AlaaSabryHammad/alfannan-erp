@@ -9,8 +9,8 @@
 [CmdletBinding()]
 param(
   [string]$At = '03:45',
-  [string]$Destination = 'D:\backups\alfannan',
-  [string]$Remote = 'root@100.64.92.110',
+  [string]$Destination = 'D:\backups\alfannan-prod',
+  [string]$Remote = 'root@145.223.82.253',
   [string]$TaskName = 'Alfannan-Pull-Backups'
 )
 
