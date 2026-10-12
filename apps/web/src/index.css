@@ -79,3 +79,41 @@
     @apply w-full border border-app-border rounded-lg px-3 py-2 text-sm text-app-text bg-white focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-colors;
   }
 }
+
+/* ── Platform console — Saudi luxury theme ─────────────────────────────────── */
+.platform-root,
+.platform-root * {
+  font-family: 'IBM Plex Sans Arabic', 'Tajawal', 'Cairo', sans-serif;
+}
+.platform-root .font-display,
+.platform-root h1,
+.platform-root h2 {
+  font-family: 'El Messiri', 'Reem Kufi', 'Tajawal', serif;
+}
+
+/* deep green sidebar with a faint eight-point star ground */
+.platform-sidebar {
+  background-color: #0c3b2b;
+  background-image:
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='72' height='72' viewBox='0 0 72 72'%3E%3Cg fill='none' stroke='%23c8963e' stroke-opacity='.10' stroke-width='1'%3E%3Crect x='20' y='20' width='32' height='32'/%3E%3Crect x='20' y='20' width='32' height='32' transform='rotate(45 36 36)'/%3E%3C/g%3E%3C/svg%3E"),
+    linear-gradient(180deg, #0f4733 0%, #0a3024 55%, #082a1f 100%);
+  border-left: 1px solid rgba(200, 150, 62, 0.35);
+}
+
+/* sand page ground */
+.platform-ground {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='72' height='72' viewBox='0 0 72 72'%3E%3Cg fill='none' stroke='%23c8963e' stroke-opacity='.11' stroke-width='1'%3E%3Crect x='20' y='20' width='32' height='32'/%3E%3Crect x='20' y='20' width='32' height='32' transform='rotate(45 36 36)'/%3E%3C/g%3E%3C/svg%3E");
+}
+
+/* Sadu weaving strip */
+.sadu-band {
+  height: 14px;
+  background-repeat: repeat-x;
+  background-position: center;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='28' height='14' viewBox='0 0 28 14'%3E%3Cpath d='M0 12 7 2l7 10 7-10 7 10' fill='none' stroke='%23c8963e' stroke-width='1.3'/%3E%3Cpath d='M14 5.2 16.2 7.4 14 9.6 11.8 7.4Z' fill='%23ebcf92'/%3E%3Cpath d='M0 5.2 2.2 7.4 0 9.6Z M28 5.2 25.8 7.4 28 9.6Z' fill='%23ebcf92'/%3E%3C/svg%3E");
+}
+.sadu-band-green {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='28' height='14' viewBox='0 0 28 14'%3E%3Cpath d='M0 12 7 2l7 10 7-10 7 10' fill='none' stroke='%2314573f' stroke-width='1.3'/%3E%3Cpath d='M14 5.2 16.2 7.4 14 9.6 11.8 7.4Z' fill='%23c8963e'/%3E%3Cpath d='M0 5.2 2.2 7.4 0 9.6Z M28 5.2 25.8 7.4 28 9.6Z' fill='%23c8963e'/%3E%3C/svg%3E");
+}
+.platform-root section.bg-najd-paper { box-shadow: 0 1px 2px rgba(60, 45, 10, 0.06), 0 8px 24px -12px rgba(60, 45, 10, 0.12); }
+.platform-root table thead { background: rgba(244, 237, 220, 0.7); }

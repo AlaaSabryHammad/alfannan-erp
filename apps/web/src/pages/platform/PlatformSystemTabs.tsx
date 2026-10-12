@@ -9,7 +9,7 @@ import { platformApi, platformRole } from '../../lib/platformApi';
 
 const errorOf = (err: unknown) => (err as AxiosError<{ error?: string }>).response?.data?.error ?? 'تعذّر تنفيذ العملية';
 const input =
-  'w-full border border-slate-300 rounded-lg px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-teal-600/30 focus:border-teal-600';
+  'w-full border border-najd-line rounded-lg px-3 py-2 text-sm bg-najd-paper focus:outline-none focus:ring-2 focus:ring-najd-gold/40 focus:border-najd-gold';
 
 const fmtDateTime = (v: string | null) => (v ? new Date(v).toLocaleString('ar-SA', { dateStyle: 'medium', timeStyle: 'short' }) : '—');
 
@@ -67,22 +67,22 @@ function AnnouncementForm({ item, onClose }: { item: Announcement | null; onClos
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40" dir="rtl">
-      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg p-6 flex flex-col gap-4 max-h-[90vh] overflow-y-auto">
+      <div className="bg-najd-paper rounded-2xl shadow-2xl w-full max-w-lg p-6 flex flex-col gap-4 max-h-[90vh] overflow-y-auto">
         <div className="flex items-center justify-between">
-          <h2 className="text-lg font-bold text-slate-900">{item ? 'تعديل إعلان' : 'إعلان جديد'}</h2>
-          <button onClick={onClose} className="text-slate-500 hover:text-slate-900"><X size={20} /></button>
+          <h2 className="text-lg font-bold text-najd-ink">{item ? 'تعديل إعلان' : 'إعلان جديد'}</h2>
+          <button onClick={onClose} className="text-najd-muted hover:text-najd-ink"><X size={20} /></button>
         </div>
 
-        <label className="text-sm font-medium text-slate-700 flex flex-col gap-1">
+        <label className="text-sm font-medium text-najd-ink/80 flex flex-col gap-1">
           العنوان
           <input value={title} onChange={(e) => setTitle(e.target.value)} maxLength={120} className={input} />
         </label>
-        <label className="text-sm font-medium text-slate-700 flex flex-col gap-1">
+        <label className="text-sm font-medium text-najd-ink/80 flex flex-col gap-1">
           النص
           <textarea value={body} onChange={(e) => setBody(e.target.value)} rows={4} maxLength={1000} className={input} />
         </label>
         <div className="grid grid-cols-2 gap-3">
-          <label className="text-sm font-medium text-slate-700 flex flex-col gap-1">
+          <label className="text-sm font-medium text-najd-ink/80 flex flex-col gap-1">
             الأهمية
             <select value={level} onChange={(e) => setLevel(e.target.value as Announcement['level'])} className={input}>
               <option value="INFO">معلومة</option>
@@ -90,14 +90,14 @@ function AnnouncementForm({ item, onClose }: { item: Announcement | null; onClos
               <option value="CRITICAL">هام (لا يمكن إخفاؤه)</option>
             </select>
           </label>
-          <label className="text-sm font-medium text-slate-700 flex items-end gap-2 pb-2">
+          <label className="text-sm font-medium text-najd-ink/80 flex items-end gap-2 pb-2">
             <input type="checkbox" checked={isActive} onChange={(e) => setIsActive(e.target.checked)} /> مفعّل
           </label>
-          <label className="text-sm font-medium text-slate-700 flex flex-col gap-1">
+          <label className="text-sm font-medium text-najd-ink/80 flex flex-col gap-1">
             يبدأ (اختياري)
             <input type="datetime-local" value={startsAt} onChange={(e) => setStartsAt(e.target.value)} className={input} />
           </label>
-          <label className="text-sm font-medium text-slate-700 flex flex-col gap-1">
+          <label className="text-sm font-medium text-najd-ink/80 flex flex-col gap-1">
             ينتهي (اختياري)
             <input type="datetime-local" value={endsAt} onChange={(e) => setEndsAt(e.target.value)} className={input} />
           </label>
@@ -107,7 +107,7 @@ function AnnouncementForm({ item, onClose }: { item: Announcement | null; onClos
         <button
           disabled={save.isPending || title.trim().length < 2 || body.trim().length < 2}
           onClick={() => { setError(null); save.mutate(); }}
-          className="bg-teal-700 hover:bg-teal-800 text-white text-sm font-semibold py-2 rounded-lg disabled:opacity-60 flex items-center justify-center gap-2"
+          className="bg-najd-green hover:bg-najd-green-dark text-white text-sm font-semibold py-2 rounded-lg disabled:opacity-60 flex items-center justify-center gap-2"
         >
           {save.isPending && <Loader2 size={14} className="animate-spin" />} {item ? 'حفظ التعديل' : 'نشر الإعلان'}
         </button>
@@ -135,54 +135,54 @@ export function AnnouncementsTab() {
 
   const now = Date.now();
   const stateOf = (a: Announcement) => {
-    if (!a.isActive) return { label: 'معطّل', style: 'bg-slate-100 text-slate-600' };
+    if (!a.isActive) return { label: 'معطّل', style: 'bg-najd-sand text-najd-muted' };
     if (a.startsAt && new Date(a.startsAt).getTime() > now) return { label: 'مجدول', style: 'bg-violet-50 text-violet-700' };
-    if (a.endsAt && new Date(a.endsAt).getTime() < now) return { label: 'منتهٍ', style: 'bg-slate-100 text-slate-600' };
+    if (a.endsAt && new Date(a.endsAt).getTime() < now) return { label: 'منتهٍ', style: 'bg-najd-sand text-najd-muted' };
     return { label: 'ظاهر الآن', style: 'bg-emerald-50 text-emerald-700' };
   };
 
   return (
     <div>
-      <div className="flex items-center gap-3 p-4 border-b border-slate-100">
-        <Megaphone size={18} className="text-teal-700" />
-        <p className="text-sm text-slate-600">تظهر الإعلانات الفعّالة كشريط أعلى النظام لكل مستخدمي كل الشركات.</p>
-        <button disabled={platformRole() !== 'OWNER'} onClick={() => setEditing('new')} className="disabled:opacity-50 mr-auto flex items-center gap-1.5 text-sm font-semibold bg-teal-700 hover:bg-teal-800 text-white px-3 py-1.5 rounded-lg">
+      <div className="flex items-center gap-3 p-4 border-b border-najd-line">
+        <Megaphone size={18} className="text-najd-green" />
+        <p className="text-sm text-najd-muted">تظهر الإعلانات الفعّالة كشريط أعلى النظام لكل مستخدمي كل الشركات.</p>
+        <button disabled={platformRole() !== 'OWNER'} onClick={() => setEditing('new')} className="disabled:opacity-50 mr-auto flex items-center gap-1.5 text-sm font-semibold bg-najd-green hover:bg-najd-green-dark text-white px-3 py-1.5 rounded-lg">
           <Plus size={16} /> إعلان جديد
         </button>
       </div>
-      <ul className="divide-y divide-slate-100">
-        {list.isLoading && <li className="py-10 text-center text-slate-400"><Loader2 className="inline animate-spin" /></li>}
+      <ul className="divide-y divide-najd-line/70">
+        {list.isLoading && <li className="py-10 text-center text-najd-muted/70"><Loader2 className="inline animate-spin" /></li>}
         {list.data?.map((a) => {
           const st = stateOf(a);
           return (
             <li key={a.id} className="p-4 flex flex-col gap-1.5">
               <div className="flex items-center gap-2 flex-wrap">
-                <span className="font-semibold text-slate-900">{a.title}</span>
+                <span className="font-semibold text-najd-ink">{a.title}</span>
                 <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${LEVELS[a.level].style}`}>{LEVELS[a.level].label}</span>
                 <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${st.style}`}>{st.label}</span>
                 <span className="mr-auto flex items-center">
-                  <button title={a.isActive ? 'تعطيل' : 'تفعيل'} onClick={() => toggle.mutate(a)} className="p-1.5 text-slate-500 hover:text-teal-700">
+                  <button title={a.isActive ? 'تعطيل' : 'تفعيل'} onClick={() => toggle.mutate(a)} className="p-1.5 text-najd-muted hover:text-najd-green">
                     {a.isActive ? <XCircle size={16} /> : <CheckCircle2 size={16} />}
                   </button>
-                  <button title="تعديل" onClick={() => setEditing(a)} className="p-1.5 text-slate-500 hover:text-teal-700"><Pencil size={16} /></button>
+                  <button title="تعديل" onClick={() => setEditing(a)} className="p-1.5 text-najd-muted hover:text-najd-green"><Pencil size={16} /></button>
                   <button
                     title="حذف"
                     onClick={() => window.confirm(`حذف الإعلان «${a.title}»؟`) && remove.mutate(a.id)}
-                    className="p-1.5 text-slate-500 hover:text-red-600"
+                    className="p-1.5 text-najd-muted hover:text-red-600"
                   >
                     <Trash2 size={16} />
                   </button>
                 </span>
               </div>
-              <p className="text-sm text-slate-600 leading-6">{a.body}</p>
-              <p className="text-xs text-slate-400">
+              <p className="text-sm text-najd-muted leading-6">{a.body}</p>
+              <p className="text-xs text-najd-muted/70">
                 {a.startsAt ? `من ${fmtDateTime(a.startsAt)} ` : ''}
                 {a.endsAt ? `حتى ${fmtDateTime(a.endsAt)}` : a.startsAt ? '' : 'بدون مدة محددة'}
               </p>
             </li>
           );
         })}
-        {list.data?.length === 0 && <li className="py-10 text-center text-slate-400">لا توجد إعلانات</li>}
+        {list.data?.length === 0 && <li className="py-10 text-center text-najd-muted/70">لا توجد إعلانات</li>}
       </ul>
       {editing !== null && <AnnouncementForm item={editing === 'new' ? null : editing} onClose={() => setEditing(null)} />}
     </div>
@@ -207,9 +207,9 @@ const fmtUptime = (s: number) => (s >= 86400 ? `${Math.floor(s / 86400)} يوم`
 
 function Row({ label, children }: { label: string; children: React.ReactNode }) {
   return (
-    <div className="flex items-center gap-3 py-2.5 border-b border-slate-100 last:border-0 text-sm">
-      <span className="text-slate-500 w-40 flex-shrink-0">{label}</span>
-      <span className="text-slate-900 flex items-center gap-2 flex-wrap">{children}</span>
+    <div className="flex items-center gap-3 py-2.5 border-b border-najd-line last:border-0 text-sm">
+      <span className="text-najd-muted w-40 flex-shrink-0">{label}</span>
+      <span className="text-najd-ink flex items-center gap-2 flex-wrap">{children}</span>
     </div>
   );
 }
@@ -238,17 +238,17 @@ export function SystemTab() {
   });
 
   const s = status.data;
-  if (status.isLoading || !s) return <div className="py-10 text-center text-slate-400"><Loader2 className="inline animate-spin" /></div>;
+  if (status.isLoading || !s) return <div className="py-10 text-center text-najd-muted/70"><Loader2 className="inline animate-spin" /></div>;
 
   const backupAgeH = s.backups.latest ? (Date.now() - new Date(s.backups.latest.at).getTime()) / 3600000 : null;
 
   return (
     <div className="p-4 grid md:grid-cols-2 gap-4">
-      <section className="border border-slate-200 rounded-xl p-4">
-        <h3 className="font-semibold text-slate-800 mb-1">التسجيل</h3>
+      <section className="border border-najd-line rounded-xl p-4">
+        <h3 className="font-semibold text-najd-ink/80 mb-1">التسجيل</h3>
         <Row label="تسجيل الشركات الجديدة">
           <Pill ok={s.signup.enabled} text={s.signup.enabled ? 'مفتوح' : 'مغلق'} />
-          <span className="text-xs text-slate-400">{s.signup.source === 'console' ? 'مضبوط من اللوحة' : 'حسب إعداد الخادم'}</span>
+          <span className="text-xs text-najd-muted/70">{s.signup.source === 'console' ? 'مضبوط من اللوحة' : 'حسب إعداد الخادم'}</span>
         </Row>
         <div className="flex gap-2 mt-2 flex-wrap">
           <button
@@ -262,7 +262,7 @@ export function SystemTab() {
             <button
               disabled={signup.isPending || platformRole() !== 'OWNER'}
               onClick={() => signup.mutate(null)}
-              className="text-sm font-semibold px-3 py-1.5 rounded-lg border border-slate-300 text-slate-700 hover:bg-slate-50"
+              className="text-sm font-semibold px-3 py-1.5 rounded-lg border border-najd-line text-najd-ink/80 hover:bg-najd-sand/70"
             >
               اتباع إعداد الخادم ({s.signup.envValue ? 'مفتوح' : 'مغلق'})
             </button>
@@ -270,22 +270,22 @@ export function SystemTab() {
         </div>
       </section>
 
-      <section className="border border-slate-200 rounded-xl p-4">
-        <h3 className="font-semibold text-slate-800 mb-1">البريد الإلكتروني</h3>
+      <section className="border border-najd-line rounded-xl p-4">
+        <h3 className="font-semibold text-najd-ink/80 mb-1">البريد الإلكتروني</h3>
         <Row label="الحالة"><Pill ok={s.mail.enabled} text={s.mail.enabled ? 'مفعّل' : 'غير مفعّل'} /></Row>
         <Row label="الخادم"><span dir="ltr">{s.mail.host ?? '—'}</span></Row>
         <Row label="المرسل"><span dir="auto">{s.mail.from ?? '—'}</span></Row>
         <button
           disabled={testMail.isPending || !s.mail.enabled}
           onClick={() => { setNotice(null); testMail.mutate(); }}
-          className="mt-2 text-sm font-semibold px-3 py-1.5 rounded-lg border border-slate-300 text-slate-700 hover:bg-slate-50 disabled:opacity-50 flex items-center gap-2"
+          className="mt-2 text-sm font-semibold px-3 py-1.5 rounded-lg border border-najd-line text-najd-ink/80 hover:bg-najd-sand/70 disabled:opacity-50 flex items-center gap-2"
         >
           {testMail.isPending ? <Loader2 size={14} className="animate-spin" /> : <Send size={14} />} إرسال رسالة اختبار لي
         </button>
       </section>
 
-      <section className="border border-slate-200 rounded-xl p-4">
-        <h3 className="font-semibold text-slate-800 mb-1">النسخ الاحتياطي</h3>
+      <section className="border border-najd-line rounded-xl p-4">
+        <h3 className="font-semibold text-najd-ink/80 mb-1">النسخ الاحتياطي</h3>
         {!s.backups.available ? (
           <Row label="الحالة"><Pill ok={false} text="المجلد غير مرئي للـ API" /></Row>
         ) : s.backups.latest ? (
@@ -302,19 +302,19 @@ export function SystemTab() {
         )}
       </section>
 
-      <section className="border border-slate-200 rounded-xl p-4">
-        <h3 className="font-semibold text-slate-800 mb-1">النظام</h3>
+      <section className="border border-najd-line rounded-xl p-4">
+        <h3 className="font-semibold text-najd-ink/80 mb-1">النظام</h3>
         <Row label="الاشتراكات">
           <Pill ok={s.subscriptions.enforcement === 'enforce'} text={s.subscriptions.enforcement === 'enforce' ? 'تطبيق كامل' : s.subscriptions.enforcement === 'log' ? 'تسجيل فقط' : 'متوقف'} />
         </Row>
         <Row label="الدفع الإلكتروني">
           <Pill ok={s.payments.enabled} text={s.payments.enabled ? 'مفعّل' : 'غير مفعّل'} />
-          <span className="text-xs text-slate-400">{s.payments.provider}</span>
+          <span className="text-xs text-najd-muted/70">{s.payments.provider}</span>
         </Row>
         <Row label="قاعدة البيانات">{fmtBytes(s.database.sizeBytes)} · {s.database.tenants} شركة · {s.database.users} مستخدم</Row>
         <Row label="الخادم">
           <span dir="ltr">Node {s.runtime.node}</span>
-          <span className="text-xs text-slate-400">يعمل منذ {fmtUptime(s.runtime.uptimeSeconds)}</span>
+          <span className="text-xs text-najd-muted/70">يعمل منذ {fmtUptime(s.runtime.uptimeSeconds)}</span>
         </Row>
       </section>
 

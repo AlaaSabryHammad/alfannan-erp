@@ -8,8 +8,20 @@ export default {
     extend: {
       fontFamily: {
         sans: ['Tajawal', 'Cairo', 'sans-serif'],
+        display: ['"El Messiri"', '"Reem Kufi"', 'serif'],
       },
       colors: {
+        // platform console: Saudi luxury palette
+        najd: {
+          green: { DEFAULT: '#14573F', dark: '#0C3B2B', deep: '#082A1F' },
+          gold: { DEFAULT: '#C8963E', light: '#EBCF92' },
+          sand: '#F4EDDC',
+          paper: '#FFFDF8',
+          line: '#E5D9BE',
+          ink: '#2A261E',
+          muted: '#7C705A',
+          red: '#9B2C1F',
+        },
         primary: {
           DEFAULT: '#0e9384',
           50: '#e6f5f3',

@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Navigate, useNavigate } from 'react-router-dom';
+import { Navigate, useNavigate, useParams } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   AlertTriangle, BadgeCheck, Copy, Download, KeyRound, Loader2, LogOut, Mail, PauseCircle, PlayCircle, Plus, Search,
@@ -9,6 +9,7 @@ import { BrandMark } from '../../components/BrandLogo';
 import { AnnouncementsTab, SystemTab } from './PlatformSystemTabs';
 import { AdminsTab, ROLE_LABEL } from './PlatformAdminsTab';
 import { AnalyticsTab } from './PlatformAnalyticsTab';
+import { PlatformShell, type SectionId } from './PlatformShell';
 import type { AxiosError } from 'axios';
 import {
   platformApi,
@@ -88,17 +89,17 @@ const STATUS_STYLE: Record<SubscriptionStatus, string> = {
   ACTIVE: 'bg-emerald-50 text-emerald-700',
   PAST_DUE: 'bg-amber-50 text-amber-700',
   EXPIRED: 'bg-red-50 text-red-700',
-  CANCELED: 'bg-slate-100 text-slate-600',
+  CANCELED: 'bg-najd-sand text-najd-muted',
 };
 
 const input =
-  'w-full border border-slate-300 rounded-lg px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-teal-600/30 focus:border-teal-600';
+  'w-full border border-najd-line rounded-lg px-3 py-2 text-sm bg-najd-paper focus:outline-none focus:ring-2 focus:ring-najd-gold/40 focus:border-najd-gold';
 
 const errorOf = (err: unknown) =>
   (err as AxiosError<{ error?: string }>).response?.data?.error ?? 'تعذّر تنفيذ العملية';
 
 function StatusBadge({ status }: { status: SubscriptionStatus | undefined }) {
-  if (!status) return <span className="text-xs text-slate-400">—</span>;
+  if (!status) return <span className="text-xs text-najd-muted/70">—</span>;
   return (
     <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${STATUS_STYLE[status]}`}>
       {STATUS_LABELS[status]}
@@ -108,10 +109,11 @@ function StatusBadge({ status }: { status: SubscriptionStatus | undefined }) {
 
 function StatCard({ label, value, hint }: { label: string; value: number | string; hint?: string }) {
   return (
-    <div className="bg-white rounded-xl border border-slate-200 p-4">
-      <p className="text-xs text-slate-500">{label}</p>
-      <p className="text-2xl font-bold text-slate-900 mt-1">{value}</p>
-      {hint && <p className="text-xs text-slate-400 mt-1">{hint}</p>}
+    <div className="relative overflow-hidden bg-najd-paper rounded-2xl border border-najd-line p-4 pt-5">
+      <span className="absolute inset-x-0 top-0 h-1" style={{ background: 'linear-gradient(90deg,#14573F,#C8963E)' }} />
+      <p className="text-xs text-najd-muted">{label}</p>
+      <p className="font-display text-3xl font-bold text-najd-ink mt-1">{value}</p>
+      {hint && <p className="text-xs text-najd-muted/70 mt-1">{hint}</p>}
     </div>
   );
 }
@@ -119,13 +121,13 @@ function StatCard({ label, value, hint }: { label: string; value: number | strin
 function SignupsChart({ data }: { data: PlatformStats['signupsByDay'] }) {
   const max = Math.max(1, ...data.map((d) => d.count));
   return (
-    <div className="bg-white rounded-xl border border-slate-200 p-4">
-      <p className="text-sm font-semibold text-slate-700 mb-3">تسجيلات الشركات — آخر 30 يومًا</p>
+    <div className="bg-najd-paper rounded-xl border border-najd-line p-4">
+      <p className="text-sm font-semibold text-najd-ink/80 mb-3">تسجيلات الشركات — آخر 30 يومًا</p>
       <div className="flex items-end gap-1 h-24">
         {data.map((d) => (
           <div key={d.date} className="flex-1 flex flex-col justify-end" title={`${d.date}: ${d.count}`}>
             <div
-              className={d.count ? 'bg-teal-600 rounded-t' : 'bg-slate-200 rounded-t'}
+              className={d.count ? 'bg-najd-gold rounded-t' : 'bg-najd-line rounded-t'}
               style={{ height: `${d.count ? Math.max(8, (d.count / max) * 100) : 4}%` }}
             />
           </div>
@@ -184,45 +186,45 @@ function PlanForm({ plan, onClose }: { plan: PlatformPlan | null; onClose: () =>
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40" dir="rtl">
       <form
         onSubmit={(e) => { e.preventDefault(); setError(null); save.mutate(); }}
-        className="bg-white rounded-2xl shadow-2xl w-full max-w-xl max-h-[90vh] overflow-y-auto p-6 flex flex-col gap-4"
+        className="bg-najd-paper rounded-2xl shadow-2xl w-full max-w-xl max-h-[90vh] overflow-y-auto p-6 flex flex-col gap-4"
       >
         <div className="flex items-center justify-between">
-          <h2 className="text-lg font-bold text-slate-900">{plan ? `تعديل باقة «${plan.nameAr}»` : 'باقة جديدة'}</h2>
-          <button type="button" onClick={onClose} className="text-slate-500 hover:text-slate-900"><X size={20} /></button>
+          <h2 className="text-lg font-bold text-najd-ink">{plan ? `تعديل باقة «${plan.nameAr}»` : 'باقة جديدة'}</h2>
+          <button type="button" onClick={onClose} className="text-najd-muted hover:text-najd-ink"><X size={20} /></button>
         </div>
 
         <div className="grid grid-cols-2 gap-3">
-          <label className="text-sm font-medium text-slate-700 flex flex-col gap-1">
+          <label className="text-sm font-medium text-najd-ink/80 flex flex-col gap-1">
             الكود
-            <input value={code} onChange={(e) => setCode(e.target.value)} disabled={!!plan} dir="ltr" className={`${input} disabled:bg-slate-100`} placeholder="pro-plus" />
+            <input value={code} onChange={(e) => setCode(e.target.value)} disabled={!!plan} dir="ltr" className={`${input} disabled:bg-najd-sand`} placeholder="pro-plus" />
           </label>
-          <label className="text-sm font-medium text-slate-700 flex flex-col gap-1">
+          <label className="text-sm font-medium text-najd-ink/80 flex flex-col gap-1">
             الاسم
             <input value={nameAr} onChange={(e) => setNameAr(e.target.value)} required className={input} />
           </label>
-          <label className="text-sm font-medium text-slate-700 flex flex-col gap-1">
+          <label className="text-sm font-medium text-najd-ink/80 flex flex-col gap-1">
             السعر الشهري (ر.س)
             <input type="number" min={0} value={priceMonthly} onChange={(e) => setPriceMonthly(e.target.value)} className={input} />
           </label>
-          <label className="text-sm font-medium text-slate-700 flex flex-col gap-1">
+          <label className="text-sm font-medium text-najd-ink/80 flex flex-col gap-1">
             السعر السنوي (ر.س)
             <input type="number" min={0} value={priceYearly} onChange={(e) => setPriceYearly(e.target.value)} className={input} />
           </label>
-          <label className="text-sm font-medium text-slate-700 flex flex-col gap-1">
+          <label className="text-sm font-medium text-najd-ink/80 flex flex-col gap-1">
             أيام التجربة
             <input type="number" min={0} max={90} value={trialDays} onChange={(e) => setTrialDays(e.target.value)} className={input} />
           </label>
-          <label className="text-sm font-medium text-slate-700 flex flex-col gap-1">
+          <label className="text-sm font-medium text-najd-ink/80 flex flex-col gap-1">
             الترتيب
             <input type="number" min={0} value={sortOrder} onChange={(e) => setSortOrder(e.target.value)} className={input} />
           </label>
         </div>
 
-        <fieldset className="border border-slate-200 rounded-lg p-3">
-          <legend className="text-sm font-semibold text-slate-700 px-1">الحدود (اتركه فارغًا = بلا حد)</legend>
+        <fieldset className="border border-najd-line rounded-lg p-3">
+          <legend className="text-sm font-semibold text-najd-ink/80 px-1">الحدود (اتركه فارغًا = بلا حد)</legend>
           <div className="grid grid-cols-2 gap-3">
             {limitKeys.map((k) => (
-              <label key={k} className="text-sm text-slate-700 flex flex-col gap-1">
+              <label key={k} className="text-sm text-najd-ink/80 flex flex-col gap-1">
                 {LIMIT_LABELS[k]}
                 <input type="number" min={0} value={limits[k]} onChange={(e) => setLimits({ ...limits, [k]: e.target.value })} placeholder="بلا حد" className={input} />
               </label>
@@ -230,11 +232,11 @@ function PlanForm({ plan, onClose }: { plan: PlatformPlan | null; onClose: () =>
           </div>
         </fieldset>
 
-        <fieldset className="border border-slate-200 rounded-lg p-3">
-          <legend className="text-sm font-semibold text-slate-700 px-1">المزايا</legend>
+        <fieldset className="border border-najd-line rounded-lg p-3">
+          <legend className="text-sm font-semibold text-najd-ink/80 px-1">المزايا</legend>
           <div className="flex flex-col gap-2">
             {featureKeys.map((k) => (
-              <label key={k} className="flex items-center gap-2 text-sm text-slate-700">
+              <label key={k} className="flex items-center gap-2 text-sm text-najd-ink/80">
                 <input type="checkbox" checked={features[k]} onChange={(e) => setFeatures({ ...features, [k]: e.target.checked })} />
                 {FEATURE_LABELS[k]}
               </label>
@@ -242,7 +244,7 @@ function PlanForm({ plan, onClose }: { plan: PlatformPlan | null; onClose: () =>
           </div>
         </fieldset>
 
-        <label className="flex items-center gap-2 text-sm text-slate-700">
+        <label className="flex items-center gap-2 text-sm text-najd-ink/80">
           <input type="checkbox" checked={isActive} onChange={(e) => setIsActive(e.target.checked)} />
           الباقة متاحة للاشتراك
         </label>
@@ -250,8 +252,8 @@ function PlanForm({ plan, onClose }: { plan: PlatformPlan | null; onClose: () =>
         {error && <div className="bg-red-50 border border-red-200 text-red-700 text-sm rounded-lg px-4 py-3">{error}</div>}
 
         <div className="flex gap-2 justify-end">
-          <button type="button" onClick={onClose} className="px-4 py-2 text-sm text-slate-600 hover:bg-slate-100 rounded-lg">إلغاء</button>
-          <button type="submit" disabled={save.isPending} className="px-4 py-2 text-sm font-semibold bg-teal-700 hover:bg-teal-800 text-white rounded-lg disabled:opacity-60 flex items-center gap-2">
+          <button type="button" onClick={onClose} className="px-4 py-2 text-sm text-najd-muted hover:bg-najd-sand rounded-lg">إلغاء</button>
+          <button type="submit" disabled={save.isPending} className="px-4 py-2 text-sm font-semibold bg-najd-green hover:bg-najd-green-dark text-white rounded-lg disabled:opacity-60 flex items-center gap-2">
             {save.isPending && <Loader2 size={14} className="animate-spin" />} حفظ
           </button>
         </div>
@@ -327,15 +329,15 @@ function SubscriptionCard({ tenant, plans }: { tenant: PlatformTenantDetail; pla
     return <div className="border border-red-200 bg-red-50 text-red-700 text-sm rounded-lg p-3 mb-6">لا يوجد اشتراك لهذه الشركة.</div>;
   }
 
-  const btn = 'text-xs font-semibold px-3 py-1.5 rounded-lg border border-slate-300 hover:bg-slate-50 text-slate-700';
+  const btn = 'text-xs font-semibold px-3 py-1.5 rounded-lg border border-najd-line hover:bg-najd-sand/70 text-najd-ink/80';
 
   return (
-    <div className="border border-slate-200 rounded-xl p-4 mb-6">
+    <div className="border border-najd-line rounded-xl p-4 mb-6">
       <div className="flex items-center gap-2 flex-wrap">
-        <h3 className="text-sm font-semibold text-slate-700">الاشتراك</h3>
+        <h3 className="text-sm font-semibold text-najd-ink/80">الاشتراك</h3>
         <StatusBadge status={sub.status} />
-        <span className="text-sm font-medium text-slate-900">{sub.planName}</span>
-        <span className="mr-auto text-xs text-slate-500">
+        <span className="text-sm font-medium text-najd-ink">{sub.planName}</span>
+        <span className="mr-auto text-xs text-najd-muted">
           {sub.status === 'TRIALING'
             ? `تنتهي التجربة ${fmtDate(sub.trialEndsAt)}`
             : sub.currentPeriodEnd
@@ -344,7 +346,7 @@ function SubscriptionCard({ tenant, plans }: { tenant: PlatformTenantDetail; pla
           {sub.daysLeft !== null && ` (${sub.daysLeft} يوم)`}
         </span>
       </div>
-      {sub.notes && <p className="text-xs text-slate-500 mt-2">ملاحظات: {sub.notes}</p>}
+      {sub.notes && <p className="text-xs text-najd-muted mt-2">ملاحظات: {sub.notes}</p>}
 
       <div className="flex flex-wrap gap-2 mt-3">
         <button className={btn} onClick={() => setMode(mode === 'activate' ? null : 'activate')}>تفعيل / تجديد</button>
@@ -362,24 +364,24 @@ function SubscriptionCard({ tenant, plans }: { tenant: PlatformTenantDetail; pla
       </div>
 
       {mode === 'activate' && (
-        <div className="mt-3 bg-slate-50 rounded-lg p-3 grid grid-cols-2 gap-3">
-          <label className="text-xs text-slate-600 flex flex-col gap-1">الباقة
+        <div className="mt-3 bg-najd-sand/60 rounded-lg p-3 grid grid-cols-2 gap-3">
+          <label className="text-xs text-najd-muted flex flex-col gap-1">الباقة
             <select value={planId} onChange={(e) => setPlanId(Number(e.target.value))} className={input}>
               {activePlans.map((p) => <option key={p.id} value={p.id}>{p.nameAr} — {fmtMoney(p.priceMonthly)} ر.س/شهر</option>)}
             </select>
           </label>
-          <label className="text-xs text-slate-600 flex flex-col gap-1">عدد الأشهر
+          <label className="text-xs text-najd-muted flex flex-col gap-1">عدد الأشهر
             <input type="number" min={1} max={36} value={months} onChange={(e) => setMonths(e.target.value)} className={input} />
           </label>
-          <label className="text-xs text-slate-600 flex flex-col gap-1">المبلغ المحصَّل (ر.س)
+          <label className="text-xs text-najd-muted flex flex-col gap-1">المبلغ المحصَّل (ر.س)
             <input type="number" min={0} value={amount} onChange={(e) => setAmount(e.target.value)} placeholder={String(expected)} className={input} />
           </label>
-          <label className="text-xs text-slate-600 flex flex-col gap-1">طريقة الدفع
+          <label className="text-xs text-najd-muted flex flex-col gap-1">طريقة الدفع
             <select value={method} onChange={(e) => setMethod(e.target.value)} className={input}>
               {Object.entries(METHOD_LABELS).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
             </select>
           </label>
-          <label className="text-xs text-slate-600 flex flex-col gap-1 col-span-2">مرجع العملية (اختياري)
+          <label className="text-xs text-najd-muted flex flex-col gap-1 col-span-2">مرجع العملية (اختياري)
             <input value={reference} onChange={(e) => setReference(e.target.value)} className={input} />
           </label>
           <button
@@ -389,7 +391,7 @@ function SubscriptionCard({ tenant, plans }: { tenant: PlatformTenantDetail; pla
               ...(amount.trim() !== '' ? { amount: Number(amount) } : {}),
               ...(reference.trim() ? { reference: reference.trim() } : {}),
             }))}
-            className="col-span-2 bg-teal-700 hover:bg-teal-800 text-white text-sm font-semibold py-2 rounded-lg disabled:opacity-60"
+            className="col-span-2 bg-najd-green hover:bg-najd-green-dark text-white text-sm font-semibold py-2 rounded-lg disabled:opacity-60"
           >
             تأكيد التفعيل وتسجيل الدفعة
           </button>
@@ -397,14 +399,14 @@ function SubscriptionCard({ tenant, plans }: { tenant: PlatformTenantDetail; pla
       )}
 
       {mode === 'trial' && (
-        <div className="mt-3 bg-slate-50 rounded-lg p-3 flex items-end gap-3">
-          <label className="text-xs text-slate-600 flex flex-col gap-1 flex-1">عدد الأيام المضافة
+        <div className="mt-3 bg-najd-sand/60 rounded-lg p-3 flex items-end gap-3">
+          <label className="text-xs text-najd-muted flex flex-col gap-1 flex-1">عدد الأيام المضافة
             <input type="number" min={1} max={365} value={days} onChange={(e) => setDays(e.target.value)} className={input} />
           </label>
           <button
             disabled={run.isPending}
             onClick={() => run.mutate(() => platformApi.post(`${base}/extend-trial`, { days: Number(days) }))}
-            className="bg-teal-700 hover:bg-teal-800 text-white text-sm font-semibold px-4 py-2 rounded-lg disabled:opacity-60"
+            className="bg-najd-green hover:bg-najd-green-dark text-white text-sm font-semibold px-4 py-2 rounded-lg disabled:opacity-60"
           >
             تمديد
           </button>
@@ -412,8 +414,8 @@ function SubscriptionCard({ tenant, plans }: { tenant: PlatformTenantDetail; pla
       )}
 
       {mode === 'plan' && (
-        <div className="mt-3 bg-slate-50 rounded-lg p-3 flex items-end gap-3">
-          <label className="text-xs text-slate-600 flex flex-col gap-1 flex-1">الباقة الجديدة (دون تغيير الفترة)
+        <div className="mt-3 bg-najd-sand/60 rounded-lg p-3 flex items-end gap-3">
+          <label className="text-xs text-najd-muted flex flex-col gap-1 flex-1">الباقة الجديدة (دون تغيير الفترة)
             <select value={planId} onChange={(e) => setPlanId(Number(e.target.value))} className={input}>
               {activePlans.map((p) => <option key={p.id} value={p.id}>{p.nameAr}</option>)}
             </select>
@@ -421,7 +423,7 @@ function SubscriptionCard({ tenant, plans }: { tenant: PlatformTenantDetail; pla
           <button
             disabled={run.isPending}
             onClick={() => run.mutate(() => platformApi.post(`${base}/change-plan`, { planId }))}
-            className="bg-teal-700 hover:bg-teal-800 text-white text-sm font-semibold px-4 py-2 rounded-lg disabled:opacity-60"
+            className="bg-najd-green hover:bg-najd-green-dark text-white text-sm font-semibold px-4 py-2 rounded-lg disabled:opacity-60"
           >
             تغيير
           </button>
@@ -429,20 +431,20 @@ function SubscriptionCard({ tenant, plans }: { tenant: PlatformTenantDetail; pla
       )}
 
       {mode === 'overrides' && (
-        <div className="mt-3 bg-slate-50 rounded-lg p-3 flex flex-col gap-3">
-          <p className="text-xs text-slate-500">القيمة الفارغة = حسب الباقة. اكتب <b>inf</b> لإلغاء الحد لهذه الشركة.</p>
+        <div className="mt-3 bg-najd-sand/60 rounded-lg p-3 flex flex-col gap-3">
+          <p className="text-xs text-najd-muted">القيمة الفارغة = حسب الباقة. اكتب <b>inf</b> لإلغاء الحد لهذه الشركة.</p>
           <div className="grid grid-cols-2 gap-3">
             {limitKeys.map((k) => (
-              <label key={k} className="text-xs text-slate-600 flex flex-col gap-1">{LIMIT_LABELS[k]}
+              <label key={k} className="text-xs text-najd-muted flex flex-col gap-1">{LIMIT_LABELS[k]}
                 <input value={limitDraft[k]} onChange={(e) => setLimitDraft({ ...limitDraft, [k]: e.target.value })} placeholder="حسب الباقة" className={input} />
               </label>
             ))}
           </div>
           <div className="grid grid-cols-1 gap-2">
             {featureKeys.map((k) => (
-              <label key={k} className="text-xs text-slate-600 flex items-center gap-2">
+              <label key={k} className="text-xs text-najd-muted flex items-center gap-2">
                 <span className="flex-1">{FEATURE_LABELS[k]}</span>
-                <select value={featureDraft[k]} onChange={(e) => setFeatureDraft({ ...featureDraft, [k]: e.target.value as '' | 'on' | 'off' })} className="border border-slate-300 rounded-lg px-2 py-1 text-sm">
+                <select value={featureDraft[k]} onChange={(e) => setFeatureDraft({ ...featureDraft, [k]: e.target.value as '' | 'on' | 'off' })} className="border border-najd-line rounded-lg px-2 py-1 text-sm">
                   <option value="">حسب الباقة</option>
                   <option value="on">مفعّلة</option>
                   <option value="off">معطّلة</option>
@@ -450,7 +452,7 @@ function SubscriptionCard({ tenant, plans }: { tenant: PlatformTenantDetail; pla
               </label>
             ))}
           </div>
-          <button onClick={saveOverrides} disabled={run.isPending} className="bg-teal-700 hover:bg-teal-800 text-white text-sm font-semibold py-2 rounded-lg disabled:opacity-60">
+          <button onClick={saveOverrides} disabled={run.isPending} className="bg-najd-green hover:bg-najd-green-dark text-white text-sm font-semibold py-2 rounded-lg disabled:opacity-60">
             حفظ
           </button>
         </div>
@@ -460,13 +462,13 @@ function SubscriptionCard({ tenant, plans }: { tenant: PlatformTenantDetail; pla
 
       {tenant.payments.length > 0 && (
         <div className="mt-4">
-          <p className="text-xs font-semibold text-slate-600 mb-1">آخر الدفعات</p>
-          <ul className="divide-y divide-slate-100 border border-slate-200 rounded-lg">
+          <p className="text-xs font-semibold text-najd-muted mb-1">آخر الدفعات</p>
+          <ul className="divide-y divide-najd-line/70 border border-najd-line rounded-lg">
             {tenant.payments.slice(0, 5).map((p: PlatformPayment) => (
               <li key={p.id} className="px-3 py-2 text-xs flex items-center gap-2">
-                <span className="font-semibold text-slate-900">{fmtMoney(p.amount)} {p.currency}</span>
-                <span className="text-slate-500">{p.months} شهر · {METHOD_LABELS[p.method] ?? p.method}</span>
-                <span className="mr-auto text-slate-400">{fmtDate(p.createdAt)}</span>
+                <span className="font-semibold text-najd-ink">{fmtMoney(p.amount)} {p.currency}</span>
+                <span className="text-najd-muted">{p.months} شهر · {METHOD_LABELS[p.method] ?? p.method}</span>
+                <span className="mr-auto text-najd-muted/70">{fmtDate(p.createdAt)}</span>
               </li>
             ))}
           </ul>
@@ -487,16 +489,16 @@ interface ConfirmState {
 function ConfirmDialog({ state, onClose }: { state: ConfirmState; onClose: () => void }) {
   return (
     <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/50" dir="rtl">
-      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm p-6 flex flex-col gap-4">
-        <h2 className="text-lg font-bold text-slate-900">{state.title}</h2>
-        <p className="text-sm leading-7 text-slate-600">{state.body}</p>
+      <div className="bg-najd-paper rounded-2xl shadow-2xl w-full max-w-sm p-6 flex flex-col gap-4">
+        <h2 className="text-lg font-bold text-najd-ink">{state.title}</h2>
+        <p className="text-sm leading-7 text-najd-muted">{state.body}</p>
         <div className="flex gap-2 justify-end">
-          <button onClick={onClose} className="px-4 py-2 text-sm font-semibold rounded-lg border border-slate-300 text-slate-700 hover:bg-slate-50">
+          <button onClick={onClose} className="px-4 py-2 text-sm font-semibold rounded-lg border border-najd-line text-najd-ink/80 hover:bg-najd-sand/70">
             تراجع
           </button>
           <button
             onClick={() => { state.onOk(); onClose(); }}
-            className={`px-4 py-2 text-sm font-semibold rounded-lg text-white ${state.danger ? 'bg-red-600 hover:bg-red-700' : 'bg-teal-700 hover:bg-teal-800'}`}
+            className={`px-4 py-2 text-sm font-semibold rounded-lg text-white ${state.danger ? 'bg-red-600 hover:bg-red-700' : 'bg-najd-green hover:bg-najd-green-dark'}`}
           >
             {state.confirmLabel}
           </button>
@@ -587,24 +589,24 @@ function TenantPanel({ tenantId, onClose }: { tenantId: number; onClose: () => v
   return (
     <div className="fixed inset-0 z-40 flex" dir="rtl">
       <div className="flex-1 bg-black/40" onClick={onClose} />
-      <aside className="w-full max-w-lg bg-white h-full overflow-y-auto shadow-2xl p-6">
+      <aside className="w-full max-w-lg bg-najd-paper h-full overflow-y-auto shadow-2xl p-6">
         <div className="flex items-start justify-between mb-4">
           <div>
-            <h2 className="text-lg font-bold text-slate-900">{data?.name ?? '…'}</h2>
-            <p className="text-xs text-slate-500 mt-0.5" dir="ltr">{data?.slug}</p>
+            <h2 className="text-lg font-bold text-najd-ink">{data?.name ?? '…'}</h2>
+            <p className="text-xs text-najd-muted mt-0.5" dir="ltr">{data?.slug}</p>
           </div>
-          <button onClick={onClose} className="p-1 text-slate-500 hover:text-slate-900"><X size={20} /></button>
+          <button onClick={onClose} className="p-1 text-najd-muted hover:text-najd-ink"><X size={20} /></button>
         </div>
 
         {isLoading || !data ? (
-          <div className="py-10 flex justify-center"><Loader2 className="animate-spin text-slate-400" /></div>
+          <div className="py-10 flex justify-center"><Loader2 className="animate-spin text-najd-muted/70" /></div>
         ) : (
           <>
             <div className="flex items-center gap-2 mb-5">
               <span className={`text-xs font-semibold px-2 py-1 rounded-full ${data.isActive ? 'bg-emerald-50 text-emerald-700' : 'bg-red-50 text-red-700'}`}>
                 {data.isActive ? 'نشطة' : 'موقوفة'}
               </span>
-              <span className="text-xs text-slate-500">منذ {fmtDate(data.createdAt)}</span>
+              <span className="text-xs text-najd-muted">منذ {fmtDate(data.createdAt)}</span>
               <button
                 onClick={confirmToggle}
                 disabled={toggle.isPending || platformRole() !== 'OWNER'}
@@ -615,7 +617,7 @@ function TenantPanel({ tenantId, onClose }: { tenantId: number; onClose: () => v
               </button>
             </div>
 
-            <p className="text-xs text-slate-500 -mt-3 mb-5">
+            <p className="text-xs text-najd-muted -mt-3 mb-5">
               {data.termsAcceptedAt
                 ? 'وافقت على الشروط (نسخة ' + data.termsVersion + ') بتاريخ ' + fmtDate(data.termsAcceptedAt) + ' — ' + (data.termsAcceptedBy ?? '')
                 : 'لم توافق على الشروط وسياسة الخصوصية بعد'}
@@ -632,20 +634,20 @@ function TenantPanel({ tenantId, onClose }: { tenantId: number; onClose: () => v
               <StatCard label="آخر نشاط" value={fmtDate(data.usage.lastActivityAt)} />
             </div>
 
-            <h3 className="text-sm font-semibold text-slate-700 mb-2 flex items-center gap-2"><Users size={16} /> المستخدمون</h3>
-            <ul className="divide-y divide-slate-100 border border-slate-200 rounded-lg">
+            <h3 className="text-sm font-semibold text-najd-ink/80 mb-2 flex items-center gap-2"><Users size={16} /> المستخدمون</h3>
+            <ul className="divide-y divide-najd-line/70 border border-najd-line rounded-lg">
               {data.users.map((u) => {
                 const ask = (c: Omit<ConfirmState, 'onOk'> & { run: () => void }) =>
                   setConfirm({ title: c.title, body: c.body, confirmLabel: c.confirmLabel, danger: c.danger, onOk: c.run });
-                const btn = 'p-1.5 text-slate-500 disabled:opacity-50';
+                const btn = 'p-1.5 text-najd-muted disabled:opacity-50';
                 return (
-                  <li key={u.id} className={`p-3 flex flex-col gap-2 ${u.isActive ? '' : 'bg-slate-50'}`}>
+                  <li key={u.id} className={`p-3 flex flex-col gap-2 ${u.isActive ? '' : 'bg-najd-sand/60'}`}>
                     <div className="flex items-center gap-3">
                       <div className="min-w-0 flex-1">
-                        <p className={`text-sm font-medium truncate ${u.isActive ? 'text-slate-900' : 'text-slate-400 line-through'}`}>{u.name}</p>
-                        <p className="text-xs text-slate-500 truncate" dir="ltr">{u.email}</p>
+                        <p className={`text-sm font-medium truncate ${u.isActive ? 'text-najd-ink' : 'text-najd-muted/70 line-through'}`}>{u.name}</p>
+                        <p className="text-xs text-najd-muted truncate" dir="ltr">{u.email}</p>
                       </div>
-                      <span className="text-xs bg-slate-100 text-slate-600 px-2 py-0.5 rounded">{u.role.nameAr}</span>
+                      <span className="text-xs bg-najd-sand text-najd-muted px-2 py-0.5 rounded">{u.role.nameAr}</span>
                     </div>
                     <div className="flex items-center gap-2 flex-wrap text-xs">
                       {u.emailVerifiedAt ? (
@@ -654,7 +656,7 @@ function TenantPanel({ tenantId, onClose }: { tenantId: number; onClose: () => v
                         <span className="bg-amber-50 text-amber-700 px-2 py-0.5 rounded-full">البريد غير مؤكَّد</span>
                       )}
                       {!u.isActive && <span className="bg-red-50 text-red-700 px-2 py-0.5 rounded-full">معطّل</span>}
-                      <span className="text-slate-400">آخر دخول: {fmtDate(u.lastLoginAt)}</span>
+                      <span className="text-najd-muted/70">آخر دخول: {fmtDate(u.lastLoginAt)}</span>
                       <span className="mr-auto flex items-center">
                         <button
                           title="إعادة تعيين كلمة المرور"
@@ -665,7 +667,7 @@ function TenantPanel({ tenantId, onClose }: { tenantId: number; onClose: () => v
                             confirmLabel: 'إنشاء كلمة مرور مؤقتة',
                             run: () => reset.mutate(u.id),
                           })}
-                          className={`${btn} hover:text-teal-700`}
+                          className={`${btn} hover:text-najd-green`}
                         >
                           <KeyRound size={16} />
                         </button>
@@ -678,7 +680,7 @@ function TenantPanel({ tenantId, onClose }: { tenantId: number; onClose: () => v
                             confirmLabel: 'إنهاء الجلسات',
                             run: () => userAction.mutate({ userId: u.id, action: 'force-logout', okText: 'تم إنهاء جلسات المستخدم' }),
                           })}
-                          className={`${btn} hover:text-teal-700`}
+                          className={`${btn} hover:text-najd-green`}
                         >
                           <LogOut size={16} />
                         </button>
@@ -688,7 +690,7 @@ function TenantPanel({ tenantId, onClose }: { tenantId: number; onClose: () => v
                               title="إعادة إرسال رسالة التأكيد"
                               disabled={userAction.isPending}
                               onClick={() => userAction.mutate({ userId: u.id, action: 'resend-verification', okText: 'أُرسلت رسالة التأكيد' })}
-                              className={`${btn} hover:text-teal-700`}
+                              className={`${btn} hover:text-najd-green`}
                             >
                               <Mail size={16} />
                             </button>
@@ -738,7 +740,7 @@ function TenantPanel({ tenantId, onClose }: { tenantId: number; onClose: () => v
             {temp && (
               <div className="mt-4 bg-amber-50 border border-amber-200 rounded-lg p-4">
                 <p className="text-sm font-semibold text-amber-900">كلمة مرور مؤقتة لـ <span dir="ltr">{temp.email}</span></p>
-                <p className="mt-2 font-mono text-base select-all bg-white border border-amber-200 rounded px-3 py-2" dir="ltr">{temp.password}</p>
+                <p className="mt-2 font-mono text-base select-all bg-najd-paper border border-amber-200 rounded px-3 py-2" dir="ltr">{temp.password}</p>
                 <p className="text-xs text-amber-800 mt-2">تُعرض مرة واحدة فقط — سلّمها للمستخدم ليغيّرها بعد الدخول.</p>
                 <div className="flex items-center gap-4 mt-2">
                   <button onClick={copyTemp} className="text-xs font-semibold text-amber-900 flex items-center gap-1">
@@ -755,7 +757,7 @@ function TenantPanel({ tenantId, onClose }: { tenantId: number; onClose: () => v
               </p>
             )}
 
-            <h3 className="text-sm font-semibold text-slate-700 mt-6 mb-2">ملاحظات داخلية</h3>
+            <h3 className="text-sm font-semibold text-najd-ink/80 mt-6 mb-2">ملاحظات داخلية</h3>
             <textarea
               value={note ?? data.platformNote ?? ''}
               onChange={(e) => setNote(e.target.value)}
@@ -767,7 +769,7 @@ function TenantPanel({ tenantId, onClose }: { tenantId: number; onClose: () => v
             <button
               disabled={note === null || saveNote.isPending}
               onClick={() => saveNote.mutate(note ?? '')}
-              className="mt-2 text-sm font-semibold bg-slate-800 hover:bg-slate-900 text-white px-4 py-1.5 rounded-lg disabled:opacity-40 flex items-center gap-2"
+              className="mt-2 text-sm font-semibold bg-najd-green-dark hover:bg-najd-green-deep text-white px-4 py-1.5 rounded-lg disabled:opacity-40 flex items-center gap-2"
             >
               {saveNote.isPending && <Loader2 size={13} className="animate-spin" />} حفظ الملاحظة
             </button>
@@ -807,29 +809,29 @@ function ChangePasswordDialog({ onClose, forced }: { onClose: () => void; forced
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40" dir="rtl">
-      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm p-6 flex flex-col gap-4">
+      <div className="bg-najd-paper rounded-2xl shadow-2xl w-full max-w-sm p-6 flex flex-col gap-4">
         <div className="flex items-center justify-between">
-          <h2 className="text-lg font-bold text-slate-900">{forced ? 'اختر كلمة مرور جديدة' : 'تغيير كلمة المرور'}</h2>
-          {!forced && <button onClick={onClose} className="text-slate-500 hover:text-slate-900"><X size={20} /></button>}
+          <h2 className="text-lg font-bold text-najd-ink">{forced ? 'اختر كلمة مرور جديدة' : 'تغيير كلمة المرور'}</h2>
+          {!forced && <button onClick={onClose} className="text-najd-muted hover:text-najd-ink"><X size={20} /></button>}
         </div>
         {done ? (
           <>
             <p className="text-sm text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-lg px-4 py-3">
               تم تغيير كلمة المرور. أُنهيت جلساتك الأخرى على أي جهاز.
             </p>
-            <button onClick={onClose} className="bg-teal-700 hover:bg-teal-800 text-white text-sm font-semibold py-2 rounded-lg">تم</button>
+            <button onClick={onClose} className="bg-najd-green hover:bg-najd-green-dark text-white text-sm font-semibold py-2 rounded-lg">تم</button>
           </>
         ) : (
           <>
-            <label className="text-sm font-medium text-slate-700 flex flex-col gap-1">
+            <label className="text-sm font-medium text-najd-ink/80 flex flex-col gap-1">
               كلمة المرور الحالية
               <input type="password" dir="ltr" autoComplete="current-password" value={current} onChange={(e) => setCurrent(e.target.value)} className={input} />
             </label>
-            <label className="text-sm font-medium text-slate-700 flex flex-col gap-1">
+            <label className="text-sm font-medium text-najd-ink/80 flex flex-col gap-1">
               كلمة المرور الجديدة (12 حرفًا على الأقل، حروف وأرقام)
               <input type="password" dir="ltr" autoComplete="new-password" value={next} onChange={(e) => setNext(e.target.value)} className={input} />
             </label>
-            <label className="text-sm font-medium text-slate-700 flex flex-col gap-1">
+            <label className="text-sm font-medium text-najd-ink/80 flex flex-col gap-1">
               تأكيد كلمة المرور الجديدة
               <input type="password" dir="ltr" autoComplete="new-password" value={confirm} onChange={(e) => setConfirm(e.target.value)} className={input} />
               {mismatch && <span className="text-xs text-red-600">غير متطابقتين</span>}
@@ -838,7 +840,7 @@ function ChangePasswordDialog({ onClose, forced }: { onClose: () => void; forced
             <button
               disabled={!valid || change.isPending}
               onClick={() => { setError(null); change.mutate(); }}
-              className="bg-teal-700 hover:bg-teal-800 text-white text-sm font-semibold py-2 rounded-lg disabled:opacity-60 flex items-center justify-center gap-2"
+              className="bg-najd-green hover:bg-najd-green-dark text-white text-sm font-semibold py-2 rounded-lg disabled:opacity-60 flex items-center justify-center gap-2"
             >
               {change.isPending && <Loader2 size={14} className="animate-spin" />} حفظ
             </button>
@@ -849,14 +851,16 @@ function ChangePasswordDialog({ onClose, forced }: { onClose: () => void; forced
   );
 }
 
-type Tab = 'tenants' | 'requests' | 'plans' | 'payments' | 'announcements' | 'system' | 'admins' | 'analytics' | 'audit';
+type Tab = 'overview' | 'tenants' | 'requests' | 'plans' | 'payments' | 'announcements' | 'system' | 'admins' | 'analytics' | 'audit';
 
 export function PlatformDashboardPage() {
   const navigate = useNavigate();
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
   const [selected, setSelected] = useState<number | null>(null);
-  const [tab, setTab] = useState<Tab>('tenants');
+  const { section } = useParams();
+  const SECTIONS: Tab[] = ['overview', 'tenants', 'requests', 'plans', 'payments', 'analytics', 'announcements', 'system', 'admins', 'audit'];
+  const tab: Tab = SECTIONS.includes(section as Tab) ? (section as Tab) : 'overview';
   const [editingPlan, setEditingPlan] = useState<PlatformPlan | 'new' | null>(null);
   const [changingPassword, setChangingPassword] = useState(false);
   const [mustChange, setMustChange] = useState(() => {
@@ -973,42 +977,25 @@ export function PlatformDashboardPage() {
     URL.revokeObjectURL(url);
   };
 
-  const tabs: Array<[Tab, string]> = [
-    ['tenants', 'الشركات'],
-    ['requests', `طلبات الترقية${s?.pendingUpgradeRequests ? ` (${s.pendingUpgradeRequests})` : ''}`],
-    ['plans', 'الباقات'],
-    ['payments', 'المدفوعات'],
-    ['analytics', 'التقارير والنمو'],
-    ['announcements', 'الإعلانات'],
-    ['system', 'حالة النظام'],
-    ...(isOwner ? ([['admins', 'مديرو المنصة']] as Array<[Tab, string]>) : []),
-    ['audit', 'سجل العمليات'],
-  ];
+  const badges: Partial<Record<SectionId, number>> = { requests: s?.pendingUpgradeRequests ?? 0 };
   const Loading = ({ cols }: { cols: number }) => (
-    <tr><td colSpan={cols} className="py-10 text-center text-slate-400"><Loader2 className="inline animate-spin" /></td></tr>
+    <tr><td colSpan={cols} className="py-10 text-center text-najd-muted/70"><Loader2 className="inline animate-spin" /></td></tr>
   );
   const th = (h: string) => <th key={h} className="text-right font-medium px-4 py-2.5">{h}</th>;
 
   return (
-    <div className="min-h-screen bg-slate-50" dir="rtl">
-      <header className="bg-slate-900 text-white">
-        <div className="max-w-6xl mx-auto px-4 h-14 flex items-center gap-3">
-          <BrandMark size={30} tone="onDark" />
-          <h1 className="font-bold">لوحة إدارة المنصة</h1>
-          <span className="mr-auto text-sm text-slate-300">
-            {admin?.name}
-            <span className="mr-2 text-xs bg-white/10 px-2 py-0.5 rounded-full">{ROLE_LABEL[platformRole()]}</span>
-          </span>
-          <button onClick={() => setChangingPassword(true)} className="flex items-center gap-1.5 text-sm text-slate-300 hover:text-white">
-            <KeyRound size={16} /> كلمة المرور
-          </button>
-          <button onClick={logout} className="flex items-center gap-1.5 text-sm text-slate-300 hover:text-white">
-            <LogOut size={16} /> خروج
-          </button>
-        </div>
-      </header>
-
-      <main className="max-w-6xl mx-auto px-4 py-6 flex flex-col gap-6">
+    <>
+      <PlatformShell
+        section={tab as SectionId}
+        isOwner={isOwner}
+        badges={badges}
+        adminName={admin?.name ?? ''}
+        roleLabel={ROLE_LABEL[platformRole()]}
+        onChangePassword={() => setChangingPassword(true)}
+        onLogout={logout}
+      >
+        {tab === 'overview' && (
+          <>
         <section className="grid grid-cols-2 md:grid-cols-4 gap-3">
           <StatCard label="الإيراد الشهري المتكرر (ر.س)" value={s ? fmtMoney(s.revenue.mrr) : '—'} hint={`${s?.revenue.payingTenants ?? 0} مشترك مدفوع`} />
           <StatCard label="المحصَّل — آخر 30 يومًا (ر.س)" value={s ? fmtMoney(s.revenue.paidLast30Days) : '—'} />
@@ -1026,10 +1013,10 @@ export function PlatformDashboardPage() {
               {s.revenue.attention.slice(0, 6).map((a) => (
                 <li key={a.tenantId}>
                   <button onClick={() => setSelected(a.tenantId)} className="w-full text-right text-sm flex items-center gap-2 hover:bg-amber-100 rounded px-2 py-1">
-                    <span className="font-medium text-slate-900">{a.name}</span>
+                    <span className="font-medium text-najd-ink">{a.name}</span>
                     <StatusBadge status={a.status} />
-                    <span className="text-slate-500">{a.planName}</span>
-                    <span className="mr-auto text-xs text-slate-500">
+                    <span className="text-najd-muted">{a.planName}</span>
+                    <span className="mr-auto text-xs text-najd-muted">
                       {a.daysLeft !== null && a.daysLeft < 0 ? `منتهٍ منذ ${-a.daysLeft} يوم` : a.daysLeft !== null ? `باقي ${a.daysLeft} يوم` : ''}
                     </span>
                   </button>
@@ -1043,34 +1030,29 @@ export function PlatformDashboardPage() {
           <button
             onClick={() => { setLifecycleMsg(null); lifecycle.mutate(); }}
             disabled={lifecycle.isPending || !isOwner}
-            className="font-semibold border border-slate-300 bg-white hover:bg-slate-50 text-slate-700 px-3 py-1.5 rounded-lg disabled:opacity-60 flex items-center gap-2"
+            className="font-semibold border border-najd-line bg-najd-paper hover:bg-najd-sand/70 text-najd-ink/80 px-3 py-1.5 rounded-lg disabled:opacity-60 flex items-center gap-2"
           >
             {lifecycle.isPending && <Loader2 size={14} className="animate-spin" />}
             تشغيل فحص الاشتراكات الآن
           </button>
-          {lifecycleMsg && <span className="text-slate-600">{lifecycleMsg}</span>}
-          <span className="text-xs text-slate-400 mr-auto">يعمل تلقائيًا كل ساعة</span>
+          {lifecycleMsg && <span className="text-najd-muted">{lifecycleMsg}</span>}
+          <span className="text-xs text-najd-muted/70 mr-auto">يعمل تلقائيًا كل ساعة</span>
         </div>
 
         {s && <SignupsChart data={s.signupsByDay} />}
+          </>
+        )}
 
-        <section className="bg-white rounded-xl border border-slate-200">
-          <div className="flex items-center gap-2 p-3 border-b border-slate-200 flex-wrap">
-            {tabs.map(([t, label]) => (
-              <button
-                key={t}
-                onClick={() => setTab(t)}
-                className={`text-sm font-semibold px-3 py-1.5 rounded-lg ${tab === t ? 'bg-teal-700 text-white' : 'text-slate-600 hover:bg-slate-100'}`}
-              >
-                {label}
-              </button>
-            ))}
+        {tab !== 'overview' && (
+
+        <section className="bg-najd-paper rounded-xl border border-najd-line">
+          <div className="flex items-center gap-2 p-3 border-b border-najd-line flex-wrap">
             {tab === 'tenants' && (
               <div className="mr-auto flex items-center gap-2">
                 <select
                   value={statusFilter}
                   onChange={(e) => setStatusFilter(e.target.value)}
-                  className="border border-slate-300 rounded-lg px-2 py-1.5 text-sm bg-white"
+                  className="border border-najd-line rounded-lg px-2 py-1.5 text-sm bg-najd-paper"
                 >
                   <option value="all">كل الشركات</option>
                   <option value="active">حساب نشط</option>
@@ -1084,7 +1066,7 @@ export function PlatformDashboardPage() {
                 <button
                   onClick={exportCsv}
                   disabled={shownTenants.length === 0}
-                  className="flex items-center gap-1.5 text-sm font-semibold border border-slate-300 bg-white hover:bg-slate-50 text-slate-700 px-3 py-1.5 rounded-lg disabled:opacity-50"
+                  className="flex items-center gap-1.5 text-sm font-semibold border border-najd-line bg-najd-paper hover:bg-najd-sand/70 text-najd-ink/80 px-3 py-1.5 rounded-lg disabled:opacity-50"
                 >
                   <Download size={15} /> تصدير CSV
                 </button>
@@ -1092,17 +1074,17 @@ export function PlatformDashboardPage() {
             )}
             {tab === 'tenants' && (
               <div className="relative">
-                <Search size={16} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                <Search size={16} className="absolute right-3 top-1/2 -translate-y-1/2 text-najd-muted/70" />
                 <input
                   value={search}
                   onChange={(e) => setSearch(e.target.value)}
                   placeholder="بحث بالاسم…"
-                  className="border border-slate-300 rounded-lg pr-9 pl-3 py-1.5 text-sm w-56 focus:outline-none focus:ring-2 focus:ring-teal-600/30"
+                  className="border border-najd-line rounded-lg pr-9 pl-3 py-1.5 text-sm w-56 focus:outline-none focus:ring-2 focus:ring-najd-gold/40"
                 />
               </div>
             )}
             {tab === 'plans' && isOwner && (
-              <button onClick={() => setEditingPlan('new')} className="mr-auto flex items-center gap-1.5 text-sm font-semibold bg-teal-700 hover:bg-teal-800 text-white px-3 py-1.5 rounded-lg">
+              <button onClick={() => setEditingPlan('new')} className="mr-auto flex items-center gap-1.5 text-sm font-semibold bg-najd-green hover:bg-najd-green-dark text-white px-3 py-1.5 rounded-lg">
                 <Plus size={16} /> باقة جديدة
               </button>
             )}
@@ -1111,20 +1093,20 @@ export function PlatformDashboardPage() {
           {tab === 'tenants' && (
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
-                <thead className="bg-slate-50 text-slate-500 text-xs">
+                <thead className="bg-najd-sand/60 text-najd-muted text-xs">
                   <tr>{['الشركة', 'الباقة', 'الاشتراك', 'المستخدمون', 'الأصناف', 'مبيعات 30 يومًا', 'آخر نشاط', 'الحساب'].map(th)}</tr>
                 </thead>
-                <tbody className="divide-y divide-slate-100">
+                <tbody className="divide-y divide-najd-line/70">
                   {tenants.isLoading && <Loading cols={8} />}
                   {shownTenants.map((t) => (
-                    <tr key={t.id} onClick={() => setSelected(t.id)} className="hover:bg-slate-50 cursor-pointer">
-                      <td className="px-4 py-3 font-medium text-slate-900">{t.name}</td>
-                      <td className="px-4 py-3 text-slate-600">{t.subscription?.planName ?? '—'}</td>
+                    <tr key={t.id} onClick={() => setSelected(t.id)} className="hover:bg-najd-sand/70 cursor-pointer">
+                      <td className="px-4 py-3 font-medium text-najd-ink">{t.name}</td>
+                      <td className="px-4 py-3 text-najd-muted">{t.subscription?.planName ?? '—'}</td>
                       <td className="px-4 py-3"><StatusBadge status={t.subscription?.status} /></td>
                       <td className="px-4 py-3">{t.usage.users}</td>
                       <td className="px-4 py-3">{t.usage.products}</td>
                       <td className="px-4 py-3">{fmtMoney(t.usage.salesLast30Days)}</td>
-                      <td className="px-4 py-3 text-slate-500">{fmtDate(t.usage.lastActivityAt)}</td>
+                      <td className="px-4 py-3 text-najd-muted">{fmtDate(t.usage.lastActivityAt)}</td>
                       <td className="px-4 py-3">
                         <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${t.isActive ? 'bg-emerald-50 text-emerald-700' : 'bg-red-50 text-red-700'}`}>
                           {t.isActive ? 'نشطة' : 'موقوفة'}
@@ -1133,7 +1115,7 @@ export function PlatformDashboardPage() {
                     </tr>
                   ))}
                   {tenants.data && shownTenants.length === 0 && (
-                    <tr><td colSpan={8} className="py-10 text-center text-slate-400">لا توجد شركات مطابقة</td></tr>
+                    <tr><td colSpan={8} className="py-10 text-center text-najd-muted/70">لا توجد شركات مطابقة</td></tr>
                   )}
                 </tbody>
               </table>
@@ -1143,35 +1125,35 @@ export function PlatformDashboardPage() {
           {tab === 'requests' && (
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
-                <thead className="bg-slate-50 text-slate-500 text-xs">
+                <thead className="bg-najd-sand/60 text-najd-muted text-xs">
                   <tr>{['التاريخ', 'الشركة', 'الباقة المطلوبة', 'مقدّم الطلب', 'ملاحظة', 'الحالة', ''].map((h, i) => (h ? th(h) : <th key={i} />))}</tr>
                 </thead>
-                <tbody className="divide-y divide-slate-100">
+                <tbody className="divide-y divide-najd-line/70">
                   {requests.isLoading && <Loading cols={7} />}
                   {requests.data?.map((r) => (
                     <tr key={r.id}>
-                      <td className="px-4 py-3 text-slate-500">{fmtDate(r.createdAt)}</td>
+                      <td className="px-4 py-3 text-najd-muted">{fmtDate(r.createdAt)}</td>
                       <td className="px-4 py-3">
-                        <button onClick={() => setSelected(r.tenantId)} className="font-medium text-teal-700 hover:underline">{r.tenantName}</button>
+                        <button onClick={() => setSelected(r.tenantId)} className="font-medium text-najd-green hover:underline">{r.tenantName}</button>
                       </td>
-                      <td className="px-4 py-3 font-medium text-slate-900">{r.planName}</td>
-                      <td className="px-4 py-3 text-slate-600">{r.requestedByName ?? '—'}<span className="block text-xs text-slate-400" dir="ltr">{r.requestedByEmail}</span></td>
-                      <td className="px-4 py-3 text-slate-600 max-w-xs">{r.message ?? '—'}</td>
+                      <td className="px-4 py-3 font-medium text-najd-ink">{r.planName}</td>
+                      <td className="px-4 py-3 text-najd-muted">{r.requestedByName ?? '—'}<span className="block text-xs text-najd-muted/70" dir="ltr">{r.requestedByEmail}</span></td>
+                      <td className="px-4 py-3 text-najd-muted max-w-xs">{r.message ?? '—'}</td>
                       <td className="px-4 py-3">
-                        <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${r.status === 'PENDING' ? 'bg-amber-50 text-amber-700' : 'bg-slate-100 text-slate-600'}`}>
+                        <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${r.status === 'PENDING' ? 'bg-amber-50 text-amber-700' : 'bg-najd-sand text-najd-muted'}`}>
                           {r.status === 'PENDING' ? 'قيد المراجعة' : 'تمت المعالجة'}
                         </span>
                       </td>
                       <td className="px-4 py-3">
                         {r.status === 'PENDING' && (
-                          <button disabled={handle.isPending} onClick={() => handle.mutate(r.id)} className="text-xs font-semibold text-teal-700 hover:underline disabled:opacity-50">
+                          <button disabled={handle.isPending} onClick={() => handle.mutate(r.id)} className="text-xs font-semibold text-najd-green hover:underline disabled:opacity-50">
                             تمت المعالجة
                           </button>
                         )}
                       </td>
                     </tr>
                   ))}
-                  {requests.data?.length === 0 && <tr><td colSpan={7} className="py-10 text-center text-slate-400">لا توجد طلبات ترقية</td></tr>}
+                  {requests.data?.length === 0 && <tr><td colSpan={7} className="py-10 text-center text-najd-muted/70">لا توجد طلبات ترقية</td></tr>}
                 </tbody>
               </table>
             </div>
@@ -1180,14 +1162,14 @@ export function PlatformDashboardPage() {
           {tab === 'plans' && (
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
-                <thead className="bg-slate-50 text-slate-500 text-xs">
+                <thead className="bg-najd-sand/60 text-najd-muted text-xs">
                   <tr>{['الباقة', 'شهري', 'سنوي', 'تجربة', 'المستخدمون', 'الأصناف', 'فواتير/شهر', 'ZATCA', 'تصنيع', 'مشتركون', ''].map((h, i) => (h ? th(h) : <th key={i} />))}</tr>
                 </thead>
-                <tbody className="divide-y divide-slate-100">
+                <tbody className="divide-y divide-najd-line/70">
                   {plans.isLoading && <Loading cols={11} />}
                   {plans.data?.map((p) => (
                     <tr key={p.id} className={p.isActive ? '' : 'opacity-50'}>
-                      <td className="px-4 py-3 font-medium text-slate-900">{p.nameAr} <span className="text-xs text-slate-400" dir="ltr">{p.code}</span></td>
+                      <td className="px-4 py-3 font-medium text-najd-ink">{p.nameAr} <span className="text-xs text-najd-muted/70" dir="ltr">{p.code}</span></td>
                       <td className="px-4 py-3">{fmtMoney(p.priceMonthly)}</td>
                       <td className="px-4 py-3">{fmtMoney(p.priceYearly)}</td>
                       <td className="px-4 py-3">{p.trialDays ? `${p.trialDays} يوم` : '—'}</td>
@@ -1197,7 +1179,7 @@ export function PlatformDashboardPage() {
                       <td className="px-4 py-3">{p.features.zatca ? '✓' : '—'}</td>
                       <td className="px-4 py-3">{p.features.manufacturing ? '✓' : '—'}</td>
                       <td className="px-4 py-3">{p.subscribers}</td>
-                      <td className="px-4 py-3"><button onClick={() => setEditingPlan(p)} className="text-xs font-semibold text-teal-700 hover:underline">تعديل</button></td>
+                      <td className="px-4 py-3"><button onClick={() => setEditingPlan(p)} className="text-xs font-semibold text-najd-green hover:underline">تعديل</button></td>
                     </tr>
                   ))}
                 </tbody>
@@ -1208,42 +1190,42 @@ export function PlatformDashboardPage() {
           {tab === 'payments' && (
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
-                <thead className="bg-slate-50 text-slate-500 text-xs">
+                <thead className="bg-najd-sand/60 text-najd-muted text-xs">
                   <tr>{['التاريخ', 'الشركة', 'المبلغ', 'المدة', 'الطريقة', 'المرجع', 'سجّلها'].map(th)}</tr>
                 </thead>
-                <tbody className="divide-y divide-slate-100">
+                <tbody className="divide-y divide-najd-line/70">
                   {payments.isLoading && <Loading cols={7} />}
                   {payments.data?.map((p) => (
                     <tr key={p.id}>
-                      <td className="px-4 py-3 text-slate-500">{fmtDate(p.createdAt)}</td>
-                      <td className="px-4 py-3 font-medium text-slate-900">{p.tenantName}</td>
+                      <td className="px-4 py-3 text-najd-muted">{fmtDate(p.createdAt)}</td>
+                      <td className="px-4 py-3 font-medium text-najd-ink">{p.tenantName}</td>
                       <td className="px-4 py-3">{fmtMoney(p.amount)} {p.currency}</td>
                       <td className="px-4 py-3">{p.months} شهر</td>
                       <td className="px-4 py-3">{METHOD_LABELS[p.method] ?? p.method}</td>
-                      <td className="px-4 py-3 text-slate-500" dir="ltr">{p.reference ?? '—'}</td>
-                      <td className="px-4 py-3 text-slate-500">{p.recordedByName ?? '—'}</td>
+                      <td className="px-4 py-3 text-najd-muted" dir="ltr">{p.reference ?? '—'}</td>
+                      <td className="px-4 py-3 text-najd-muted">{p.recordedByName ?? '—'}</td>
                     </tr>
                   ))}
-                  {payments.data?.length === 0 && <tr><td colSpan={7} className="py-10 text-center text-slate-400">لا توجد دفعات بعد</td></tr>}
+                  {payments.data?.length === 0 && <tr><td colSpan={7} className="py-10 text-center text-najd-muted/70">لا توجد دفعات بعد</td></tr>}
                 </tbody>
               </table>
             </div>
           )}
 
           {tab === 'payments' && (
-            <div className="border-t border-slate-200">
-              <p className="px-4 pt-4 pb-2 text-sm font-semibold text-slate-700">طلبات الدفع الإلكتروني</p>
+            <div className="border-t border-najd-line">
+              <p className="px-4 pt-4 pb-2 text-sm font-semibold text-najd-ink/80">طلبات الدفع الإلكتروني</p>
               <div className="overflow-x-auto">
                 <table className="w-full text-sm">
-                  <thead className="bg-slate-50 text-slate-500 text-xs">
+                  <thead className="bg-najd-sand/60 text-najd-muted text-xs">
                     <tr>{['التاريخ', 'الشركة', 'الباقة', 'المبلغ', 'الحالة', 'البوابة', 'ملاحظة', ''].map((h, i) => (h ? th(h) : <th key={i} />))}</tr>
                   </thead>
-                  <tbody className="divide-y divide-slate-100">
+                  <tbody className="divide-y divide-najd-line/70">
                     {orders.isLoading && <Loading cols={8} />}
                     {orders.data?.map((o) => (
                       <tr key={o.id}>
-                        <td className="px-4 py-3 text-slate-500">{fmtDate(o.createdAt)}</td>
-                        <td className="px-4 py-3 font-medium text-slate-900">{o.tenantName}</td>
+                        <td className="px-4 py-3 text-najd-muted">{fmtDate(o.createdAt)}</td>
+                        <td className="px-4 py-3 font-medium text-najd-ink">{o.tenantName}</td>
                         <td className="px-4 py-3">{o.planName} · {o.months === 12 ? 'سنة' : 'شهر'}</td>
                         <td className="px-4 py-3">{fmtMoney(o.amount)} {o.currency}</td>
                         <td className="px-4 py-3">
@@ -1254,14 +1236,14 @@ export function PlatformDashboardPage() {
                             {o.status === 'PAID' ? 'مدفوع' : o.status === 'PENDING' ? 'قيد الانتظار' : o.status === 'EXPIRED' ? 'منتهي' : 'فشل'}
                           </span>
                         </td>
-                        <td className="px-4 py-3 text-slate-500" dir="ltr">{o.provider}</td>
-                        <td className="px-4 py-3 text-slate-500 max-w-xs truncate" dir="ltr">{o.failureReason ?? ''}</td>
+                        <td className="px-4 py-3 text-najd-muted" dir="ltr">{o.provider}</td>
+                        <td className="px-4 py-3 text-najd-muted max-w-xs truncate" dir="ltr">{o.failureReason ?? ''}</td>
                         <td className="px-4 py-3">
                           {(o.status === 'PENDING' || o.failureReason?.startsWith('amount_mismatch')) && (
                             <button
                               disabled={recheck.isPending}
                               onClick={() => recheck.mutate(o.id)}
-                              className="text-xs font-semibold text-teal-700 hover:underline disabled:opacity-50"
+                              className="text-xs font-semibold text-najd-green hover:underline disabled:opacity-50"
                             >
                               إعادة الفحص
                             </button>
@@ -1269,7 +1251,7 @@ export function PlatformDashboardPage() {
                         </td>
                       </tr>
                     ))}
-                    {orders.data?.length === 0 && <tr><td colSpan={8} className="py-8 text-center text-slate-400">لا توجد طلبات دفع إلكتروني</td></tr>}
+                    {orders.data?.length === 0 && <tr><td colSpan={8} className="py-8 text-center text-najd-muted/70">لا توجد طلبات دفع إلكتروني</td></tr>}
                   </tbody>
                 </table>
               </div>
@@ -1282,22 +1264,23 @@ export function PlatformDashboardPage() {
           {tab === 'admins' && isOwner && <AdminsTab myId={(admin as { id?: number } | null)?.id ?? null} />}
 
           {tab === 'audit' && (
-            <ul className="divide-y divide-slate-100">
-              {audit.isLoading && <li className="py-10 text-center text-slate-400"><Loader2 className="inline animate-spin" /></li>}
+            <ul className="divide-y divide-najd-line/70">
+              {audit.isLoading && <li className="py-10 text-center text-najd-muted/70"><Loader2 className="inline animate-spin" /></li>}
               {audit.data?.map((r) => (
                 <li key={r.id} className="px-4 py-3 flex items-center gap-3 text-sm">
-                  <span className="font-medium text-slate-900">{ACTION_LABELS[r.action] ?? r.action}</span>
-                  {r.detail && <span className="text-slate-500 truncate" dir="auto">{r.detail}</span>}
-                  <span className="mr-auto text-xs text-slate-400">
+                  <span className="font-medium text-najd-ink">{ACTION_LABELS[r.action] ?? r.action}</span>
+                  {r.detail && <span className="text-najd-muted truncate" dir="auto">{r.detail}</span>}
+                  <span className="mr-auto text-xs text-najd-muted/70">
                     {r.admin?.name ?? '—'} · {new Date(r.createdAt).toLocaleString('ar-SA')}
                   </span>
                 </li>
               ))}
-              {audit.data?.length === 0 && <li className="py-10 text-center text-slate-400">لا توجد عمليات بعد</li>}
+              {audit.data?.length === 0 && <li className="py-10 text-center text-najd-muted/70">لا توجد عمليات بعد</li>}
             </ul>
           )}
         </section>
-      </main>
+        )}
+      </PlatformShell>
 
       {(changingPassword || mustChange) && (
         <ChangePasswordDialog
@@ -1309,6 +1292,6 @@ export function PlatformDashboardPage() {
       {editingPlan !== null && (
         <PlanForm plan={editingPlan === 'new' ? null : editingPlan} onClose={() => setEditingPlan(null)} />
       )}
-    </div>
+    </>
   );
 }
