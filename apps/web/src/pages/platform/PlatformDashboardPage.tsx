@@ -8,6 +8,7 @@ import {
 import { BrandMark } from '../../components/BrandLogo';
 import { AnnouncementsTab, SystemTab } from './PlatformSystemTabs';
 import { AdminsTab, ROLE_LABEL } from './PlatformAdminsTab';
+import { AnalyticsTab } from './PlatformAnalyticsTab';
 import type { AxiosError } from 'axios';
 import {
   platformApi,
@@ -848,7 +849,7 @@ function ChangePasswordDialog({ onClose, forced }: { onClose: () => void; forced
   );
 }
 
-type Tab = 'tenants' | 'requests' | 'plans' | 'payments' | 'announcements' | 'system' | 'admins' | 'audit';
+type Tab = 'tenants' | 'requests' | 'plans' | 'payments' | 'announcements' | 'system' | 'admins' | 'analytics' | 'audit';
 
 export function PlatformDashboardPage() {
   const navigate = useNavigate();
@@ -977,6 +978,7 @@ export function PlatformDashboardPage() {
     ['requests', `طلبات الترقية${s?.pendingUpgradeRequests ? ` (${s.pendingUpgradeRequests})` : ''}`],
     ['plans', 'الباقات'],
     ['payments', 'المدفوعات'],
+    ['analytics', 'التقارير والنمو'],
     ['announcements', 'الإعلانات'],
     ['system', 'حالة النظام'],
     ...(isOwner ? ([['admins', 'مديرو المنصة']] as Array<[Tab, string]>) : []),
@@ -1274,6 +1276,7 @@ export function PlatformDashboardPage() {
             </div>
           )}
 
+          {tab === 'analytics' && <AnalyticsTab onOpenTenant={setSelected} />}
           {tab === 'announcements' && <AnnouncementsTab />}
           {tab === 'system' && <SystemTab />}
           {tab === 'admins' && isOwner && <AdminsTab myId={(admin as { id?: number } | null)?.id ?? null} />}
