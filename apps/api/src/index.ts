@@ -57,6 +57,7 @@ import platformRouter from './routes/platform';
 import subscriptionRouter from './routes/subscription';
 import paymentWebhooksRouter from './routes/paymentWebhooks';
 import legalRouter from './routes/legal';
+import announcementsRouter from './routes/announcements';
 import { startScheduler } from './lib/scheduler';
 import { auditMiddleware } from './middleware/audit';
 import { errorHandler } from './middleware/errorHandler';
@@ -177,6 +178,7 @@ app.use('/api/bank-reconciliations', bankReconciliationsRouter);
 app.use('/api/platform', platformRouter);
 app.use('/api/subscription', subscriptionRouter);
 app.use('/api/legal', legalRouter);
+app.use('/api/announcements', announcementsRouter);
 // payment gateway notifications: no session — authenticity is checked inside (HMAC / shared secret)
 app.use('/api/webhooks', paymentWebhooksRouter);
 

@@ -52,6 +52,7 @@ services:
       MOYASAR_WEBHOOK_SECRET: ${MOYASAR_WEBHOOK_SECRET:-}
       PUBLIC_BASE_URL: ${PUBLIC_BASE_URL:-}
       # Outgoing e-mail (address confirmation) — see docs/EMAIL.md. Empty SMTP_HOST = nothing is sent.
+      BACKUPS_DIR: /backups
       SMTP_HOST: ${SMTP_HOST:-}
       SMTP_PORT: ${SMTP_PORT:-465}
       SMTP_USER: ${SMTP_USER:-}
@@ -59,6 +60,8 @@ services:
       MAIL_FROM: ${MAIL_FROM:-}
     volumes:
       - uploads:/app/apps/api/uploads
+      # read-only: the platform console shows the age of the latest database backup
+      - ./backups:/backups:ro
     depends_on:
       db:
         condition: service_healthy

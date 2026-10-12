@@ -29,6 +29,7 @@ import { computeEntitlements } from '../lib/entitlements';
 import { rateLimit } from '../middleware/rateLimit';
 import { invalidateUserSessions } from '../lib/userSession';
 import billingRouter from './platformBilling';
+import systemRouter from './platformSystem';
 import { sendVerificationEmail } from '../lib/emailVerification';
 import { mailEnabled } from '../lib/mail/mailer';
 
@@ -77,6 +78,7 @@ router.post('/auth/login', rateLimit({ name: 'platform-login', windowMs: 10 * 60
 router.use(requirePlatformAdmin);
 
 router.use(billingRouter);
+router.use(systemRouter);
 
 // Change my own password. Needs the current one; every other session of this account is ended and the
 // caller continues with a fresh token.
