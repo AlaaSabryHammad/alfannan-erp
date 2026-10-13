@@ -245,7 +245,7 @@ export function Sidebar() {
   const { pathname } = useLocation();
 
   return (
-    <aside className="w-64 flex-shrink-0 h-screen sticky top-0 flex flex-col bg-gradient-to-b from-[#0b1f1d] to-[#103a35] overflow-hidden">
+    <aside className="print:hidden w-64 flex-shrink-0 h-screen sticky top-0 flex flex-col bg-gradient-to-b from-[#0b1f1d] to-[#103a35] overflow-hidden">
       {/* Brand block */}
       <div className="px-4 py-5 border-b border-white/10">
         <div className="flex items-center gap-3 mb-3">

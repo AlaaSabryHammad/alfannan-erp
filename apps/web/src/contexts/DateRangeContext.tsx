@@ -19,8 +19,11 @@ interface DateRangeContextValue extends DateRange {
 
 // ─── Helpers ───────────────────────────────────────────────────────────────────
 
+// The LOCAL calendar day. `toISOString()` converts to UTC first: at UTC+3 local midnight is 21:00 of the
+// previous day, so "today" and "start of month" came out one day early.
 function toISODate(d: Date): string {
-  return d.toISOString().slice(0, 10);
+  const p = (n: number) => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`;
 }
 
 function computeRange(preset: DatePreset): { from: string | null; to: string | null } {

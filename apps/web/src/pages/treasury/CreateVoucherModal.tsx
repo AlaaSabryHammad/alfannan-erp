@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useMutation } from '@tanstack/react-query';
 import { Plus, Trash2 } from 'lucide-react';
 import apiClient from '../../lib/api';
@@ -66,44 +66,32 @@ export function CreateVoucherModal({ open, onClose, onCreated }: CreateVoucherMo
   ]);
   const [submitting, setSubmitting] = useState(false);
 
-  // ── Data: treasury accounts ─────────────────────────────────────────────────
+  // ── Data: loaded once each time the dialog opens (never during render) ──────
   const [treasuryAccounts, setTreasuryAccounts] = useState<TreasuryAccount[]>([]);
-  if (open && treasuryAccounts.length === 0) {
-    apiClient
-      .get<{ data: TreasuryAccount[] }>('/treasury/accounts')
-      .then((r) => {
-        if (r.data.data.length > 0) {
-          setTreasuryAccounts(r.data.data);
-          setTreasuryAccountId(r.data.data[0].id);
-        }
-      })
-      .catch(() => {});
-  }
-
-  // ── Data: accounts (for compound lines + ACCOUNT party) ─────────────────────
   const [accounts, setAccounts] = useState<TreasuryAccount[]>([]);
-  if (open && accounts.length === 0) {
-    apiClient
-      .get<{ data: TreasuryAccount[] }>('/accounts', { params: { page: 1, pageSize: 500 } })
-      .then((r) => setAccounts(r.data.data))
-      .catch(() => {});
-  }
-
-  // ── Data: customers/suppliers (party pickers) ───────────────────────────────
   const [customers, setCustomers] = useState<PartyOption[]>([]);
   const [suppliers, setSuppliers] = useState<PartyOption[]>([]);
-  if (open && customers.length === 0) {
-    apiClient
-      .get<{ data: PartyOption[] }>('/customers', { params: { page: 1, pageSize: 500 } })
-      .then((r) => setCustomers(r.data.data))
-      .catch(() => {});
-  }
-  if (open && suppliers.length === 0) {
-    apiClient
-      .get<{ data: PartyOption[] }>('/suppliers', { params: { page: 1, pageSize: 500 } })
-      .then((r) => setSuppliers(r.data.data))
-      .catch(() => {});
-  }
+  useEffect(() => {
+    if (!open) return;
+    let cancelled = false;
+    (async () => {
+      const [treasury, accs, cust, sup] = await Promise.all([
+        apiClient.get<{ data: TreasuryAccount[] }>('/treasury/accounts').catch(() => null),
+        apiClient.get<{ data: TreasuryAccount[] }>('/accounts', { params: { page: 1, pageSize: 1000 } }).catch(() => null),
+        apiClient.get<{ data: PartyOption[] }>('/customers', { params: { page: 1, pageSize: 1000 } }).catch(() => null),
+        apiClient.get<{ data: PartyOption[] }>('/suppliers', { params: { page: 1, pageSize: 1000 } }).catch(() => null),
+      ]);
+      if (cancelled) return;
+      if (treasury) {
+        setTreasuryAccounts(treasury.data.data);
+        if (treasury.data.data.length > 0) setTreasuryAccountId((cur) => (cur === '' ? treasury.data.data[0].id : cur));
+      }
+      if (accs) setAccounts(accs.data.data);
+      if (cust) setCustomers(cust.data.data);
+      if (sup) setSuppliers(sup.data.data);
+    })();
+    return () => { cancelled = true; };
+  }, [open]);
 
   const mutation = useMutation({
     mutationFn: (payload: unknown) => apiClient.post('/vouchers', payload),

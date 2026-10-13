@@ -15,6 +15,7 @@ import { requireAuth, requirePermission } from '../middleware/auth';
 import { getPagination, paginatedResponse } from '../lib/paginate';
 
 import { postStockAdjustmentEntry, type StockChange } from '../lib/stockAdjustment';
+import { lockStock } from '../lib/reservation';
 const router = Router();
 router.use(requireAuth);
 
@@ -217,6 +218,9 @@ router.post('/:id/post', requirePermission('stockcount.adjust'), async (req: Req
       }
 
       const changes: StockChange[] = [];
+      for (const line of [...stockCount.lines].sort((a, b) => a.productId - b.productId)) {
+        await lockStock(tx, line.productId, stockCount.warehouseId);
+      }
       for (const line of stockCount.lines) {
         const countedQty = Number(line.countedQty);
         // against what is on hand at posting time: sales made since the line was added are not a "shortage"

@@ -128,6 +128,15 @@ router.put('/:id/permissions', requirePermission('roles.edit'), async (req: Requ
 
     const roleId = parseInt(req.params.id);
 
+    // Escalation guard: you can only hand out permissions you hold yourself. Without this, anyone with
+    // roles.edit could give their own role everything.
+    const mine = new Set(req.user!.permissions);
+    const notMine = permissionCodes.filter((c) => !mine.has(c));
+    if (notMine.length > 0) {
+      res.status(403).json({ error: 'لا يمكنك منح صلاحيات لا تملكها: ' + notMine.slice(0, 5).join('، ') });
+      return;
+    }
+
     // The role must belong to this company (RolePermission itself carries no tenant column).
     await prisma.role.findUniqueOrThrow({ where: { id: roleId }, select: { id: true } });
 

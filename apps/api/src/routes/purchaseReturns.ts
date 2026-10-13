@@ -245,10 +245,29 @@ router.post('/', requirePermission('purchasereturns.create'), async (req: Reques
       // Dr cash (refund received) or AP (we owe the supplier less)
       // Cr 1200 inventory (net of discount) + Cr 1300 input VAT share
       const debitAccountCode = body.refundMethod === 'CASH' ? ACCT.CASH : ACCT.AP;
+      // Stock leaves the books at its current moving-average cost, so the inventory account keeps following
+      // quantity × average. What the supplier credits us for (the invoice price, net of discount) can differ
+      // from that: the difference is a purchase price variance booked against COGS.
+      const costRows = await tx.product.findMany({
+        where: { id: { in: lines.map((l) => l.productId) } },
+        select: { id: true, costPrice: true },
+      });
+      const avgCost = new Map(costRows.map((p) => [p.id, Number(p.costPrice)]));
+      const inventoryOut = round2(lines.reduce((s, l) => s + l.qty * (avgCost.get(l.productId) ?? 0), 0));
+      const supplierCredit = round2(subtotal - discount);
+      const variance = round2(supplierCredit - inventoryOut);
+
       const ledgerLines = [
         { accountCode: debitAccountCode, debit: total, credit: 0, description: `مرتجع مشتريات ${refNo}` },
-        { accountCode: ACCT.INVENTORY, debit: 0, credit: round2(subtotal - discount), description: `إخراج مخزون ${refNo}` },
+        { accountCode: ACCT.INVENTORY, debit: 0, credit: inventoryOut, description: `إخراج مخزون ${refNo}` },
       ];
+      if (variance !== 0) {
+        ledgerLines.push(
+          variance > 0
+            ? { accountCode: ACCT.COGS, debit: 0, credit: variance, description: `فرق سعر شراء ${refNo}` }
+            : { accountCode: ACCT.COGS, debit: -variance, credit: 0, description: `فرق سعر شراء ${refNo}` },
+        );
+      }
       if (tax > 0) {
         ledgerLines.push({ accountCode: ACCT.INPUT_VAT, debit: 0, credit: tax, description: `عكس ضريبة مدخلات ${refNo}` });
       }

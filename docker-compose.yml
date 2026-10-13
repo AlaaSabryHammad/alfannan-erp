@@ -43,8 +43,8 @@ services:
       CORS_ORIGIN: ${CORS_ORIGIN:-http://localhost:8080}
       # SaaS: allow anyone to create a new company from the login screen (off by default)
       ALLOW_SIGNUP: ${ALLOW_SIGNUP:-false}
-      # Plans/subscriptions: off | log (record what would be blocked, block nothing) | enforce (HTTP 402)
-      SUBSCRIPTION_ENFORCEMENT: ${SUBSCRIPTION_ENFORCEMENT:-log}
+      # Plans/subscriptions: off | log (record what would be blocked, block nothing) | enforce (HTTP 402, default)
+      SUBSCRIPTION_ENFORCEMENT: ${SUBSCRIPTION_ENFORCEMENT:-enforce}
       # Online subscription payments (see docs/PAYMENTS.md) — off unless PAYMENTS_ENABLED=true
       PAYMENTS_ENABLED: ${PAYMENTS_ENABLED:-false}
       PAYMENTS_PROVIDER: ${PAYMENTS_PROVIDER:-moyasar}

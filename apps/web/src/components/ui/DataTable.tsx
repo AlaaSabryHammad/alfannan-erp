@@ -50,7 +50,7 @@ function cellText(td: HTMLTableCellElement): string {
 
 /** Build the RTL print CSS + company header HTML used by both Print and PDF flows */
 function buildPrintWindowHTML(tableHTML: string, title: string): string {
-  const now = new Date().toLocaleDateString('ar-SA', {
+  const now = new Date().toLocaleDateString('ar-SA-u-ca-gregory', {
     year: 'numeric',
     month: 'long',
     day: 'numeric',

@@ -100,6 +100,7 @@ function NewCountModal({
   onClose: () => void;
   onCreated: (id: number) => void;
 }) {
+  const qc = useQueryClient();
   const [warehouseId, setWarehouseId] = useState('');
   const [notes, setNotes] = useState('');
   const [error, setError] = useState('');
@@ -109,6 +110,7 @@ function NewCountModal({
   const createMutation = useMutation({
     mutationFn: () => apiClient.post<StockCount>('/stock-counts', { warehouseId: parseInt(warehouseId), notes: notes || undefined }),
     onSuccess: (res) => {
+      qc.invalidateQueries({ queryKey: ['stock-counts'] });
       handleClose();
       onCreated(res.data.id);
     },

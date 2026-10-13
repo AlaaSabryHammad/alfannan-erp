@@ -12,7 +12,7 @@
 import { Prisma, JournalSource } from '@prisma/client';
 import type { Tx } from './prisma';
 import { postJournalEntry, ACCT } from './ledger';
-import { getReservedQty } from './reservation';
+import { getReservedQty, lockStock } from './reservation';
 import { validateCoupon, computeCouponDiscount } from '../routes/coupons';
 
 export interface SalesInvoiceItemInput {
@@ -93,7 +93,7 @@ export async function createSalesInvoiceInTx(tx: Tx, body: CreateSalesInvoiceInp
 
   const finalDiscount = (body.discount ?? 0) + couponDiscount + pointsValue;
   const total = subtotal - finalDiscount + (body.tax ?? 0);
-  if (total < 0) {
+  if (total < 0 || finalDiscount > subtotal + 0.0001) {
     throw new Error('قيمة الخصم الإجمالية (يدوي + كوبون + نقاط الولاء) تتجاوز إجمالي الفاتورة');
   }
 
@@ -192,6 +192,10 @@ export async function createSalesInvoiceInTx(tx: Tx, body: CreateSalesInvoiceInp
   // Decrement stock atomically & write OUT movements.
   // Using {decrement} (not read-then-write) makes this safe under concurrent
   // requests for the same product/warehouse — Postgres serializes the row update.
+  // lock in a fixed order so two sales touching the same products cannot deadlock
+  for (const item of [...body.items].sort((a, b) => a.productId - b.productId)) {
+    await lockStock(tx, item.productId, body.warehouseId);
+  }
   for (const item of body.items) {
     const balance = await tx.stockBalance.upsert({
       where: { productId_warehouseId: { productId: item.productId, warehouseId: body.warehouseId } },

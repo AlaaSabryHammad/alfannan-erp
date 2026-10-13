@@ -15,18 +15,20 @@ export function AppShell() {
       <Sidebar />
 
       {/* Main area */}
-      <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
+      <div className="flex-1 flex flex-col min-w-0 overflow-hidden print:overflow-visible">
         {/* Topbar */}
         <Topbar />
 
         {/* Trial ending / expired / grace — only visible when it needs attention */}
-        <AnnouncementBanner />
-        <SubscriptionBanner />
-        <EmailVerificationBanner />
-        <LegalBanner />
+        <div className="print:hidden">
+          <AnnouncementBanner />
+          <SubscriptionBanner />
+          <EmailVerificationBanner />
+          <LegalBanner />
+        </div>
 
         {/* Page content */}
-        <main className="flex-1 overflow-y-auto p-6">
+        <main className="flex-1 overflow-y-auto p-6 print:overflow-visible print:p-0">
           {/* a crash in one page shows a message here instead of a blank application */}
           <ErrorBoundary resetKey={pathname}>
             <Outlet />
@@ -34,7 +36,7 @@ export function AppShell() {
         </main>
 
         {/* Footer */}
-        <footer className="border-t border-app-border bg-white px-6 py-3">
+        <footer className="print:hidden border-t border-app-border bg-white px-6 py-3">
           <p className="text-xs text-app-muted text-center">
             © 2026 الفنان السعودي · حلول الفنان · جميع الحقوق محفوظة
           </p>

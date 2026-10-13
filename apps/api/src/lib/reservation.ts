@@ -10,6 +10,15 @@ import { Prisma } from '@prisma/client';
 import type { Tx } from './prisma';
 
 /**
+ * Serialise everything that decides "is there enough of this product in this warehouse": sales, sales
+ * orders (reservations), stock counts and manual adjustments. Transaction-scoped advisory lock — released
+ * at commit/rollback, no table row needed, and independent of whether a stock row exists yet.
+ */
+export async function lockStock(tx: Tx, productId: number, warehouseId: number): Promise<void> {
+  await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtextextended(${'stock:' + productId + ':' + warehouseId}, 0))`;
+}
+
+/**
  * Total quantity of a product reserved by PENDING sales orders on a warehouse.
  * `excludeOrderId` omits one order — used when THAT order is being fulfilled,
  * since it is entitled to consume its own reservation.
