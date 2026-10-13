@@ -88,6 +88,8 @@ router.post('/sales-invoices/:id/submit', requirePermission('sales.edit'), async
         unitPrice: Number(it.unitPrice),
         lineTotal: Number(it.lineTotal),
         taxRate: Number(it.product.taxRate ?? 0),
+        // the VAT recorded on the line at the sale (null-safe for invoices from before it existed)
+        taxAmount: Number(it.taxAmount) > 0 || Number(invoice.tax) === 0 ? Number(it.taxAmount) : undefined,
       })),
     });
     const invoiceHash = computeInvoiceHash(xml);

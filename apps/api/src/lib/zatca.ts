@@ -119,7 +119,7 @@ interface InvoiceXmlInput {
   buyerName: string;
   buyerVatNumber?: string | null;
   isSimplified: boolean; // true = B2C simplified invoice (reporting), false = B2B standard invoice (clearance)
-  lines: { nameAr: string; qty: number; unitPrice: number; lineTotal: number; taxRate: number }[];
+  lines: { nameAr: string; qty: number; unitPrice: number; lineTotal: number; taxRate: number; taxAmount?: number }[];
 }
 
 function escapeXml(s: string): string {
@@ -143,7 +143,7 @@ export function buildInvoiceXml(inv: InvoiceXmlInput): string {
       <cbc:InvoicedQuantity>${l.qty}</cbc:InvoicedQuantity>
       <cbc:LineExtensionAmount currencyID="SAR">${l.lineTotal.toFixed(2)}</cbc:LineExtensionAmount>
       <cac:TaxTotal>
-        <cbc:TaxAmount currencyID="SAR">${((l.lineTotal * l.taxRate) / 100).toFixed(2)}</cbc:TaxAmount>
+        <cbc:TaxAmount currencyID="SAR">${(l.taxAmount ?? (l.lineTotal * l.taxRate) / 100).toFixed(2)}</cbc:TaxAmount>
       </cac:TaxTotal>
       <cac:Item>
         <cbc:Name>${escapeXml(l.nameAr)}</cbc:Name>
@@ -196,6 +196,7 @@ export function buildInvoiceXml(inv: InvoiceXmlInput): string {
   <cac:LegalMonetaryTotal>
     <cbc:LineExtensionAmount currencyID="SAR">${inv.subtotal.toFixed(2)}</cbc:LineExtensionAmount>
     <cbc:AllowanceTotalAmount currencyID="SAR">${inv.discount.toFixed(2)}</cbc:AllowanceTotalAmount>
+    <cbc:TaxExclusiveAmount currencyID="SAR">${(inv.subtotal - inv.discount).toFixed(2)}</cbc:TaxExclusiveAmount>
     <cbc:TaxInclusiveAmount currencyID="SAR">${inv.total.toFixed(2)}</cbc:TaxInclusiveAmount>
     <cbc:PayableAmount currencyID="SAR">${inv.total.toFixed(2)}</cbc:PayableAmount>
   </cac:LegalMonetaryTotal>${lines}

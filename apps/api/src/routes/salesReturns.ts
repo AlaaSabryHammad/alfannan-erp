@@ -65,13 +65,18 @@ async function getReturnableMap(tx: Tx, salesInvoiceId: number) {
     tx.salesReturnItem.findMany({ where: { return: { salesInvoiceId } } }),
   ]);
 
-  const map = new Map<number, { invoicedQty: number; returnedQty: number; unitPrice: number }>();
+  const map = new Map<number, { invoicedQty: number; returnedQty: number; unitPrice: number; taxAmount: number }>();
   for (const it of invoiceItems) {
-    const prev = map.get(it.productId) ?? { invoicedQty: 0, returnedQty: 0, unitPrice: 0 };
+    const prev = map.get(it.productId) ?? { invoicedQty: 0, returnedQty: 0, unitPrice: 0, taxAmount: 0 };
     const invoicedQty = prev.invoicedQty + Number(it.qty);
     // weighted average price across the invoice's lines for this product
     const totalValue = prev.unitPrice * prev.invoicedQty + Number(it.lineTotal);
-    map.set(it.productId, { invoicedQty, returnedQty: prev.returnedQty, unitPrice: totalValue / invoicedQty });
+    map.set(it.productId, {
+      invoicedQty,
+      returnedQty: prev.returnedQty,
+      unitPrice: totalValue / invoicedQty,
+      taxAmount: prev.taxAmount + Number(it.taxAmount),
+    });
   }
   for (const r of returnedItems) {
     const entry = map.get(r.productId);
@@ -183,6 +188,7 @@ router.post('/', requirePermission('salesreturns.create'), async (req: Request, 
 
       // Validate quantities and price the returned lines from the original invoice
       let subtotal = 0;
+      let lineTaxTotal = 0;
       const lines: Array<{ productId: number; qty: number; unitPrice: number; lineTotal: number }> = [];
       for (const item of body.items) {
         const entry = returnable.get(item.productId);
@@ -196,13 +202,22 @@ router.post('/', requirePermission('salesreturns.create'), async (req: Request, 
         const lineTotal = round2(item.qty * entry.unitPrice);
         subtotal = round2(subtotal + lineTotal);
         lines.push({ productId: item.productId, qty: item.qty, unitPrice: round2(entry.unitPrice), lineTotal });
+
+        // the VAT these goods bore, on a cumulative basis so that successive partial returns add up to
+        // exactly the line's VAT (never a halala more)
+        if (entry.invoicedQty > 0 && entry.taxAmount > 0) {
+          const upTo = (q: number) => round2(entry.taxAmount * (q / entry.invoicedQty));
+          lineTaxTotal = round2(lineTaxTotal + upTo(entry.returnedQty + item.qty) - upTo(entry.returnedQty));
+        }
       }
 
       // The return takes its share of the invoice's discount and tax proportionally
       const invSubtotal = Number(invoice.subtotal);
       const ratio = invSubtotal > 0 ? subtotal / invSubtotal : 0;
       const discount = round2(Number(invoice.discount) * ratio);
-      const tax = round2(Number(invoice.tax) * ratio);
+      // Invoices created before the line VAT was recorded carry none: they keep the proportional share.
+      const hasLineTax = [...returnable.values()].some((e) => e.taxAmount > 0);
+      const tax = hasLineTax || Number(invoice.tax) === 0 ? lineTaxTotal : round2(Number(invoice.tax) * ratio);
       const total = round2(subtotal - discount + tax);
 
       const refNo = await generateReturnNo(tx, retDate);

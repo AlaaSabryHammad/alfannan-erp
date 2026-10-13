@@ -164,13 +164,16 @@ router.get('/trial-balance', async (req: Request, res: Response, next: NextFunct
           _sum: { debit: true, credit: true },
         });
 
-        const totalDebit   = Number(agg._sum.debit  ?? 0);
-        const totalCredit  = Number(agg._sum.credit ?? 0);
-        const opening      = Number(acct.openingBalance);
+        // amounts are money: keep them at 2 decimals so floating-point noise (5996.179999999999)
+        // never appears in a column or makes two equal totals compare unequal
+        const cents        = (n: number) => Math.round(n * 100) / 100;
+        const totalDebit   = cents(Number(agg._sum.debit  ?? 0));
+        const totalCredit  = cents(Number(agg._sum.credit ?? 0));
+        const opening      = cents(Number(acct.openingBalance));
         const isDebitNorm  = acct.type === 'ASSET' || acct.type === 'EXPENSE';
-        const balance      = isDebitNorm
+        const balance      = cents(isDebitNorm
           ? opening + totalDebit - totalCredit
-          : opening + totalCredit - totalDebit;
+          : opening + totalCredit - totalDebit);
 
         // Trial balance columns reflect the account's closing balance (opening
         // balance included), not just ledger postings — a contra (negative)
@@ -193,8 +196,8 @@ router.get('/trial-balance', async (req: Request, res: Response, next: NextFunct
       }),
     );
 
-    const grandTotalDebit  = rows.reduce((s, r) => s + r.debit,  0);
-    const grandTotalCredit = rows.reduce((s, r) => s + r.credit, 0);
+    const grandTotalDebit  = Math.round(rows.reduce((s, r) => s + r.debit,  0) * 100) / 100;
+    const grandTotalCredit = Math.round(rows.reduce((s, r) => s + r.credit, 0) * 100) / 100;
     const balanced         = Math.abs(grandTotalDebit - grandTotalCredit) < 0.01;
 
     res.json({
@@ -514,20 +517,39 @@ router.get('/vat', async (req: Request, res: Response, next: NextFunction) => {
     const salesInvoices = await prisma.salesInvoice.findMany({
       where: dateWhere,
       orderBy: { date: 'desc' },
-      include: { customer: { select: { id: true, nameAr: true } } },
+      include: {
+        customer: { select: { id: true, nameAr: true } },
+        items: { select: { lineTotal: true, taxAmount: true } },
+      },
     });
     const salesTaxable = salesInvoices.filter((inv) => Number(inv.tax) > 0);
     const salesExempt = salesInvoices.filter((inv) => Number(inv.tax) === 0);
 
     const outputVAT = salesInvoices.reduce((s, inv) => s + Number(inv.tax ?? 0), 0);
-    const salesTaxableNet = salesTaxable.reduce(
-      (s, inv) => s + Number(inv.subtotal ?? 0) - Number(inv.discount ?? 0),
-      0,
-    );
-    const salesExemptNet = salesExempt.reduce(
-      (s, inv) => s + Number(inv.subtotal ?? 0) - Number(inv.discount ?? 0),
-      0,
-    );
+
+    // An invoice can mix standard-rated and exempt items: split each invoice's net (after its discount) per
+    // item. Invoices from before the line VAT was recorded count wholly as taxable when they carry tax.
+    let salesTaxableNet = 0;
+    let salesExemptNet = 0;
+    for (const inv of salesInvoices) {
+      const sub = Number(inv.subtotal ?? 0);
+      const disc = Number(inv.discount ?? 0);
+      const hasLineTax = inv.items.some((it) => Number(it.taxAmount) > 0);
+      if (!hasLineTax) {
+        const net = sub - disc;
+        if (Number(inv.tax) > 0) salesTaxableNet += net;
+        else salesExemptNet += net;
+        continue;
+      }
+      for (const it of inv.items) {
+        const gross = Number(it.lineTotal);
+        const net = sub > 0 ? gross - disc * (gross / sub) : 0;
+        if (Number(it.taxAmount) > 0) salesTaxableNet += net;
+        else salesExemptNet += net;
+      }
+    }
+    salesTaxableNet = Math.round(salesTaxableNet * 100) / 100;
+    salesExemptNet = Math.round(salesExemptNet * 100) / 100;
 
     // ── Sales returns lower output VAT (إشعارات دائن) ─────────────────────────
     const salesReturns = await prisma.salesReturn.findMany({
@@ -945,7 +967,7 @@ router.get('/ar-aging', async (req: Request, res: Response, next: NextFunction) 
 
     const byCustomer = new Map<number, { id: number; nameAr: string } & ReturnType<typeof emptyAgingRow>>();
     for (const inv of invoices) {
-      const paid = paidMap.get(inv.id) ?? 0;
+      const paid = (paidMap.get(inv.id) ?? 0) + Number(inv.settledAtSale ?? 0);
       const returned = returnMap.get(inv.id) ?? 0; // BALANCE returns settle the receivable
       const remaining = Number(inv.total) - paid - returned;
       if (remaining <= 0.01) continue;

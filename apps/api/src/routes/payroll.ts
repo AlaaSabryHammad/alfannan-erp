@@ -223,14 +223,16 @@ payrollRouter.post('/run', requirePermission('hr.create'), async (req: Request, 
       let totalDeductions = 0;
       let totalNet = 0;
       const items = employees.map((emp) => {
-        const basic = Number(emp.basicSalary);
-        const allow = Number(emp.allowances);
-        const deduct = Number(emp.deductions);
-        const gross = basic + allow;
-        const net = gross - deduct;
-        totalGross += gross;
-        totalDeductions += deduct;
-        totalNet += net;
+        const cents = (n: number) => Math.round(n * 100) / 100;
+        const basic = cents(Number(emp.basicSalary));
+        const allow = cents(Number(emp.allowances));
+        const gross = cents(basic + allow);
+        // a deduction can never exceed what the employee earned (the net would be a negative payable)
+        const deduct = Math.min(cents(Number(emp.deductions)), gross);
+        const net = cents(gross - deduct);
+        totalGross = cents(totalGross + gross);
+        totalDeductions = cents(totalDeductions + deduct);
+        totalNet = cents(totalNet + net);
         return {
           employeeId: emp.id,
           basic,
