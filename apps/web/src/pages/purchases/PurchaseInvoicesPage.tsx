@@ -549,6 +549,8 @@ function CreateInvoiceModal({
   const discount = parseFloat(watchedDiscount ?? '0') || 0;
   const tax = parseFloat(watchedTax ?? '0') || 0;
   const total = subtotal - discount + tax;
+  // a discount can never exceed what is being bought (the server refuses it as well)
+  const discountTooLarge = discount > subtotal + 0.0001;
 
   const createMutation = useMutation({
     mutationFn: (body: object) => apiClient.post('/purchase-invoices', body),
@@ -598,7 +600,7 @@ function CreateInvoiceModal({
           <Button variant="outline" onClick={() => { reset(); onClose(); }}>
             إلغاء
           </Button>
-          <Button loading={createMutation.isPending} onClick={handleSubmit(onSubmit)}>
+          <Button loading={createMutation.isPending} disabled={discountTooLarge} onClick={handleSubmit(onSubmit)}>
             حفظ الفاتورة
           </Button>
         </>
@@ -795,6 +797,7 @@ function CreateInvoiceModal({
               step="0.01"
               placeholder="0.00"
               {...register('discount')}
+              error={discountTooLarge ? 'الخصم أكبر من المجموع الفرعي للفاتورة' : undefined}
             />
             <Input
               label="الضريبة (ر.س)"

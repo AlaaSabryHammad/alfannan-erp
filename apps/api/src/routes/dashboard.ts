@@ -32,8 +32,14 @@ router.get('/', requirePermission('dashboard.view'), async (req: Request, res: R
     const stockWhere = branchWarehouseIds ? { warehouseId: { in: branchWarehouseIds } } : {};
 
     // ── Net Sales (filtered or all-time)
-    const salesAgg = await prisma.salesInvoice.aggregate({ where: dateWhere, _sum: { total: true } });
-    const netSales = Number(salesAgg._sum.total ?? 0);
+    // Net sales = what the company earned (before VAT, after discounts). The invoice total also carries the
+    // VAT collected for the state, which is not revenue and must not inflate sales or profit.
+    const salesAgg = await prisma.salesInvoice.aggregate({
+      where: dateWhere,
+      _sum: { total: true, subtotal: true, discount: true },
+    });
+    const grossSales = Number(salesAgg._sum.total ?? 0);
+    const netSales = Number(salesAgg._sum.subtotal ?? 0) - Number(salesAgg._sum.discount ?? 0);
 
     // ── Inventory valuation (costPrice * totalQty per product) — always all-time
     const stockBalances = await prisma.stockBalance.findMany({
@@ -67,7 +73,7 @@ router.get('/', requirePermission('dashboard.view'), async (req: Request, res: R
     const [monthlyInvoices, monthlyPurchaseInvoices] = await Promise.all([
       prisma.salesInvoice.findMany({
         where: { date: { gte: startOfYear }, ...(branchId ? { branchId } : {}) },
-        select: { date: true, total: true },
+        select: { date: true, subtotal: true, discount: true },
       }),
       prisma.purchaseInvoice.findMany({
         where: { date: { gte: startOfYear }, ...(branchId ? { branchId } : {}) },
@@ -83,7 +89,8 @@ router.get('/', requirePermission('dashboard.view'), async (req: Request, res: R
     }
     for (const inv of monthlyInvoices) {
       const month = inv.date.getMonth() + 1;
-      monthlySales[month] = (monthlySales[month] || 0) + Number(inv.total);
+      // net of VAT, like the headline figure
+      monthlySales[month] = (monthlySales[month] || 0) + Number(inv.subtotal) - Number(inv.discount);
     }
     for (const po of monthlyPurchaseInvoices) {
       const month = po.date.getMonth() + 1;
@@ -187,7 +194,7 @@ router.get('/', requirePermission('dashboard.view'), async (req: Request, res: R
         purchases,
         expenses,
         netProfit: branchId ? netProfit : ledgerNetProfit,
-        cashLiquidity: branchId ? netSales - totalReceivables : ledgerCash,
+        cashLiquidity: branchId ? grossSales - totalReceivables : ledgerCash,
         inventoryValuation: branchId ? inventoryValuation : ledgerInventory,
         totalItemQty,
         lowStockCount,
