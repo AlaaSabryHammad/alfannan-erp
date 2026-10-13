@@ -42,6 +42,9 @@ function generatePoNo(): string {
 export async function createPurchaseInvoiceInTx(tx: Tx, body: CreatePurchaseInvoiceInput) {
   const userId = body.userId;
   const subtotal = body.items.reduce((s, item) => s + item.qty * item.unitCost, 0);
+  if ((body.discount ?? 0) > subtotal + 0.0001) {
+    throw new Error('قيمة الخصم تتجاوز إجمالي الفاتورة');
+  }
   const total = subtotal - (body.discount ?? 0) + (body.tax ?? 0);
   const refNo = generatePoNo();
 

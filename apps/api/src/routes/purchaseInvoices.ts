@@ -124,7 +124,11 @@ router.post('/', requirePermission('purchases.create'), async (req: Request, res
     });
 
     res.status(201).json(full);
-  } catch (err) {
+  } catch (err: any) {
+    if (typeof err?.message === 'string' && err.message.includes('قيمة الخصم تتجاوز')) {
+      res.status(400).json({ error: err.message });
+      return;
+    }
     next(err);
   }
 });

@@ -229,17 +229,21 @@ router.post('/:id/complete', requirePermission('reconciliation.create'), async (
     const cleared = await computeClearedBalance(recon.accountId, {});
     const difference = round2(Number(recon.statementBalance) - cleared);
 
-    const updated = await prisma.bankReconciliation.update({
-      where: { id },
+    // claim it: two simultaneous "complete" requests cannot both succeed
+    const claimed = await prisma.bankReconciliation.updateMany({
+      where: { id, status: 'DRAFT' },
       data: {
         status: 'COMPLETED',
         clearedBalance: new Prisma.Decimal(cleared),
         difference: new Prisma.Decimal(difference),
         completedAt: new Date(),
       },
-      include: reconInclude,
     });
-    res.json(updated);
+    if (claimed.count === 0) {
+      res.status(400).json({ error: 'التسوية مكتملة بالفعل' });
+      return;
+    }
+    res.json(await prisma.bankReconciliation.findUniqueOrThrow({ where: { id }, include: reconInclude }));
   } catch (err) {
     next(err);
   }

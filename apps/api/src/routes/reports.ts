@@ -3,6 +3,7 @@ import { Prisma } from '@prisma/client';
 import prisma from '../lib/prisma';
 import { requireAuth, requirePermission } from '../middleware/auth';
 
+import { endOfDay } from '../lib/dateRange';
 const router = Router();
 router.use(requireAuth);
 router.use(requirePermission('reports.view'));
@@ -38,7 +39,7 @@ router.get('/control-reconciliation', async (_req: Request, res: Response, next:
 router.get('/sales-log', async (req: Request, res: Response, next: NextFunction) => {
   try {
     const from = req.query.from ? new Date(req.query.from as string) : undefined;
-    const to = req.query.to ? new Date(req.query.to as string) : undefined;
+    const to = req.query.to ? endOfDay(req.query.to as string) : undefined;
 
     const where: Record<string, unknown> = {};
     if (from || to) {
@@ -84,7 +85,7 @@ router.get('/sales-log', async (req: Request, res: Response, next: NextFunction)
 router.get('/purchases-log', async (req: Request, res: Response, next: NextFunction) => {
   try {
     const from = req.query.from ? new Date(req.query.from as string) : undefined;
-    const to = req.query.to ? new Date(req.query.to as string) : undefined;
+    const to = req.query.to ? endOfDay(req.query.to as string) : undefined;
 
     const where: Record<string, unknown> = {};
     if (from || to) {
@@ -283,7 +284,7 @@ router.get('/balance-sheet', async (req: Request, res: Response, next: NextFunct
 async function incomeStatementHandler(req: Request, res: Response, next: NextFunction) {
   try {
     const from = req.query.from ? new Date(req.query.from as string) : undefined;
-    const to   = req.query.to   ? new Date(req.query.to as string)   : undefined;
+    const to   = req.query.to   ? endOfDay(req.query.to as string)   : undefined;
 
     // Date filter for journal lines
     const dateFilter = (from || to)
@@ -499,7 +500,7 @@ router.get('/expiring-products', async (req: Request, res: Response, next: NextF
 router.get('/vat', async (req: Request, res: Response, next: NextFunction) => {
   try {
     const from = req.query.from ? new Date(req.query.from as string) : undefined;
-    const to = req.query.to ? new Date(req.query.to as string) : undefined;
+    const to = req.query.to ? endOfDay(req.query.to as string) : undefined;
 
     const dateWhere: Record<string, unknown> = {};
     if (from || to) {
@@ -661,7 +662,7 @@ router.get('/vat', async (req: Request, res: Response, next: NextFunction) => {
 router.get('/cash-flow', async (req: Request, res: Response, next: NextFunction) => {
   try {
     const from = req.query.from ? new Date(req.query.from as string) : undefined;
-    const to = req.query.to ? new Date(req.query.to as string) : undefined;
+    const to = req.query.to ? endOfDay(req.query.to as string) : undefined;
 
     const cashAccounts = await prisma.account.findMany({
       where: { code: { in: ['1000', '1100'] } },
@@ -757,7 +758,7 @@ router.get('/cash-flow', async (req: Request, res: Response, next: NextFunction)
 router.get('/cost-centers', async (req: Request, res: Response, next: NextFunction) => {
   try {
     const from = req.query.from ? new Date(req.query.from as string) : undefined;
-    const to = req.query.to ? new Date(req.query.to as string) : undefined;
+    const to = req.query.to ? endOfDay(req.query.to as string) : undefined;
 
     const dateFilter: Record<string, unknown> = {};
     if (from) dateFilter.gte = from;

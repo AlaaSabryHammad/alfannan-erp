@@ -178,8 +178,20 @@ export async function postJournalEntry(
       );
     }
 
-    const debit = Number(line.debit ?? 0);
-    const credit = Number(line.credit ?? 0);
+    // A line is one-sided and non-negative: a negative debit is a credit (and vice versa), and a line
+    // carrying both sides is stored as its net.
+    let debit = Number(line.debit ?? 0);
+    let credit = Number(line.credit ?? 0);
+    if (!Number.isFinite(debit) || !Number.isFinite(credit)) {
+      throw new Error('مبلغ غير صالح في القيد');
+    }
+    if (debit < 0) { credit += -debit; debit = 0; }
+    if (credit < 0) { debit += -credit; credit = 0; }
+    if (debit > 0 && credit > 0) {
+      const net = debit - credit;
+      debit = net > 0 ? net : 0;
+      credit = net < 0 ? -net : 0;
+    }
 
     if (debit !== 0 || credit !== 0) {
       resolvedLines.push({

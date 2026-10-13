@@ -124,7 +124,7 @@ export function Topbar({ onMenuToggle }: { onMenuToggle?: () => void }) {
       .join('');
 
   return (
-    <header className="h-16 bg-white border-b border-app-border sticky top-0 z-30 flex items-center px-4 gap-3">
+    <header className="print:hidden h-16 bg-white border-b border-app-border sticky top-0 z-30 flex items-center px-4 gap-3">
       {/* Right side: user chip + notifications + POS button */}
       <div className="flex items-center gap-3">
         {/* User chip */}

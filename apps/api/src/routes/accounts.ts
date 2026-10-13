@@ -5,6 +5,7 @@ import prisma from '../lib/prisma';
 import { requireAuth, requirePermission } from '../middleware/auth';
 import { getPagination, paginatedResponse } from '../lib/paginate';
 
+import { endOfDay } from '../lib/dateRange';
 const router = Router();
 router.use(requireAuth);
 
@@ -135,7 +136,7 @@ router.get('/:id/ledger', requirePermission('accounts.view'), async (req: Reques
   try {
     const accountId = parseInt(req.params.id);
     const from = req.query.from ? new Date(req.query.from as string) : undefined;
-    const to   = req.query.to   ? new Date(req.query.to as string)   : undefined;
+    const to   = req.query.to   ? endOfDay(req.query.to as string)   : undefined;
 
     const account = await prisma.account.findUniqueOrThrow({
       where: { id: accountId },

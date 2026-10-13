@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Plus, Trash2, CheckCircle2, AlertCircle, XCircle } from 'lucide-react';
 import apiClient from '../../lib/api';
@@ -373,15 +373,23 @@ function CreateNoteModal({
   const [customers, setCustomers] = useState<PartyOption[]>([]);
   const [suppliers, setSuppliers] = useState<PartyOption[]>([]);
   const [accounts, setAccounts] = useState<PartyOption[]>([]);
-  if (open && customers.length === 0) {
-    apiClient.get<{ data: PartyOption[] }>('/customers', { params: { page: 1, pageSize: 500 } }).then((r) => setCustomers(r.data.data)).catch(() => {});
-  }
-  if (open && suppliers.length === 0) {
-    apiClient.get<{ data: PartyOption[] }>('/suppliers', { params: { page: 1, pageSize: 500 } }).then((r) => setSuppliers(r.data.data)).catch(() => {});
-  }
-  if (open && accounts.length === 0) {
-    apiClient.get<{ data: PartyOption[] }>('/accounts', { params: { page: 1, pageSize: 500 } }).then((r) => setAccounts(r.data.data)).catch(() => {});
-  }
+  // loaded once each time the dialog opens — never while rendering (an empty list used to re-fetch forever)
+  useEffect(() => {
+    if (!open) return;
+    let cancelled = false;
+    (async () => {
+      const [c, s, a] = await Promise.all([
+        apiClient.get<{ data: PartyOption[] }>('/customers', { params: { page: 1, pageSize: 1000 } }).catch(() => null),
+        apiClient.get<{ data: PartyOption[] }>('/suppliers', { params: { page: 1, pageSize: 1000 } }).catch(() => null),
+        apiClient.get<{ data: PartyOption[] }>('/accounts', { params: { page: 1, pageSize: 1000 } }).catch(() => null),
+      ]);
+      if (cancelled) return;
+      if (c) setCustomers(c.data.data);
+      if (s) setSuppliers(s.data.data);
+      if (a) setAccounts(a.data.data);
+    })();
+    return () => { cancelled = true; };
+  }, [open]);
 
   const mutation = useMutation({
     mutationFn: (payload: unknown) => apiClient.post('/promissory-notes', payload),

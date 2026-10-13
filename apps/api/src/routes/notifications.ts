@@ -1,11 +1,14 @@
 import { Router, Request, Response, NextFunction } from 'express';
 import { z } from 'zod';
 import prisma from '../lib/prisma';
-import { requireAuth } from '../middleware/auth';
+import { requireAuth, requirePermission } from '../middleware/auth';
+import { rateLimit } from '../middleware/rateLimit';
 import { sendWhatsAppMessage, sendSms } from '../lib/notifications';
 
 const router = Router();
 router.use(requireAuth);
+// Messages go out on the company's own WhatsApp/SMS account: bound the volume per client.
+router.use(rateLimit({ name: 'notifications', windowMs: 10 * 60 * 1000, max: 40 }));
 
 const sendSchema = z.object({
   to: z.string().min(4),
@@ -13,7 +16,7 @@ const sendSchema = z.object({
 });
 
 // POST /api/notifications/whatsapp — إرسال رسالة واتساب عامة
-router.post('/whatsapp', async (req: Request, res: Response, next: NextFunction) => {
+router.post('/whatsapp', requirePermission('settings.edit'), async (req: Request, res: Response, next: NextFunction) => {
   try {
     const body = sendSchema.parse(req.body);
     const result = await sendWhatsAppMessage(body.to, body.message);
@@ -28,7 +31,7 @@ router.post('/whatsapp', async (req: Request, res: Response, next: NextFunction)
 });
 
 // POST /api/notifications/sms — إرسال رسالة نصية عامة
-router.post('/sms', async (req: Request, res: Response, next: NextFunction) => {
+router.post('/sms', requirePermission('settings.edit'), async (req: Request, res: Response, next: NextFunction) => {
   try {
     const body = sendSchema.parse(req.body);
     const result = await sendSms(body.to, body.message);
@@ -43,7 +46,7 @@ router.post('/sms', async (req: Request, res: Response, next: NextFunction) => {
 });
 
 // POST /api/notifications/sales-invoices/:id/whatsapp — إرسال تفاصيل فاتورة بيع للعميل عبر واتساب
-router.post('/sales-invoices/:id/whatsapp', async (req: Request, res: Response, next: NextFunction) => {
+router.post('/sales-invoices/:id/whatsapp', requirePermission('sales.view'), async (req: Request, res: Response, next: NextFunction) => {
   try {
     const invoice = await prisma.salesInvoice.findUniqueOrThrow({
       where: { id: parseInt(req.params.id) },
@@ -72,7 +75,7 @@ router.post('/sales-invoices/:id/whatsapp', async (req: Request, res: Response, 
 });
 
 // POST /api/notifications/low-stock-alert — إرسال ملخص الأصناف المنخفضة للجوال الإداري المُعرَّف بالإعدادات
-router.post('/low-stock-alert', async (req: Request, res: Response, next: NextFunction) => {
+router.post('/low-stock-alert', requirePermission('stock.view'), async (req: Request, res: Response, next: NextFunction) => {
   try {
     const adminPhoneSetting = await prisma.setting.findFirst({ where: { key: 'notificationAdminPhone' } });
     const adminPhone = adminPhoneSetting?.value;

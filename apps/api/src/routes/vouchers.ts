@@ -47,6 +47,8 @@ const createVoucherSchema = z.object({
   amount: z.number().positive().optional(), // simple mode total (used when no lines)
   lines: z.array(voucherLineSchema).optional(), // compound mode
   branchId: z.number().int().positive().optional().nullable(), // فرع العمل الحالي (من محدد الفرع في الأعلى)
+}).refine((v) => !(v.salesInvoiceId && v.purchaseInvoiceId), {
+  message: 'لا يمكن ربط السند بفاتورة بيع وفاتورة شراء معًا',
 });
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -251,20 +253,6 @@ router.post('/', requirePermission('treasury.create'), async (req: Request, res:
           throw new Error('المبلغ الإجمالي للسند يجب أن يكون أكبر من صفر');
         }
 
-        // Reject payments that would overpay the linked invoice —
-        // "remaining" accounts for both prior vouchers and BALANCE returns.
-        if (body.salesInvoiceId) {
-          const { remaining } = await getSalesInvoiceSettlement(tx, body.salesInvoiceId);
-          if (totalAmount > remaining + 0.01) {
-            throw new Error(`المبلغ أكبر من المتبقي على الفاتورة (${remaining.toFixed(2)})`);
-          }
-        }
-        if (body.purchaseInvoiceId) {
-          const { remaining } = await getPurchaseInvoiceSettlement(tx, body.purchaseInvoiceId);
-          if (totalAmount > remaining + 0.01) {
-            throw new Error(`المبلغ أكبر من المتبقي على الفاتورة (${remaining.toFixed(2)})`);
-          }
-        }
         let counterAccountId: number;
         if (type === 'RECEIPT') {
           counterAccountId = (await tx.account.findFirstOrThrow({ where: { code: ACCT.AR }, select: { id: true } })).id;
@@ -281,6 +269,36 @@ router.post('/', requirePermission('treasury.create'), async (req: Request, res:
           counterAccountId = (await tx.account.findFirstOrThrow({ where: { code: ACCT.CASH }, select: { id: true } })).id;
         }
         voucherLines = [{ accountId: counterAccountId, amount: totalAmount, description: body.description ?? null }];
+      }
+
+      // A voucher applied against an invoice must match it: the right kind of voucher, the invoice's own
+      // party, and never more than what is still owed (prior vouchers and BALANCE returns included) —
+      // in simple AND compound mode.
+      if (body.salesInvoiceId) {
+        if (type !== 'RECEIPT' && type !== 'DISCOUNT') {
+          throw new Error('فاتورة البيع تُسدَّد بسند قبض أو سند خصم فقط');
+        }
+        const inv = await tx.salesInvoice.findUniqueOrThrow({ where: { id: body.salesInvoiceId }, select: { customerId: true } });
+        if (body.partyType === 'CUSTOMER' && body.partyId && body.partyId !== inv.customerId) {
+          throw new Error('عميل السند لا يطابق عميل الفاتورة');
+        }
+        const { remaining } = await getSalesInvoiceSettlement(tx, body.salesInvoiceId);
+        if (totalAmount > remaining + 0.01) {
+          throw new Error(`المبلغ أكبر من المتبقي على الفاتورة (${remaining.toFixed(2)})`);
+        }
+      }
+      if (body.purchaseInvoiceId) {
+        if (type !== 'PAYMENT' && type !== 'DISCOUNT') {
+          throw new Error('فاتورة الشراء تُسدَّد بسند صرف أو سند خصم فقط');
+        }
+        const inv = await tx.purchaseInvoice.findUniqueOrThrow({ where: { id: body.purchaseInvoiceId }, select: { supplierId: true } });
+        if (body.partyType === 'SUPPLIER' && body.partyId && body.partyId !== inv.supplierId) {
+          throw new Error('مورد السند لا يطابق مورد الفاتورة');
+        }
+        const { remaining } = await getPurchaseInvoiceSettlement(tx, body.purchaseInvoiceId);
+        if (totalAmount > remaining + 0.01) {
+          throw new Error(`المبلغ أكبر من المتبقي على الفاتورة (${remaining.toFixed(2)})`);
+        }
       }
 
       const voucherNo = await generateVoucherNo(tx, type, vDate);
@@ -386,7 +404,9 @@ router.post('/', requirePermission('treasury.create'), async (req: Request, res:
     if (typeof err?.message === 'string' && (
       err.message.includes('القيد غير متوازن') ||
       err.message.includes('المبلغ أكبر من المتبقي') ||
-      err.message.includes('المبلغ الإجمالي للسند')
+      err.message.includes('المبلغ الإجمالي للسند') ||
+      err.message.includes('تُسدَّد بسند') ||
+      err.message.includes('لا يطابق')
     )) {
       res.status(400).json({ error: err.message });
       return;

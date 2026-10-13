@@ -13,7 +13,7 @@ import { requireAuth, requirePermission } from '../middleware/auth';
 import { getPagination, paginatedResponse } from '../lib/paginate';
 import { parseDateRange } from '../lib/dateRange';
 import { createSalesInvoiceInTx, SALES_INVOICE_USER_ERRORS } from '../lib/salesInvoiceService';
-import { getReservedQty } from '../lib/reservation';
+import { getReservedQty, lockStock } from '../lib/reservation';
 
 const router = Router();
 router.use(requireAuth);
@@ -112,6 +112,9 @@ router.post('/', requirePermission('salesorders.create'), async (req: Request, r
 
       // The order reserves its quantities — it can only reserve what is
       // actually available: on-hand minus what other PENDING orders hold.
+      for (const item of [...body.items].sort((a, b) => a.productId - b.productId)) {
+        await lockStock(tx, item.productId, body.warehouseId);
+      }
       for (const item of body.items) {
         const bal = await tx.stockBalance.findUnique({
           where: { productId_warehouseId: { productId: item.productId, warehouseId: body.warehouseId } },

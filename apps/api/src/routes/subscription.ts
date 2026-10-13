@@ -52,7 +52,7 @@ router.get('/plans', async (_req: Request, res: Response, next: NextFunction) =>
   }
 });
 
-router.get('/payments', async (_req: Request, res: Response, next: NextFunction) => {
+router.get('/payments', requirePermission('settings.view'), async (_req: Request, res: Response, next: NextFunction) => {
   try {
     const rows = await prisma.subscriptionPayment.findMany({ orderBy: { id: 'desc' }, take: 50 });
     res.json(rows.map((r) => ({
@@ -71,7 +71,7 @@ router.get('/payments', async (_req: Request, res: Response, next: NextFunction)
   }
 });
 
-router.get('/upgrade-requests', async (_req: Request, res: Response, next: NextFunction) => {
+router.get('/upgrade-requests', requirePermission('settings.view'), async (_req: Request, res: Response, next: NextFunction) => {
   try {
     const rows = await prisma.upgradeRequest.findMany({ orderBy: { id: 'desc' }, take: 10 });
     res.json(rows);

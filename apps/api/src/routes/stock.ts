@@ -8,6 +8,7 @@ import { parseDateRange } from '../lib/dateRange';
 const MOVEMENT_TYPES = ['IN', 'OUT', 'TRANSFER', 'ADJUST'] as const;
 
 import { postStockAdjustmentEntry } from '../lib/stockAdjustment';
+import { lockStock } from '../lib/reservation';
 const router = Router();
 router.use(requireAuth);
 
@@ -97,6 +98,7 @@ router.post('/adjust', requirePermission('stock.adjust'), async (req: Request, r
     const userId = req.user!.userId;
 
     const result = await prisma.$transaction(async (tx) => {
+      await lockStock(tx, productId, warehouseId);
       const before = await tx.stockBalance.findUnique({
         where: { productId_warehouseId: { productId, warehouseId } },
       });
