@@ -264,7 +264,8 @@ export function DataTable<T>({
   const total = pagination?.total ?? data.length;
   const page = pagination?.page ?? 1;
   const pageSize = pagination?.pageSize ?? data.length;
-  const totalPages = pagination?.totalPages ?? 1;
+  // an empty result reports 0 pages: there is still exactly one (empty) page to be on
+  const totalPages = Math.max(1, pagination?.totalPages ?? 1);
   const fromRecord = total === 0 ? 0 : (page - 1) * pageSize + 1;
   const toRecord = Math.min(page * pageSize, total);
 
@@ -294,7 +295,7 @@ export function DataTable<T>({
                 onChange={(e) => onPageSizeChange(Number(e.target.value))}
                 className="border border-app-border rounded-lg px-2 py-1.5 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-primary/30"
               >
-                {PAGE_SIZE_OPTIONS.map((n) => (
+                {(PAGE_SIZE_OPTIONS.includes(pageSize) || !pageSize ? PAGE_SIZE_OPTIONS : [...PAGE_SIZE_OPTIONS, pageSize].sort((a, b) => a - b)).map((n) => (
                   <option key={n} value={n}>
                     {n}
                   </option>
@@ -419,14 +420,14 @@ export function DataTable<T>({
           <div className="flex items-center gap-1">
             <button
               onClick={() => onPageChange?.(1)}
-              disabled={page === 1}
+              disabled={page <= 1}
               className="px-3 py-1.5 text-xs border border-app-border rounded-lg hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
             >
               الأول
             </button>
             <button
               onClick={() => onPageChange?.(page - 1)}
-              disabled={page === 1}
+              disabled={page <= 1}
               className="px-3 py-1.5 text-xs border border-app-border rounded-lg hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
             >
               السابق
@@ -462,14 +463,14 @@ export function DataTable<T>({
 
             <button
               onClick={() => onPageChange?.(page + 1)}
-              disabled={page === totalPages}
+              disabled={page >= totalPages}
               className="px-3 py-1.5 text-xs border border-app-border rounded-lg hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
             >
               التالي
             </button>
             <button
               onClick={() => onPageChange?.(totalPages)}
-              disabled={page === totalPages}
+              disabled={page >= totalPages}
               className="px-3 py-1.5 text-xs border border-app-border rounded-lg hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
             >
               الأخير

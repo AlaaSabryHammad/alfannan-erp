@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Printer } from 'lucide-react';
 import apiClient from '../../lib/api';
@@ -48,17 +48,18 @@ export function CashMovementPage() {
   const { from, to } = useDateRange();
   const [accountId, setAccountId] = useState<number | ''>('');
 
-  // Load treasury accounts
-  const { data: accountsData } = useQuery<{ data: TreasuryAccount[] }>({
+  // Load treasury accounts. The cache entry ['treasury-accounts'] is shared with the POS, invoices and bank
+  // reconciliation pages, which store the LIST: this page must store the same shape or, after visiting any of
+  // them, it reads an array as if it were { data } and shows no accounts at all.
+  const { data: accounts = [] } = useQuery<TreasuryAccount[]>({
     queryKey: ['treasury-accounts'],
-    queryFn: async () => (await apiClient.get<{ data: TreasuryAccount[] }>('/treasury/accounts')).data,
+    queryFn: async () => (await apiClient.get<{ data: TreasuryAccount[] }>('/treasury/accounts')).data.data,
   });
-  const accounts = accountsData?.data ?? [];
 
   // Auto-select first account
-  if (accountId === '' && accounts.length > 0) {
-    setAccountId(accounts[0].id);
-  }
+  useEffect(() => {
+    if (accountId === '' && accounts.length > 0) setAccountId(accounts[0].id);
+  }, [accountId, accounts]);
 
   // Load movement
   const { data, isLoading } = useQuery<CashMovementData>({

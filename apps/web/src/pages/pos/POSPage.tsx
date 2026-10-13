@@ -301,6 +301,18 @@ export function POSPage() {
     return matchesDept && matchesSearch;
   });
 
+  // Policy: the price level applies to the WHOLE basket at once (what the cashier sees on the cards is
+  // what every line is charged), so the totals never mix two levels.
+  const changePriceTier = (tier: PriceTier) => {
+    setPriceTier(tier);
+    setCart((prev) =>
+      prev.map((line) => {
+        const p = products.find((x) => x.id === line.productId);
+        return p ? { ...line, unitPrice: priceForTier(p, tier) } : line;
+      }),
+    );
+  };
+
   // --- Cart operations ---
   const addToCart = useCallback(
     (product: Product) => {
@@ -621,7 +633,7 @@ export function POSPage() {
           {PRICE_TIERS.map((t) => (
             <button
               key={t.code}
-              onClick={() => setPriceTier(t.code)}
+              onClick={() => changePriceTier(t.code)}
               className={`px-3 py-1 rounded-lg text-xs font-medium border transition-colors ${
                 priceTier === t.code
                   ? 'bg-accent text-white border-accent'

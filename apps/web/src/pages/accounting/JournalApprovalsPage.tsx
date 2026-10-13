@@ -110,8 +110,9 @@ function EditApprovalModal({ target, onClose }: { target: Approval | null; onClo
   const [loadedId, setLoadedId] = useState<number | null>(null);
 
   const { data: accounts = [] } = useQuery({
-    queryKey: ['accounts-flat'],
-    queryFn: async () => (await apiClient.get<PaginatedResponse<AccountOpt>>('/accounts', { params: { page: 1, pageSize: 500 } })).data.data,
+    // not ['accounts-flat']: that entry holds { data, pagination } for the accounts / journal / recurring pages
+    queryKey: ['accounts-options'],
+    queryFn: async () => (await apiClient.get<PaginatedResponse<AccountOpt>>('/accounts', { params: { page: 1, pageSize: 1000 } })).data.data,
     enabled: !!target,
   });
 
