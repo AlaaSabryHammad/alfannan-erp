@@ -60,8 +60,11 @@ function generateRefNo(): string {
 export async function createSalesInvoiceInTx(tx: Tx, body: CreateSalesInvoiceInput) {
   const cashierId = body.cashierId;
 
-  // Calculate totals
-  const subtotal = body.items.reduce((s, item) => s + item.qty * item.unitPrice, 0);
+  // Calculate totals. Every line is a money amount: round it first, so Σ lines = subtotal exactly (a
+  // 1.5 × 10.33 line is 15.50 and the subtotal must add 15.50, not 15.495).
+  const money = (n: number) => Math.round(n * 100) / 100;
+  const lineAmount = (item: { qty: number; unitPrice: number }) => money(item.qty * item.unitPrice);
+  const subtotal = money(body.items.reduce((s, item) => s + lineAmount(item), 0));
   const refNo = generateRefNo();
 
   const customer = await tx.customer.findUniqueOrThrow({
@@ -91,8 +94,8 @@ export async function createSalesInvoiceInTx(tx: Tx, body: CreateSalesInvoiceInp
     pointsValue = redeemPoints * parseFloat(pointValueSetting?.value ?? '0.05');
   }
 
-  const finalDiscount = (body.discount ?? 0) + couponDiscount + pointsValue;
-  const total = subtotal - finalDiscount + (body.tax ?? 0);
+  const finalDiscount = money((body.discount ?? 0) + couponDiscount + pointsValue);
+  const total = money(subtotal - finalDiscount + (body.tax ?? 0));
   if (total < 0 || finalDiscount > subtotal + 0.0001) {
     throw new Error('قيمة الخصم الإجمالية (يدوي + كوبون + نقاط الولاء) تتجاوز إجمالي الفاتورة');
   }
@@ -133,8 +136,28 @@ export async function createSalesInvoiceInTx(tx: Tx, body: CreateSalesInvoiceInp
   const productIds = body.items.map(i => i.productId);
   const productMap = await tx.product.findMany({
     where: { id: { in: productIds } },
-    select: { id: true, costPrice: true },
+    select: { id: true, costPrice: true, taxRate: true },
   }).then(rows => new Map(rows.map(r => [r.id, r])));
+
+  // ── VAT per line ──────────────────────────────────────────────────────────
+  // The invoice carries one VAT figure. Split it over the lines in proportion to (net after the invoice
+  // discount × the product's rate), so each line holds the VAT it really bore: a zero-rated item holds none,
+  // and a return later refunds exactly that. When no product has a rate, fall back to the net amounts.
+  const grossOf = body.items.map((i) => lineAmount(i));
+  const grossSum = grossOf.reduce((a, b) => a + b, 0);
+  const netOf = grossOf.map((g) => (grossSum > 0 ? g - finalDiscount * (g / grossSum) : 0));
+  let weight = netOf.map((n, i) => n * Math.max(Number(productMap.get(body.items[i].productId)?.taxRate ?? 0), 0));
+  let weightSum = weight.reduce((a, b) => a + b, 0);
+  if (weightSum <= 0) { weight = netOf; weightSum = netOf.reduce((a, b) => a + b, 0); }
+  const taxTotal = Math.round((body.tax ?? 0) * 100) / 100;
+  const lineTax = weight.map((w) => (weightSum > 0 ? Math.round(taxTotal * (w / weightSum) * 100) / 100 : 0));
+  const drift = Math.round((taxTotal - lineTax.reduce((a, b) => a + b, 0)) * 100) / 100;
+  if (drift !== 0 && lineTax.length > 0) {
+    // the halala left over by rounding goes to the heaviest line
+    let k = 0;
+    weight.forEach((w, i) => { if (w > weight[k]) k = i; });
+    lineTax[k] = Math.round((lineTax[k] + drift) * 100) / 100;
+  }
 
   // Create invoice
   const inv = await tx.salesInvoice.create({
@@ -149,19 +172,22 @@ export async function createSalesInvoiceInTx(tx: Tx, body: CreateSalesInvoiceInp
       tax: body.tax ?? 0,
       total,
       paidStatus: body.paidStatus ?? 'PAID',
+      // collected at the sale: nothing was ever receivable (see willRaiseBalance below)
+      settledAtSale: willRaiseBalance ? 0 : total,
       paymentMethod: body.paymentMethod ?? 'CASH',
       couponId: coupon?.id ?? null,
       pointsEarned,
       pointsRedeemed: redeemPoints,
       items: {
-        create: body.items.map(item => ({
+        create: body.items.map((item, idx) => ({
           productId: item.productId,
           qty: item.qty,
           unitPrice: item.unitPrice,
+          taxAmount: lineTax[idx],
           // snapshot the moving-average cost at sale time so a later return can
           // reverse the exact COGS this sale booked, not a since-drifted average
           unitCost: Number(productMap.get(item.productId)?.costPrice ?? 0),
-          lineTotal: item.qty * item.unitPrice,
+          lineTotal: lineAmount(item),
         })),
       },
     },
@@ -257,7 +283,7 @@ export async function createSalesInvoiceInTx(tx: Tx, body: CreateSalesInvoiceInp
     return sum + (prod ? Number(prod.costPrice) * item.qty : 0);
   }, 0) * 100) / 100;
 
-  const revenueAmount = subtotal - finalDiscount;
+  const revenueAmount = money(subtotal - finalDiscount);
   const taxAmount = Number(body.tax ?? 0);
 
   const ledgerLines = [

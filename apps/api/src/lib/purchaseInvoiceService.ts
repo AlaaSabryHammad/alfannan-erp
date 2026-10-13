@@ -41,11 +41,13 @@ function generatePoNo(): string {
 
 export async function createPurchaseInvoiceInTx(tx: Tx, body: CreatePurchaseInvoiceInput) {
   const userId = body.userId;
-  const subtotal = body.items.reduce((s, item) => s + item.qty * item.unitCost, 0);
+  // money amounts at 2 decimals: Σ rounded lines = subtotal
+  const money = (n: number) => Math.round(n * 100) / 100;
+  const subtotal = money(body.items.reduce((s, item) => s + money(item.qty * item.unitCost), 0));
   if ((body.discount ?? 0) > subtotal + 0.0001) {
     throw new Error('قيمة الخصم تتجاوز إجمالي الفاتورة');
   }
-  const total = subtotal - (body.discount ?? 0) + (body.tax ?? 0);
+  const total = money(subtotal - (body.discount ?? 0) + (body.tax ?? 0));
   const refNo = generatePoNo();
 
   // The document belongs to its warehouse's branch
@@ -66,6 +68,8 @@ export async function createPurchaseInvoiceInTx(tx: Tx, body: CreatePurchaseInvo
       tax: body.tax ?? 0,
       total,
       paymentStatus: body.paymentStatus ?? 'UNPAID',
+      // paid in full when it was entered: no payable is ever raised for it
+      settledAtPurchase: (body.paymentStatus ?? 'UNPAID') === 'PAID' ? total : 0,
       receiveStatus: body.receiveStatus ?? 'PENDING',
       notes: body.notes,
       items: {
@@ -73,7 +77,7 @@ export async function createPurchaseInvoiceInTx(tx: Tx, body: CreatePurchaseInvo
           productId: item.productId,
           qty: item.qty,
           unitCost: item.unitCost,
-          lineTotal: item.qty * item.unitCost,
+          lineTotal: money(item.qty * item.unitCost),
         })),
       },
     },
@@ -131,7 +135,7 @@ export async function createPurchaseInvoiceInTx(tx: Tx, body: CreatePurchaseInvo
     // Inventory is booked at NET cost (after discount) — booking the gross
     // subtotal while crediting the discounted total leaves the entry
     // unbalanced and postJournalEntry rejects it.
-    const inventoryAmount = subtotal - (body.discount ?? 0);
+    const inventoryAmount = money(subtotal - (body.discount ?? 0));
 
     const ledgerLines = [
       // Dr: 1200 inventory = subtotal

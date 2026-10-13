@@ -123,8 +123,9 @@ router.get('/:id/statement', requirePermission('customers.view'), async (req: Re
       // Invoices settled in full at the moment of sale (cash/card, not credit) never
       // raised the receivable in the first place — show the offsetting entry so the
       // statement stays transparent about every sale without inflating the balance.
-      if (inv.paymentMethod !== 'CREDIT' && inv.paidStatus === 'PAID' && !settledViaDocs.has(inv.id)) {
-        rows.push({ date: inv.date, refNo: inv.refNo, description: `تحصيل عند البيع — ${inv.refNo}`, debit: 0, credit: Number(inv.total), seq: seq++ });
+      // (the amount comes from what was recorded at the sale — the status can change later, e.g. a return)
+      if (Number(inv.settledAtSale) > 0) {
+        rows.push({ date: inv.date, refNo: inv.refNo, description: `تحصيل عند البيع — ${inv.refNo}`, debit: 0, credit: Number(inv.settledAtSale), seq: seq++ });
       }
     }
 

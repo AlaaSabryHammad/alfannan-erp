@@ -24,12 +24,13 @@ export async function getSalesInvoiceSettlement(
   salesInvoiceId: number,
 ): Promise<InvoiceSettlement> {
   const [invoice, paidAgg, returnAgg] = await Promise.all([
-    tx.salesInvoice.findUniqueOrThrow({ where: { id: salesInvoiceId }, select: { total: true } }),
+    tx.salesInvoice.findUniqueOrThrow({ where: { id: salesInvoiceId }, select: { total: true, settledAtSale: true } }),
     tx.voucher.aggregate({ where: { salesInvoiceId }, _sum: { totalAmount: true } }),
     tx.salesReturn.aggregate({ where: { salesInvoiceId, refundMethod: 'BALANCE' }, _sum: { total: true } }),
   ]);
   const total = Number(invoice.total);
-  const paidAmount = Number(paidAgg._sum.totalAmount ?? 0);
+  // collected at the sale counts as paid: a return must not make a cash sale "unpaid"
+  const paidAmount = Number(paidAgg._sum.totalAmount ?? 0) + Number(invoice.settledAtSale ?? 0);
   const returnedAmount = Number(returnAgg._sum.total ?? 0);
   return { total, paidAmount, returnedAmount, remaining: total - paidAmount - returnedAmount };
 }
@@ -39,12 +40,12 @@ export async function getPurchaseInvoiceSettlement(
   purchaseInvoiceId: number,
 ): Promise<InvoiceSettlement> {
   const [invoice, paidAgg, returnAgg] = await Promise.all([
-    tx.purchaseInvoice.findUniqueOrThrow({ where: { id: purchaseInvoiceId }, select: { total: true } }),
+    tx.purchaseInvoice.findUniqueOrThrow({ where: { id: purchaseInvoiceId }, select: { total: true, settledAtPurchase: true } }),
     tx.voucher.aggregate({ where: { purchaseInvoiceId }, _sum: { totalAmount: true } }),
     tx.purchaseReturn.aggregate({ where: { purchaseInvoiceId, refundMethod: 'BALANCE' }, _sum: { total: true } }),
   ]);
   const total = Number(invoice.total);
-  const paidAmount = Number(paidAgg._sum.totalAmount ?? 0);
+  const paidAmount = Number(paidAgg._sum.totalAmount ?? 0) + Number(invoice.settledAtPurchase ?? 0);
   const returnedAmount = Number(returnAgg._sum.total ?? 0);
   return { total, paidAmount, returnedAmount, remaining: total - paidAmount - returnedAmount };
 }

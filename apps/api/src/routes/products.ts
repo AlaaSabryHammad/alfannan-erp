@@ -104,6 +104,12 @@ router.get('/:id', requirePermission('products.view'), async (req: Request, res:
 router.post('/', requirePermission('products.create'), enforceLimit('products'), async (req: Request, res: Response, next: NextFunction) => {
   try {
     const data = productSchema.parse(req.body);
+    if (data.taxRate === undefined) {
+      // a product entered without a rate takes the company's VAT rate (Settings → taxRate), not 0 %
+      const setting = await prisma.setting.findFirst({ where: { key: 'taxRate' } });
+      const rate = Number(setting?.value);
+      if (Number.isFinite(rate) && rate >= 0 && rate <= 100) data.taxRate = rate;
+    }
     const product = await prisma.product.create({ data });
     res.status(201).json(product);
   } catch (err) {

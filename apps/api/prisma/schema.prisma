@@ -489,6 +489,9 @@ model SalesInvoice {
   tax            Decimal       @db.Decimal(12, 2) @default(0)
   total          Decimal       @db.Decimal(12, 2)
   paidStatus     PaidStatus    @default(UNPAID)
+  // collected in full at the moment of sale (cash / card): the receivable never existed. Needed so that a
+  // later return, which re-derives the paid status, cannot turn a paid invoice into an unpaid one.
+  settledAtSale  Decimal       @db.Decimal(12, 2) @default(0)
   paymentMethod  PaymentMethod @default(CASH)
   couponId       Int?          // الكوبون المستخدم في هذه الفاتورة (إن وجد)
   pointsEarned   Decimal       @db.Decimal(12, 2) @default(0) // نقاط الولاء المكتسبة من هذه الفاتورة
@@ -587,6 +590,8 @@ model SalesInvoiceItem {
   unitPrice Decimal @db.Decimal(12, 2)
   unitCost  Decimal @db.Decimal(14, 4) @default(0) // متوسط تكلفة الوحدة وقت البيع — لعكس تكلفة البضاعة عند المرتجع بدقة
   lineTotal Decimal @db.Decimal(12, 2)
+  // VAT this line carries (after its share of the invoice discount): a return refunds exactly this
+  taxAmount Decimal @db.Decimal(12, 2) @default(0)
 
   invoice SalesInvoice @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
   product Product      @relation(fields: [productId], references: [id])
@@ -944,6 +949,8 @@ model PurchaseInvoice {
   tax           Decimal       @db.Decimal(12, 2) @default(0)
   total         Decimal       @db.Decimal(12, 2)
   paymentStatus PaidStatus    @default(UNPAID)
+  // paid in full when the purchase was entered (no payable was ever raised)
+  settledAtPurchase Decimal   @db.Decimal(12, 2) @default(0)
   receiveStatus ReceiveStatus @default(PENDING)
   notes         String?
   createdAt     DateTime      @default(now())

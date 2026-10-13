@@ -91,11 +91,13 @@ router.get('/:id/statement', requirePermission('suppliers.view'), async (req: Re
     }
 
     for (const inv of invoices) {
+      // a purchase still waiting to be received has raised no payable yet
+      if (inv.receiveStatus !== 'RECEIVED') continue;
       rows.push({ date: inv.date, refNo: inv.refNo, description: `فاتورة شراء ${inv.refNo}`, debit: 0, credit: Number(inv.total), seq: seq++ });
       // Invoices settled in full at creation never raised the payable — show the
       // offsetting entry so every purchase is visible without inflating the balance.
-      if (inv.paymentStatus === 'PAID' && !settledViaDocs.has(inv.id)) {
-        rows.push({ date: inv.date, refNo: inv.refNo, description: `سداد عند الشراء — ${inv.refNo}`, debit: Number(inv.total), credit: 0, seq: seq++ });
+      if (Number(inv.settledAtPurchase) > 0) {
+        rows.push({ date: inv.date, refNo: inv.refNo, description: `سداد عند الشراء — ${inv.refNo}`, debit: Number(inv.settledAtPurchase), credit: 0, seq: seq++ });
       }
     }
 

@@ -419,7 +419,7 @@ export function POSPage() {
   const taxAmount = cart.reduce((s, i) => {
     const rate = Number(i.taxRate ?? 0);
     if (rate <= 0) return s;
-    const lineNet = i.unitPrice * i.qty - discountAmt * ((i.unitPrice * i.qty) / Math.max(subtotal, 1));
+    const lineNet = i.unitPrice * i.qty - (subtotal > 0 ? discountAmt * ((i.unitPrice * i.qty) / subtotal) : 0);
     return s + lineNet * (rate / 100);
   }, 0);
   const total = taxableBase + taxAmount;
